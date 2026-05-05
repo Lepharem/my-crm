@@ -34,7 +34,7 @@
 }}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
 .app{max-width:980px;margin:0 auto;padding:24px 16px}
- 
+
 /* Login */
 #login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg3)}
 .login-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:40px 36px;max-width:400px;width:100%;text-align:center}
@@ -836,6 +836,14 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 <div class="toast" id="toast"></div>
 
 <script>
+// ── 核心工具函式（最優先載入）──
+function isBool(v,expect){
+  if(typeof v==='boolean')return expect?v:!v;
+  const s=String(v).toUpperCase().trim();
+  return expect?(s==='TRUE'||s==='1'):(s==='FALSE'||s==='0'||s===''||s==='NULL');
+}
+function isResigned(m){return isBool(m.active,false);}
+function isActive(m){return isBool(m.active,true);}
 const API='https://script.google.com/macros/s/AKfycbxXaeXM8YJD8qenB64lXlekWXgv6L4_bbJkZq1988i0URk9_LeiCWv9VF6AbtCvrgrT/exec';
 const ALLOWED_DOMAIN='lepharem';
 const COLORS=[{bg:'#e1f5ee',c:'#085041'},{bg:'#e6f1fb',c:'#0c447c'},{bg:'#faeeda',c:'#633806'},{bg:'#eeedfe',c:'#3c3489'},{bg:'#faece7',c:'#712b13'},{bg:'#eaf3de',c:'#27500a'}];
@@ -1415,14 +1423,6 @@ function renderMyAttendance(){
 /* Members */
 let memberFilter='all';
 function setMemberFilter(el){memberFilter=el.dataset.mf;document.querySelectorAll('[data-mf]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderMembers();}
-
-function isBool(v,expect){
-  if(typeof v==='boolean')return expect?v:!v;
-  const s=String(v).toUpperCase().trim();
-  return expect?(s==='TRUE'||s==='1'):(s==='FALSE'||s==='0'||s===''||s==='NULL');
-}
-function isResigned(m){return isBool(m.active,false);}
-function isActive(m){return isBool(m.active,true);}
 
 function renderMemberCard(m){
   const cl=col(m.id);
