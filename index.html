@@ -128,6 +128,7 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .b-present{background:var(--green-bg);color:var(--green-text)}
 .b-late{background:var(--amber-bg);color:var(--amber-text)}
 .b-absent{background:var(--red-bg);color:var(--red-text)}
+.b-early{background:var(--purple-bg);color:var(--purple-text)}
 .pexpand{display:none;margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)}
 .pexpand.open{display:block}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;margin-bottom:12px}
@@ -414,6 +415,7 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
       <div class="clock-alert ca-warn" id="clock-alert-nomember">
         尚未建立員工資料，請先至「人資管理 → 員工資料」新增你的帳號（Email 需與登入帳號一致）
       </div>
+      <div class="clock-alert" id="clock-alert-holiday" style="display:none;background:var(--blue-bg);color:var(--blue-text);padding:12px 14px;border-radius:var(--r);margin-bottom:16px;font-size:13px"></div>
       <div class="clock-wrap">
         <div class="clock-hero">
           <div class="clock-user">
@@ -421,6 +423,7 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
             <div class="clock-user-info">
               <div class="clock-user-name" id="clock-uname">—</div>
               <div class="clock-user-sub" id="clock-utitle">—</div>
+              <div style="font-size:11px;color:var(--teal-text);margin-top:3px" id="clock-leave-balance"></div>
             </div>
           </div>
           <div class="clock-display">
@@ -718,14 +721,22 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 <div class="overlay" id="lm-ov" onclick="oc(event,'lm-ov')">
   <div class="modal">
     <h2 id="lm-title">申請請假</h2>
+    <div id="lm-balance-box" style="display:none;background:var(--teal-bg);color:var(--teal-text);padding:10px 12px;border-radius:var(--r);font-size:13px;margin-bottom:14px">
+      <span style="font-weight:500">特休餘額：</span>
+      <span id="lm-balance-days">—</span> 天
+      （<span id="lm-balance-hours">—</span> 小時）
+    </div>
     <div class="fg"><label>假別 *</label>
-      <select id="lm-leave_type_id" onchange="updateLeaveDays()"></select>
+      <select id="lm-leave_type_id" onchange="onLeaveTypeChange();updateLeaveDays()"></select>
     </div>
     <div class="fgr">
       <div class="fg"><label>開始日期 *</label><input id="lm-start_date" type="date" oninput="updateLeaveDays()"></div>
       <div class="fg"><label>結束日期 *</label><input id="lm-end_date" type="date" oninput="updateLeaveDays()"></div>
     </div>
     <div class="fg"><label>請假天數</label><input id="lm-days" readonly placeholder="自動計算"></div>
+    <div id="lm-exceed-warn" style="display:none;background:var(--red-bg);color:var(--red-text);padding:8px 12px;border-radius:var(--r);font-size:12px;margin-bottom:8px">
+      ⚠ 請假天數超過特休餘額，請確認
+    </div>
     <div class="fg"><label>請假原因</label><textarea id="lm-reason" rows="2"></textarea></div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="cm('lm-ov')">取消</button>
@@ -788,10 +799,10 @@ const WORK_L={office:'辦公室',remote:'遠端',hybrid:'混合'};
 const EMP_L={full_time:'全職',part_time:'兼職',contractor:'約聘'};
 const LEAVE_STATUS_L={pending:'待審核',approved:'已核准',rejected:'已駁回'};
 const LEAVE_STATUS_C={pending:'b-pending',approved:'b-approved',rejected:'b-rejected'};
-const ATT_L={present:'正常',late:'遲到',absent:'缺勤'};
-const ATT_C={present:'b-present',late:'b-late',absent:'b-absent'};
+const ATT_L={present:'正常',late:'遲到',absent:'缺勤',early_leave:'早退',late_early:'遲到+早退'};
+const ATT_C={present:'b-present',late:'b-late',absent:'b-absent',early_leave:'b-proposal',late_early:'b-overdue'};
 
-let D={clients:[],projects:[],payments:[],invoices:[],members:[],leave_types:[],leave_requests:[],attendance:[],salary_records:[],login_logs:[]};
+let D={clients:[],projects:[],payments:[],invoices:[],members:[],leave_types:[],leave_requests:[],attendance:[],salary_records:[],login_logs:[],annual_leave:[],holidays:[]};
 let crmF='all',finF='all',statusF='all',leaveF='all';
 let openCid=null,openPids={};
 let editCid=null,editPid=null,editPcid=null,editPayId=null,editPayPid=null,editPayCid=null;
@@ -841,6 +852,7 @@ async function loadData(){
     D.members=all.members||[];D.leave_types=all.leave_types||[];
     D.leave_requests=all.leave_requests||[];D.attendance=all.attendance||[];
     D.salary_records=all.salary_records||[];D.login_logs=all.login_logs||[];
+    D.annual_leave=all.annual_leave||[];D.holidays=all.holidays||[];
     myMember=D.members.find(m=>m.email===currentUser?.email)||null;
     const now=new Date();
     g('sync-info').textContent='上次同步 '+now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
@@ -1124,6 +1136,31 @@ async function loadAttendanceStatus(){
     if(alertEl)alertEl.style.display='block';
     setClockState('nomember',null);
     return;
+  }
+
+  // 假日檢查
+  const today=new Date().toISOString().slice(0,10);
+  const dow=new Date().getDay();
+  const isWeekend=dow===0||dow===6;
+  const todayHoliday=(D.holidays||[]).find(h=>String(h.date).slice(0,10)===today);
+  const holidayAlertEl=g('clock-alert-holiday');
+  if(holidayAlertEl){
+    if(todayHoliday){
+      holidayAlertEl.textContent='🎌 今日為國定假日：'+todayHoliday.name+'，無需打卡';
+      holidayAlertEl.style.display='block';
+    }else if(isWeekend){
+      holidayAlertEl.textContent='🏖 今日為'+(dow===6?'星期六':'星期日')+'，無需打卡';
+      holidayAlertEl.style.display='block';
+    }else{
+      if(holidayAlertEl)holidayAlertEl.style.display='none';
+    }
+  }
+
+  // 特休餘額
+  if(myMember){
+    const bal=getLocalLeaveBalance(myMember.id);
+    const balEl=g('clock-leave-balance');
+    if(balEl)balEl.textContent='特休餘額：'+bal.days+' 天（'+bal.hours+' 小時）';
   }
 
   // 更新使用者資訊
@@ -1454,8 +1491,73 @@ async function autoCalcInsurance(){
   }
 }
 function updateLeaveDays(){
-  const s=g('lm-start_date').value;const e=g('lm-end_date').value;
-  if(s&&e){const days=Math.max(0,Math.round((new Date(e)-new Date(s))/86400000)+1);g('lm-days').value=days;}
+  const s=g('lm-start_date').value;
+  const e=g('lm-end_date').value;
+  if(!s||!e)return;
+  let count=0;
+  const cur=new Date(s);const end=new Date(e);
+  while(cur<=end){
+    const dateStr=cur.toISOString().slice(0,10);
+    const dow=cur.getDay();
+    const isWeekend=dow===0||dow===6;
+    const isHoliday=(D.holidays||[]).some(h=>String(h.date).slice(0,10)===dateStr);
+    if(!isWeekend&&!isHoliday)count++;
+    cur.setDate(cur.getDate()+1);
+  }
+  g('lm-days').value=count;
+  checkLeaveExceed();
+}
+function onLeaveTypeChange(){
+  const sel=g('lm-leave_type_id');
+  const lt=D.leave_types.find(x=>String(x.id)===String(sel.value));
+  const balBox=g('lm-balance-box');
+  if(lt&&lt.name==='特別休假'&&myMember){
+    const bal=getLocalLeaveBalance(myMember.id);
+    g('lm-balance-days').textContent=bal.days;
+    g('lm-balance-hours').textContent=bal.hours;
+    if(balBox)balBox.style.display='block';
+  }else{if(balBox)balBox.style.display='none';}
+  checkLeaveExceed();
+}
+function getLocalLeaveBalance(memberId){
+  const now=new Date().toISOString().slice(0,10);
+  const records=(D.annual_leave||[]).filter(r=>String(r.member_id)===String(memberId)&&String(r.year_start).slice(0,10)<=now&&String(r.expire_date).slice(0,10)>now);
+  const days=records.reduce((s,r)=>s+parseFloat(r.remaining_days||0),0);
+  return{days:days.toFixed(1),hours:(days*8).toFixed(0)};
+}
+function checkLeaveExceed(){
+  const warnEl=g('lm-exceed-warn');if(!warnEl)return;
+  const sel=g('lm-leave_type_id');
+  const lt=D.leave_types.find(x=>String(x.id)===String(sel.value));
+  if(lt&&lt.name==='特別休假'&&myMember){
+    const days=parseFloat(g('lm-days').value)||0;
+    const bal=getLocalLeaveBalance(myMember.id);
+    warnEl.style.display=days>parseFloat(bal.days)?'block':'none';
+  }else{warnEl.style.display='none';}
+}
+function openLeaveModal(){
+  editLeaveId=null;g('lm-title').textContent='申請請假';
+  g('lm-start_date').value='';g('lm-end_date').value='';g('lm-days').value='';g('lm-reason').value='';
+  const balBox=g('lm-balance-box');if(balBox)balBox.style.display='none';
+  const warnEl=g('lm-exceed-warn');if(warnEl)warnEl.style.display='none';
+  const sel=g('lm-leave_type_id');
+  sel.innerHTML=D.leave_types.map(lt=>`<option value="${lt.id}">${lt.name}（最多${String(lt.max_days)==='999'?'無上限':lt.max_days+'天'}）</option>`).join('');
+  g('lm-ov').classList.add('open');onLeaveTypeChange();
+}
+async function saveLeave(){
+  if(!myMember){alert('請先在員工資料中登錄你的帳號');return;}
+  const s=v('lm-start_date');const e=v('lm-end_date');
+  if(!s||!e){alert('請選擇請假日期');return;}
+  const days=parseFloat(g('lm-days').value)||0;
+  if(days<=0){alert('請假天數為 0，請確認日期範圍（假日和週末不計入）');return;}
+  const d={member_id:myMember.id,leave_type_id:g('lm-leave_type_id').value,start_date:s,end_date:e,days,reason:v('lm-reason')};
+  if(editLeaveId)d.id=editLeaveId;
+  try{
+    const res=await api('saveLeaveRequest',d);
+    if(!editLeaveId)D.leave_requests.push({...d,id:res.id,status:'pending'});
+    const all=await api('getAll');D.annual_leave=all.annual_leave||[];
+    toast('已送出申請');cm('lm-ov');renderLeave();
+  }catch(e){toast('送出失敗：'+e.message);}
 }
 
 /* Login Logs */
@@ -1508,8 +1610,7 @@ async function saveMember(){const name=v('mm-name_zh');if(!name){alert('請輸�
 async function delMember(id){if(!confirm('確定刪除此員工資料？'))return;try{await api('delete',{sheet:'members',id});D.members=D.members.filter(m=>String(m.id)!==String(id));toast('已刪除');renderMembers();}catch(e){toast('刪除失敗：'+e.message);}}
 
 // Leave
-function openLeaveModal(){editLeaveId=null;g('lm-title').textContent='申請請假';g('lm-start_date').value='';g('lm-end_date').value='';g('lm-days').value='';g('lm-reason').value='';const sel=g('lm-leave_type_id');sel.innerHTML=D.leave_types.map(lt=>`<option value="${lt.id}">${lt.name}（最多${lt.max_days}天）</option>`).join('');g('lm-ov').classList.add('open');}
-async function saveLeave(){if(!myMember){alert('請先在員工資料中登錄你的帳號');return;}const s=v('lm-start_date');const e=v('lm-end_date');if(!s||!e){alert('請選擇請假日期');return;}const days=pn(g('lm-days').value)||1;const d={member_id:myMember.id,leave_type_id:g('lm-leave_type_id').value,start_date:s,end_date:e,days,reason:v('lm-reason')};if(editLeaveId)d.id=editLeaveId;try{const res=await api('saveLeaveRequest',d);if(!editLeaveId)D.leave_requests.push({...d,id:res.id,status:'pending'});toast('已送出申請');cm('lm-ov');renderLeave();}catch(e){toast('送出失敗：'+e.message);}}
+// leave functions moved above
 
 // Salary
 function openSalaryModal(){
