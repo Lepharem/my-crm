@@ -256,7 +256,30 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:var(--r);font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 .empty-state{text-align:center;padding:40px;color:var(--text3);font-size:13px}
-@media(max-width:520px){.fgr{grid-template-columns:1fr}.dgrid{grid-template-columns:1fr 1fr}.pgrid{grid-template-columns:1fr 1fr}}
+/* 差勤月結報表 */
+.report-table-wrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:16px}
+.report-header{padding:16px 20px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.report-title{font-size:15px;font-weight:600}
+.report-sub{font-size:12px;color:var(--text2)}
+.rtable{width:100%;border-collapse:collapse;font-size:12px}
+.rtable th{text-align:center;padding:8px 10px;font-size:11px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2);white-space:nowrap}
+.rtable th:first-child{text-align:left}
+.rtable td{padding:10px 10px;border-bottom:0.5px solid var(--border);text-align:center;vertical-align:middle}
+.rtable td:first-child{text-align:left;font-weight:500}
+.rtable tr:last-child td{border-bottom:none}
+.rtable tr:hover td{background:var(--bg2)}
+.rtable .warn{color:var(--amber-text)}
+.rtable .danger{color:var(--red-text)}
+.rtable .good{color:var(--green-text)}
+.rtable .purple{color:var(--purple-text)}
+@media print{
+  nav,#page-crm,#page-finance,#page-clock,#page-logs,.topbar,
+  .hr-tabs,.fin-bar,.btn-add,.btn-sm,button{display:none!important}
+  #page-hr,#hr-report{display:block!important}
+  .report-table-wrap{border:none}
+  body{background:#fff}
+  .rtable{font-size:11px}
+}
 @media(max-width:768px){
   .app{padding:16px 10px}
   nav{gap:2px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch}
@@ -456,7 +479,7 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
         <div class="att-month-stat" id="clock-month-stat" style="display:none">
           <div class="ams"><div class="ams-n good" id="cms-present">0</div><div class="ams-l">正常出勤</div></div>
           <div class="ams"><div class="ams-n warn" id="cms-late">0</div><div class="ams-l">遲到</div></div>
-          <div class="ams"><div class="ams-n danger" id="cms-absent">0</div><div class="ams-l">缺勤</div></div>
+          <div class="ams"><div class="ams-n" style="color:var(--purple-text)" id="cms-early">0</div><div class="ams-l">早退</div></div>
           <div class="ams"><div class="ams-n" id="cms-hours">0h</div><div class="ams-l">本月工時</div></div>
         </div>
         <div class="sec-title" style="margin-bottom:10px">近期出勤記錄</div>
@@ -477,6 +500,7 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
         <button class="hr-tab" data-ht="attendance" onclick="setHRTab(this)">出勤記錄</button>
         <button class="hr-tab" data-ht="leave" onclick="setHRTab(this)">假勤申請</button>
         <button class="hr-tab" data-ht="salary" onclick="setHRTab(this)">薪資記錄</button>
+        <button class="hr-tab" id="tab-report" data-ht="report" onclick="setHRTab(this)" style="display:none">差勤月結</button>
       </div>
 
       <!-- 員工資料 -->
@@ -546,6 +570,19 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
             <tbody id="sal-tbody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- 差勤月結（老闆專屬） -->
+      <div class="hr-panel" id="hr-report">
+        <div class="fin-bar">
+          <div class="month-nav">
+            <button onclick="changeReportMonth(-1)">&#8249;</button>
+            <span class="month-label" id="report-month-label"></span>
+            <button onclick="changeReportMonth(1)">&#8250;</button>
+          </div>
+          <button class="btn-add" onclick="printAttReport()">列印 PDF</button>
+        </div>
+        <div id="report-content"></div>
       </div>
     </div>
 
@@ -884,6 +921,7 @@ function setHRTab(el){
   if(el.dataset.ht==='members')renderMembers();
   if(el.dataset.ht==='leave')renderLeave();
   if(el.dataset.ht==='salary')renderSalary();
+  if(el.dataset.ht==='report')renderReport();
 }
 
 /* ── CRM ── */
@@ -1055,7 +1093,103 @@ function setFinFilter(el){finF=el.dataset.fp;document.querySelectorAll('[data-fp
 function setStatusFilter(el){statusF=el.dataset.fs;document.querySelectorAll('[data-fs]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderFinance()}
 
 /* ── HR ── */
-function renderHR(){renderMembers();}
+function renderHR(){
+  const tabReport=g('tab-report');
+  if(tabReport)tabReport.style.display=isOwner()?'':'none';
+  renderMembers();
+}
+
+/* ── 差勤月結報表 ── */
+let reportMonth=new Date().toISOString().slice(0,7);
+function changeReportMonth(d){
+  const[y,m]=reportMonth.split('-').map(Number);
+  const nd=new Date(y,m-1+d,1);
+  reportMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');
+  renderReport();
+}
+function calcWorkdays(year,month){
+  const days=[];const d=new Date(year,month-1,1);
+  while(d.getMonth()===month-1){
+    const dow=d.getDay();const dateStr=d.toISOString().slice(0,10);
+    const isWeekend=dow===0||dow===6;
+    const isHoliday=(D.holidays||[]).some(h=>String(h.date).slice(0,10)===dateStr);
+    if(!isWeekend&&!isHoliday)days.push(dateStr);
+    d.setDate(d.getDate()+1);
+  }
+  return days;
+}
+function calcLateMin(rec){
+  if(!rec.clock_in)return 0;
+  const t=new Date(rec.clock_in);const h=t.getHours()+t.getMinutes()/60;
+  return h>10.5?Math.round((h-10.5)*60):0;
+}
+function calcEarlyMin(rec){
+  if(!rec.clock_in||!rec.clock_out)return 0;
+  const inT=new Date(rec.clock_in);const outT=new Date(rec.clock_out);
+  const exp=new Date(inT.getTime()+9*3600000);
+  return outT<exp?Math.round((exp-outT)/60000):0;
+}
+function renderReport(){
+  const[y,mo]=reportMonth.split('-').map(Number);
+  const mn=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  g('report-month-label').textContent=y+'年 '+mn[mo-1];
+  const workdays=calcWorkdays(y,mo);
+  const shouldDays=workdays.length;
+  const members=D.members.filter(m=>m.active===true||String(m.active).toUpperCase()==='TRUE');
+  const rows=members.map(m=>{
+    const recs=D.attendance.filter(a=>String(a.member_id)===String(m.id)&&String(a.date).slice(0,7)===reportMonth);
+    const present=recs.filter(a=>a.status==='present').length;
+    const late=recs.filter(a=>a.status==='late'||a.status==='late_early').length;
+    const early=recs.filter(a=>a.status==='early_leave'||a.status==='late_early').length;
+    const absent=recs.filter(a=>a.status==='absent').length;
+    const actualDays=recs.filter(a=>a.clock_in).length;
+    const totalHrs=recs.reduce((s,a)=>s+parseFloat(a.work_hours||0),0);
+    const lateMin=recs.reduce((s,a)=>s+calcLateMin(a),0);
+    const earlyMin=recs.reduce((s,a)=>s+calcEarlyMin(a),0);
+    const leaveRecs=D.leave_requests.filter(lr=>String(lr.member_id)===String(m.id)&&lr.status==='approved'&&(lr.start_date||'').slice(0,7)===reportMonth);
+    const leaveStr=leaveRecs.map(lr=>{const lt=D.leave_types.find(t=>String(t.id)===String(lr.leave_type_id));return(lt?lt.name:'假')+lr.days+'天';}).join('、')||'—';
+    return{m,shouldDays,actualDays,present,late,early,absent,totalHrs,lateMin,earlyMin,leaveStr};
+  });
+  const content=g('report-content');
+  content.innerHTML=`
+    <div class="report-table-wrap">
+      <div class="report-header">
+        <div>
+          <div class="report-title">樂法網路行銷有限公司　差勤月結報表</div>
+          <div class="report-sub">${y}年${mn[mo-1]}　應出勤 ${shouldDays} 天　共 ${members.length} 人</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+      <table class="rtable">
+        <thead><tr>
+          <th>姓名</th><th>部門</th><th>應出勤</th><th>實際出勤</th>
+          <th>正常</th>
+          <th>遲到<br><small>次/分鐘</small></th>
+          <th>早退<br><small>次/分鐘</small></th>
+          <th>缺勤</th><th>總工時</th><th>請假記錄</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr>
+            <td>${r.m.name_zh||'—'}</td>
+            <td style="color:var(--text2)">${r.m.department||'—'}</td>
+            <td>${r.shouldDays}</td>
+            <td>${r.actualDays}</td>
+            <td class="good">${r.present||'—'}</td>
+            <td class="${r.late>0?'warn':''}">${r.late>0?r.late+'次 '+r.lateMin+'分':'—'}</td>
+            <td class="${r.early>0?'purple':''}">${r.early>0?r.early+'次 '+r.earlyMin+'分':'—'}</td>
+            <td class="${r.absent>0?'danger':''}">${r.absent>0?r.absent:'—'}</td>
+            <td>${r.totalHrs.toFixed(1)}h</td>
+            <td style="color:var(--text2);font-size:11px;text-align:left">${r.leaveStr}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text3);text-align:right;margin-top:8px">
+      報表產出：${new Date().toLocaleString('zh-TW')}　製表：${currentUser?.name||'—'}
+    </div>`;
+}
+function printAttReport(){renderReport();setTimeout(()=>window.print(),300);}
 function isOwner(){return myMember&&myMember.role==='owner';}
 function isManager(){return myMember&&myMember.role==='manager';}
 function canSeeAllAttendance(){return isOwner();}
@@ -1184,14 +1318,14 @@ async function loadAttendanceStatus(){
     const thisMonth=new Date().toISOString().slice(0,7);
     const myRecs=D.attendance.filter(a=>String(a.member_id)===String(myMember.id)&&String(a.date).slice(0,7)===thisMonth);
     const present=myRecs.filter(a=>a.status==='present').length;
-    const late=myRecs.filter(a=>a.status==='late').length;
-    const absent=myRecs.filter(a=>a.status==='absent').length;
+    const late=myRecs.filter(a=>a.status==='late'||a.status==='late_early').length;
+    const earlyLeave=myRecs.filter(a=>a.status==='early_leave'||a.status==='late_early').length;
     const totalHrs=myRecs.reduce((s,a)=>s+parseFloat(a.work_hours||0),0);
     if(monthStat){
       monthStat.style.display='grid';
       g('cms-present').textContent=present;
       g('cms-late').textContent=late;
-      g('cms-absent').textContent=absent;
+      g('cms-early').textContent=earlyLeave;
       g('cms-hours').textContent=totalHrs.toFixed(1)+'h';
     }
     renderMyAttendance();
