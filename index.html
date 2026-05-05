@@ -168,25 +168,56 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .ptable tr:last-child td{border-bottom:none}
 .ptable tr:hover td{background:var(--bg2)}
 
-/* HR */
-.hr-tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+/* ── Clock Page ── */
+.clock-wrap{max-width:480px;margin:0 auto}
+.clock-hero{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:32px 24px;text-align:center;margin-bottom:16px}
+.clock-user{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:20px}
+.clock-user-av{width:40px;height:40px;border-radius:50%;border:0.5px solid var(--border)}
+.clock-user-info{text-align:left}
+.clock-user-name{font-size:15px;font-weight:500}
+.clock-user-sub{font-size:12px;color:var(--text2)}
+.clock-display{margin-bottom:8px}
+.clock-time{font-size:56px;font-weight:600;letter-spacing:3px;font-variant-numeric:tabular-nums;line-height:1;color:var(--text)}
+.clock-date{font-size:13px;color:var(--text2);margin-top:4px;margin-bottom:24px}
+.clock-state{margin-bottom:20px;min-height:52px}
+.clock-state-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500}
+.cs-idle{background:var(--bg2);color:var(--text2)}
+.cs-in{background:var(--teal-bg);color:var(--teal-text)}
+.cs-done{background:var(--green-bg);color:var(--green-text)}
+.cs-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
+.cs-in .cs-dot{animation:pulse-dot 1.5s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+.clock-times-row{display:flex;gap:16px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
+.clock-time-item{text-align:center}
+.clock-time-label{font-size:11px;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em}
+.clock-time-val{font-size:16px;font-weight:600;color:var(--text)}
+.clock-time-val.empty{color:var(--text3);font-weight:400}
+.clock-action-btn{width:100%;padding:16px;border-radius:var(--r);border:none;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.5px}
+.cab-in{background:var(--teal);color:#fff}
+.cab-in:hover:not(:disabled){background:#0d5e49}
+.cab-in:active:not(:disabled){transform:scale(0.98)}
+.cab-out{background:var(--bg2);color:var(--text);border:0.5px solid var(--border2)}
+.cab-out:hover:not(:disabled){background:var(--border)}
+.cab-out:active:not(:disabled){transform:scale(0.98)}
+.cab-done{background:var(--bg2);color:var(--text3);border:0.5px solid var(--border);cursor:default}
+.clock-action-btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+.clock-loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px;font-size:13px;color:var(--text3)}
+.clock-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+.clock-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.clock-stat{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);padding:12px;text-align:center}
+.clock-stat-n{font-size:22px;font-weight:600;margin-bottom:2px}
+.clock-stat-l{font-size:11px;color:var(--text2)}
+.clock-alert{padding:12px 14px;border-radius:var(--r);font-size:13px;margin-bottom:16px;display:none}
+.ca-warn{background:var(--amber-bg);color:var(--amber-text)}
+.ca-err{background:var(--red-bg);color:var(--red-text)}
+.att-month-stat{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.ams{background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center}
+.ams-n{font-size:18px;font-weight:600}
+.ams-l{font-size:11px;color:var(--text2);margin-top:2px}
 .hr-tab{padding:7px 16px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:13px;cursor:pointer;transition:.15s}
 .hr-tab:hover{background:var(--bg2)}
 .hr-tab.on{background:var(--teal-bg);border-color:var(--teal);color:var(--teal-text);font-weight:500}
 .hr-panel{display:none}.hr-panel.on{display:block}
-
-/* Clock */
-.clock-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:28px;text-align:center;max-width:400px;margin:0 auto 24px}
-.clock-time{font-size:48px;font-weight:600;letter-spacing:2px;margin-bottom:4px;font-variant-numeric:tabular-nums}
-.clock-date{font-size:14px;color:var(--text2);margin-bottom:24px}
-.clock-status{font-size:13px;color:var(--text2);margin-bottom:20px;min-height:20px}
-.clock-btns{display:flex;gap:12px;justify-content:center}
-.btn-clock-in{padding:12px 32px;border-radius:var(--r);border:none;background:var(--teal);color:#fff;font-size:15px;font-weight:500;cursor:pointer;transition:.15s}
-.btn-clock-in:hover{opacity:.85}
-.btn-clock-in:disabled{opacity:.4;cursor:not-allowed}
-.btn-clock-out{padding:12px 32px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);font-size:15px;font-weight:500;cursor:pointer;transition:.15s}
-.btn-clock-out:hover{background:var(--border)}
-.btn-clock-out:disabled{opacity:.4;cursor:not-allowed}
 
 /* Member card */
 .member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
@@ -260,10 +291,11 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
   .hr-tabs{overflow-x:auto;flex-wrap:nowrap;gap:4px;-webkit-overflow-scrolling:touch;padding-bottom:2px}
   .hr-tabs::-webkit-scrollbar{display:none}
   .hr-tab{white-space:nowrap;padding:6px 12px;font-size:12px}
-  .clock-card{padding:20px 16px}
-  .clock-time{font-size:36px}
-  .clock-btns{flex-direction:column;gap:8px}
-  .btn-clock-in,.btn-clock-out{width:100%;padding:12px}
+  .clock-hero{padding:20px 16px}
+  .clock-time{font-size:40px}
+  .clock-times-row{gap:10px}
+  .clock-action-btn{padding:14px;font-size:15px}
+  .att-month-stat{grid-template-columns:repeat(2,1fr)}
   .member-grid{grid-template-columns:1fr}
   .leave-row{flex-wrap:wrap;gap:8px}
   .leave-right{flex-wrap:wrap;gap:6px}
@@ -376,26 +408,61 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 
     <!-- HR -->
     <!-- 打卡（獨立分頁） -->
+    <!-- 打卡（獨立分頁） -->
     <div class="page" id="page-clock">
       <div class="page-header"><div class="page-title">打卡</div></div>
-      <div id="clock-no-member" style="display:none;background:var(--amber-bg);color:var(--amber-text);padding:12px 16px;border-radius:var(--r);margin-bottom:20px;font-size:13px">
+      <div class="clock-alert ca-warn" id="clock-alert-nomember">
         尚未建立員工資料，請先至「人資管理 → 員工資料」新增你的帳號（Email 需與登入帳號一致）
       </div>
-      <div class="clock-card">
-        <div class="clock-time" id="clock-time">00:00:00</div>
-        <div class="clock-date" id="clock-date"></div>
-        <div class="clock-status" id="clock-status">載入中…</div>
-        <div class="clock-btns">
-          <button class="btn-clock-in" id="btn-in" onclick="doClock('in')" disabled>上班打卡</button>
-          <button class="btn-clock-out" id="btn-out" onclick="doClock('out')" disabled>下班打卡</button>
+      <div class="clock-wrap">
+        <div class="clock-hero">
+          <div class="clock-user">
+            <img class="clock-user-av" id="clock-av" src="" alt="">
+            <div class="clock-user-info">
+              <div class="clock-user-name" id="clock-uname">—</div>
+              <div class="clock-user-sub" id="clock-utitle">—</div>
+            </div>
+          </div>
+          <div class="clock-display">
+            <div class="clock-time" id="clock-time">00:00:00</div>
+            <div class="clock-date" id="clock-date"></div>
+          </div>
+          <div class="clock-state" id="clock-state">
+            <div class="clock-state-badge cs-idle"><span class="cs-dot"></span>載入中…</div>
+          </div>
+          <div class="clock-times-row" id="clock-times-row" style="display:none">
+            <div class="clock-time-item">
+              <div class="clock-time-label">上班打卡</div>
+              <div class="clock-time-val" id="ct-in">—</div>
+            </div>
+            <div class="clock-time-item">
+              <div class="clock-time-label">下班打卡</div>
+              <div class="clock-time-val empty" id="ct-out">尚未打卡</div>
+            </div>
+            <div class="clock-time-item">
+              <div class="clock-time-label">累計工時</div>
+              <div class="clock-time-val" id="ct-hours">—</div>
+            </div>
+          </div>
+          <div id="clock-btn-wrap">
+            <div class="clock-loading" id="clock-loading">
+              <div class="clock-spinner"></div>查詢打卡狀態…
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="sec-title" style="margin-bottom:12px">我的近期出勤</div>
-      <div class="table-wrap">
-        <table class="ptable">
-          <thead><tr><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th><th>備註</th></tr></thead>
-          <tbody id="my-attendance"></tbody>
-        </table>
+        <div class="att-month-stat" id="clock-month-stat" style="display:none">
+          <div class="ams"><div class="ams-n good" id="cms-present">0</div><div class="ams-l">正常出勤</div></div>
+          <div class="ams"><div class="ams-n warn" id="cms-late">0</div><div class="ams-l">遲到</div></div>
+          <div class="ams"><div class="ams-n danger" id="cms-absent">0</div><div class="ams-l">缺勤</div></div>
+          <div class="ams"><div class="ams-n" id="cms-hours">0h</div><div class="ams-l">本月工時</div></div>
+        </div>
+        <div class="sec-title" style="margin-bottom:10px">近期出勤記錄</div>
+        <div class="table-wrap">
+          <table class="ptable">
+            <thead><tr><th>日期</th><th>星期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
+            <tbody id="my-attendance"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -983,6 +1050,9 @@ function canSeeAllAttendance(){return isOwner();}
 function canSeeDeptAttendance(){return isManager();}
 
 /* Clock */
+/* ── Clock ── */
+let clockLocked=false;
+
 function startClock(){
   if(clockInterval)clearInterval(clockInterval);
   tickClock();
@@ -990,79 +1060,172 @@ function startClock(){
 }
 function tickClock(){
   const now=new Date();
-  g('clock-time').textContent=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+  const el=g('clock-time');
+  if(el)el.textContent=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
   const days=['日','一','二','三','四','五','六'];
-  g('clock-date').textContent=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日 （週'+days[now.getDay()]+'）';
+  const el2=g('clock-date');
+  if(el2)el2.textContent=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日（週'+days[now.getDay()]+'）';
+  // 即時更新累計工時（如果已上班未下班）
+  if(currentClockIn&&!currentClockOut){
+    const hrs=((now-new Date(currentClockIn))/3600000);
+    const el3=g('ct-hours');
+    if(el3)el3.textContent=hrs.toFixed(1)+'h';
+  }
 }
+
+let currentClockIn=null;
+let currentClockOut=null;
+
+function setClockState(state,rec){
+  const stateEl=g('clock-state');
+  const timesRow=g('clock-times-row');
+  const btnWrap=g('clock-btn-wrap');
+  const loadingEl=g('clock-loading');
+  if(loadingEl)loadingEl.style.display='none';
+
+  currentClockIn=rec?.clock_in||null;
+  currentClockOut=rec?.clock_out||null;
+
+  if(state==='idle'){
+    stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>今日尚未打卡</div>';
+    timesRow.style.display='none';
+    btnWrap.innerHTML=`<button class="clock-action-btn cab-in" onclick="doClock('in')">上班打卡</button>`;
+  }else if(state==='in'){
+    stateEl.innerHTML='<div class="clock-state-badge cs-in"><span class="cs-dot"></span>上班中</div>';
+    timesRow.style.display='flex';
+    g('ct-in').textContent=fmtTime(rec.clock_in);
+    g('ct-out').textContent='尚未打卡';
+    g('ct-out').className='clock-time-val empty';
+    g('ct-hours').textContent='計算中…';
+    btnWrap.innerHTML=`<button class="clock-action-btn cab-out" onclick="doClock('out')">下班打卡</button>`;
+  }else if(state==='done'){
+    const hrs=Number(rec.work_hours).toFixed(1);
+    stateEl.innerHTML=`<div class="clock-state-badge cs-done"><span class="cs-dot"></span>今日出勤完成・工時 ${hrs} 小時</div>`;
+    timesRow.style.display='flex';
+    g('ct-in').textContent=fmtTime(rec.clock_in);
+    g('ct-out').textContent=fmtTime(rec.clock_out);
+    g('ct-out').className='clock-time-val';
+    g('ct-hours').textContent=hrs+'h';
+    btnWrap.innerHTML=`<button class="clock-action-btn cab-done" disabled>今日打卡完成</button>`;
+  }else if(state==='nomember'){
+    stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>尚未建立員工資料</div>';
+    timesRow.style.display='none';
+    btnWrap.innerHTML=`<button class="clock-action-btn cab-done" disabled>請先建立員工資料</button>`;
+  }
+}
+
 async function loadAttendanceStatus(){
-  const noMemberEl=g('clock-no-member');
+  const alertEl=g('clock-alert-nomember');
+  const monthStat=g('clock-month-stat');
+
+  if(alertEl)alertEl.style.display='none';
+
   if(!myMember){
-    if(noMemberEl)noMemberEl.style.display='block';
-    g('clock-status').textContent='請先建立員工資料';
-    g('btn-in').disabled=true;g('btn-out').disabled=true;
+    if(alertEl)alertEl.style.display='block';
+    setClockState('nomember',null);
     return;
   }
-  if(noMemberEl)noMemberEl.style.display='none';
+
+  // 更新使用者資訊
+  const avEl=g('clock-av');const unEl=g('clock-uname');const utEl=g('clock-utitle');
+  if(avEl)avEl.src=currentUser?.picture||'';
+  if(unEl)unEl.textContent=myMember.name_zh||currentUser?.name||'—';
+  if(utEl)utEl.textContent=(myMember.title||'')+(myMember.department?' · '+myMember.department:'');
+
   try{
     const res=await api('getAttendanceStatus',{member_id:myMember.id});
     const rec=res.data;
     if(!rec){
-      g('clock-status').textContent='今日尚未打卡';
-      g('btn-in').disabled=false;
-      g('btn-out').disabled=true;
-      g('btn-in').style.opacity='1';
-      g('btn-out').style.opacity='0.4';
+      setClockState('idle',null);
     }else if(rec.clock_in&&!rec.clock_out){
-      g('clock-status').textContent='上班打卡：'+fmtTime(rec.clock_in)+'　尚未下班打卡';
-      g('btn-in').disabled=true;
-      g('btn-out').disabled=false;
-      g('btn-in').style.opacity='0.4';
-      g('btn-out').style.opacity='1';
+      setClockState('in',rec);
     }else if(rec.clock_in&&rec.clock_out){
-      g('clock-status').textContent='上班：'+fmtTime(rec.clock_in)+'　下班：'+fmtTime(rec.clock_out)+'　工時：'+Number(rec.work_hours).toFixed(1)+'小時';
-      g('btn-in').disabled=true;
-      g('btn-out').disabled=true;
-      g('btn-in').style.opacity='0.4';
-      g('btn-out').style.opacity='0.4';
+      setClockState('done',rec);
+    }
+
+    // 本月統計
+    const thisMonth=new Date().toISOString().slice(0,7);
+    const myRecs=D.attendance.filter(a=>String(a.member_id)===String(myMember.id)&&String(a.date).slice(0,7)===thisMonth);
+    const present=myRecs.filter(a=>a.status==='present').length;
+    const late=myRecs.filter(a=>a.status==='late').length;
+    const absent=myRecs.filter(a=>a.status==='absent').length;
+    const totalHrs=myRecs.reduce((s,a)=>s+parseFloat(a.work_hours||0),0);
+    if(monthStat){
+      monthStat.style.display='grid';
+      g('cms-present').textContent=present;
+      g('cms-late').textContent=late;
+      g('cms-absent').textContent=absent;
+      g('cms-hours').textContent=totalHrs.toFixed(1)+'h';
     }
     renderMyAttendance();
-  }catch(e){g('clock-status').textContent='載入失敗：'+e.message;}
+  }catch(e){
+    const stateEl=g('clock-state');
+    if(stateEl)stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>載入失敗，請重新整理</div>';
+    const btnWrap=g('clock-btn-wrap');
+    if(btnWrap)btnWrap.innerHTML=`<button class="clock-action-btn cab-done" onclick="loadAttendanceStatus()">重新載入</button>`;
+  }
 }
+
 async function doClock(type){
+  if(clockLocked){toast('打卡處理中，請稍候…');return;}
   if(!myMember){toast('請先建立員工資料');return;}
-  const btnIn=g('btn-in');const btnOut=g('btn-out');
-  btnIn.disabled=true;btnOut.disabled=true;
+  clockLocked=true;
+
+  const btnWrap=g('clock-btn-wrap');
+  if(btnWrap)btnWrap.innerHTML='<div class="clock-loading"><div class="clock-spinner"></div>打卡中…</div>';
+
   try{
     const action=type==='in'?'clockIn':'clockOut';
     const res=await api(action,{member_id:myMember.id,location:WORK_L[myMember.work_mode]||''});
-    if(type==='in'){
-      toast('上班打卡成功！'+new Date().getHours()+':'+String(new Date().getMinutes()).padStart(2,'0'));
-    }else{
-      toast('下班打卡成功！工時：'+Number(res.work_hours).toFixed(1)+'小時');
-    }
+
+    // 更新本地資料
     const all=await api('getAll');
     D.attendance=all.attendance||[];
-    loadAttendanceStatus();
+
+    if(type==='in'){
+      const now=new Date();
+      const isLate=now.getHours()+now.getMinutes()/60>10.5;
+      toast(isLate?'上班打卡成功（遲到）':'上班打卡成功！');
+    }else{
+      toast('下班打卡成功！工時 '+Number(res.work_hours).toFixed(1)+' 小時');
+    }
+    await loadAttendanceStatus();
   }catch(e){
-    const msg=e.message||'';
-    if(msg.includes('已經打過上班卡')){toast('今天已經打過上班卡了！');}
-    else if(msg.includes('已經打過下班卡')){toast('今天已經打過下班卡了！');}
-    else if(msg.includes('找不到今天的上班打卡')){toast('請先打上班卡！');}
-    else{toast('打卡失敗：'+msg);}
-    loadAttendanceStatus();
+    const code=e.message||'';
+    if(code.includes('ALREADY_IN')||code.includes('已經打過上班卡')){
+      toast('⚠ 今天已經打過上班卡了');
+    }else if(code.includes('ALREADY_OUT')||code.includes('已經打過下班卡')){
+      toast('⚠ 今天已經打過下班卡了');
+    }else if(code.includes('NO_IN')||code.includes('請先打上班卡')){
+      toast('⚠ 請先打上班卡');
+    }else{
+      toast('打卡失敗：'+code);
+    }
+    await loadAttendanceStatus();
+  }finally{
+    setTimeout(()=>{ clockLocked=false; },2000);
   }
 }
+
 function renderMyAttendance(){
   if(!myMember)return;
-  const recs=D.attendance.filter(a=>String(a.member_id)===String(myMember.id)).slice(-14).reverse();
-  g('my-attendance').innerHTML=recs.length?recs.map(a=>`<tr>
-    <td>${fmtDate(a.date)}</td>
-    <td>${fmtTime(a.clock_in)}</td>
-    <td>${a.clock_out?fmtTime(a.clock_out):'—'}</td>
-    <td>${a.work_hours?a.work_hours+'h':'—'}</td>
-    <td><span class="badge ${ATT_C[a.status]||'b-present'}">${ATT_L[a.status]||a.status}</span></td>
-    <td style="color:var(--text2)">${a.note||''}</td>
-  </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">尚無打卡記錄</td></tr>';
+  const days=['日','一','二','三','四','五','六'];
+  const recs=D.attendance.filter(a=>String(a.member_id)===String(myMember.id))
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,20);
+  const tbody=g('my-attendance');
+  if(!tbody)return;
+  tbody.innerHTML=recs.length?recs.map(a=>{
+    const d=new Date(String(a.date).slice(0,10));
+    const isToday=String(a.date).slice(0,10)===new Date().toISOString().slice(0,10);
+    return`<tr${isToday?' style="background:var(--teal-bg)"':''}>
+      <td style="font-weight:${isToday?'600':'400'}">${String(a.date).slice(0,10)}</td>
+      <td style="color:var(--text2)">週${days[d.getDay()]}</td>
+      <td>${fmtTime(a.clock_in)}</td>
+      <td>${a.clock_out?fmtTime(a.clock_out):'<span style="color:var(--text3)">未打卡</span>'}</td>
+      <td>${a.work_hours?Number(a.work_hours).toFixed(1)+'h':'—'}</td>
+      <td><span class="badge ${ATT_C[a.status]||'b-present'}">${ATT_L[a.status]||a.status||'—'}</span></td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">尚無打卡記錄</td></tr>';
 }
 
 /* Members */
