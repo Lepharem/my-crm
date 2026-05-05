@@ -661,14 +661,14 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
   <div class="modal">
     <h2 id="sm-title">新增薪資記錄</h2>
     <div class="fgr">
-      <div class="fg"><label>員工 *</label><select id="sm-member_id"></select></div>
+      <div class="fg"><label>員工 *</label><select id="sm-member_id" onchange="onMemberSelect()"></select></div>
       <div class="fgr" style="gap:8px">
         <div class="fg"><label>年</label><input id="sm-year" type="number" placeholder="2025"></div>
         <div class="fg"><label>月</label><input id="sm-month" type="number" placeholder="1" min="1" max="12"></div>
       </div>
     </div>
     <div class="fgr">
-      <div class="fg"><label>底薪（NT$）</label><input id="sm-base_salary" oninput="calcNet()"></div>
+      <div class="fg"><label>底薪（NT$）</label><input id="sm-base_salary" oninput="calcNet()" onchange="autoCalcInsurance()"></div>
       <div class="fg"><label>津貼（NT$）</label><input id="sm-allowances" oninput="calcNet()"></div>
     </div>
     <div class="fgr">
@@ -676,11 +676,12 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
       <div class="fg"><label>其他扣除（NT$）</label><input id="sm-deductions" oninput="calcNet()"></div>
     </div>
     <div class="fgr">
-      <div class="fg"><label>勞保費（NT$）</label><input id="sm-labor_insurance" oninput="calcNet()"></div>
-      <div class="fg"><label>健保費（NT$）</label><input id="sm-health_insurance" oninput="calcNet()"></div>
+      <div class="fg"><label>勞保費（NT$）</label><input id="sm-labor_insurance" oninput="calcNet()" placeholder="輸入底薪後自動帶入"></div>
+      <div class="fg"><label>健保費（NT$）</label><input id="sm-health_insurance" oninput="calcNet()" placeholder="輸入底薪後自動帶入"></div>
     </div>
     <div class="fgr">
       <div class="fg"><label>所得稅（NT$）</label><input id="sm-tax" oninput="calcNet()"></div>
+      <div id="sm-insurance-info" style="display:none;font-size:11px;color:var(--teal-text);background:var(--teal-bg);padding:6px 10px;border-radius:var(--r);margin-bottom:8px"></div>
       <div class="fg"><label>實領薪資（NT$）</label><input id="sm-net_salary" readonly style="font-weight:600;color:var(--teal-text)"></div>
     </div>
     <div class="fgr">
@@ -1148,6 +1149,42 @@ function calcNet(){
   const net=base+allow+bonus-ded-labor-health-tax;
   g('sm-net_salary').value=net>0?net.toLocaleString():'0';
 }
+
+function onMemberSelect(){
+  const mid=g('sm-member_id').value;
+  const m=D.members.find(x=>String(x.id)===String(mid));
+  if(!m)return;
+  if(m.base_salary){
+    g('sm-base_salary').value=m.base_salary;
+    g('sm-allowances').value=m.allowances||'';
+    autoCalcInsurance();
+  }
+}
+
+async function autoCalcInsurance(){
+  const base=pn(g('sm-base_salary').value);
+  if(!base)return;
+  const year=g('sm-year').value||new Date().getFullYear();
+  try{
+    g('sm-labor_insurance').placeholder='計算中…';
+    g('sm-health_insurance').placeholder='計算中…';
+    const res=await api('calcInsurance',{salary:base,year});
+    g('sm-labor_insurance').value=res.labor.employee;
+    g('sm-health_insurance').value=res.health.employee;
+    g('sm-labor_insurance').placeholder='';
+    g('sm-health_insurance').placeholder='';
+    const infoEl=g('sm-insurance-info');
+    if(infoEl){
+      infoEl.textContent=`勞保投保級距 NT$ ${res.labor.insured_amount.toLocaleString()}・健保投保級距 NT$ ${res.health.insured_amount.toLocaleString()}`;
+      infoEl.style.display='block';
+    }
+    calcNet();
+    toast('已自動帶入勞保健保');
+  }catch(e){
+    g('sm-labor_insurance').placeholder='自動計算失敗，請手動填入';
+    g('sm-health_insurance').placeholder='自動計算失敗，請手動填入';
+  }
+}
 function updateLeaveDays(){
   const s=g('lm-start_date').value;const e=g('lm-end_date').value;
   if(s&&e){const days=Math.max(0,Math.round((new Date(e)-new Date(s))/86400000)+1);g('lm-days').value=days;}
@@ -1207,7 +1244,22 @@ function openLeaveModal(){editLeaveId=null;g('lm-title').textContent='申請請�
 async function saveLeave(){if(!myMember){alert('請先在員工資料中登錄你的帳號');return;}const s=v('lm-start_date');const e=v('lm-end_date');if(!s||!e){alert('請選擇請假日期');return;}const days=pn(g('lm-days').value)||1;const d={member_id:myMember.id,leave_type_id:g('lm-leave_type_id').value,start_date:s,end_date:e,days,reason:v('lm-reason')};if(editLeaveId)d.id=editLeaveId;try{const res=await api('saveLeaveRequest',d);if(!editLeaveId)D.leave_requests.push({...d,id:res.id,status:'pending'});toast('已送出申請');cm('lm-ov');renderLeave();}catch(e){toast('送出失敗：'+e.message);}}
 
 // Salary
-function openSalaryModal(){editSalaryId=null;g('sm-title').textContent='新增薪資記錄';const now=new Date();g('sm-year').value=now.getFullYear();g('sm-month').value=now.getMonth()+1;['sm-base_salary','sm-allowances','sm-bonus','sm-deductions','sm-labor_insurance','sm-health_insurance','sm-tax','sm-net_salary','sm-pay_date','sm-note'].forEach(id=>g(id).value='');const sel=g('sm-member_id');sel.innerHTML=D.members.map(m=>`<option value="${m.id}">${m.name_zh}</option>`).join('');g('sm-ov').classList.add('open');}
+function openSalaryModal(){
+  editSalaryId=null;
+  g('sm-title').textContent='新增薪資記錄';
+  const now=new Date();
+  g('sm-year').value=now.getFullYear();
+  g('sm-month').value=now.getMonth()+1;
+  ['sm-base_salary','sm-allowances','sm-bonus','sm-deductions','sm-labor_insurance','sm-health_insurance','sm-tax','sm-net_salary','sm-pay_date','sm-note'].forEach(id=>g(id).value='');
+  ['sm-labor_insurance','sm-health_insurance'].forEach(id=>{g(id).placeholder='輸入底薪後自動帶入';});
+  const infoEl=g('sm-insurance-info');
+  if(infoEl)infoEl.style.display='none';
+  const sel=g('sm-member_id');
+  sel.innerHTML=D.members.filter(m=>m.active!==false&&m.active!=='FALSE').map(m=>`<option value="${m.id}">${m.name_zh}${m.employment_type==='contractor'?'（外包）':''}</option>`).join('');
+  g('sm-ov').classList.add('open');
+  // 自動帶入第一位員工的底薪
+  if(sel.value) setTimeout(()=>onMemberSelect(),100);
+}
 async function saveSalary(){const mid=g('sm-member_id').value;if(!mid){alert('請選擇員工');return;}const d={member_id:mid,year:v('sm-year'),month:v('sm-month'),base_salary:v('sm-base_salary'),allowances:v('sm-allowances'),bonus:v('sm-bonus'),deductions:v('sm-deductions'),labor_insurance:v('sm-labor_insurance'),health_insurance:v('sm-health_insurance'),tax:v('sm-tax'),net_salary:g('sm-net_salary').value.replace(/,/g,''),pay_date:v('sm-pay_date'),note:v('sm-note')};if(editSalaryId)d.id=editSalaryId;try{const res=await api('saveSalaryRecord',d);if(!editSalaryId)D.salary_records.push({...d,id:res.id});toast(editSalaryId?'已更新':'已新增薪資記錄');cm('sm-ov');renderSalary();}catch(e){toast('儲存失敗：'+e.message);}}
 
 function v(id){return(g(id).value||'').trim()}
