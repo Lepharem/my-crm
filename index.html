@@ -42,6 +42,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .login-sub{font-size:13px;color:var(--text2);margin-bottom:32px}
 .login-hint{font-size:12px;color:var(--text3);margin-top:16px}
 .login-err{font-size:13px;color:var(--red-text);margin-top:12px;display:none}
+.g_id_signin{display:flex!important;justify-content:center!important}
+.g_id_signin>div{margin:0 auto!important}
+.g_id_signin iframe{margin:0 auto!important;display:block!important}
 
 /* App */
 #app{display:none}
@@ -1144,7 +1147,7 @@ function renderReport(){
   g('report-month-label').textContent=y+'年 '+mn[mo-1];
   const workdays=calcWorkdays(y,mo);
   const shouldDays=workdays.length;
-  const members=D.members.filter(m=>m.active===true||String(m.active).toUpperCase()==='TRUE');
+  const members=D.members.filter(m=>isActive(m));
   const rows=members.map(m=>{
     const recs=D.attendance.filter(a=>String(a.member_id)===String(m.id)&&String(a.date).slice(0,7)===reportMonth);
     const present=recs.filter(a=>a.status==='present').length;
@@ -1199,7 +1202,7 @@ function renderReport(){
     </div>`;
 }
 function printAttReport(){renderReport();setTimeout(()=>window.print(),300);}
-function isSuperAdmin(){return myMember&&(myMember.super_admin===true||String(myMember.super_admin).toUpperCase()==='TRUE');}
+function isSuperAdmin(){return myMember&&isBool(myMember.super_admin,true);}
 function isOwner(){return myMember&&(myMember.role==='owner'||isSuperAdmin());}
 function isManager(){return myMember&&(myMember.role==='manager'||isOwner());}
 function canSeeAllAttendance(){return isOwner();}
@@ -1413,7 +1416,13 @@ function renderMyAttendance(){
 let memberFilter='all';
 function setMemberFilter(el){memberFilter=el.dataset.mf;document.querySelectorAll('[data-mf]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderMembers();}
 
-function isResigned(m){return m.active===false||String(m.active).toUpperCase()==='FALSE'||m.active===0||m.active==='0';}
+function isBool(v,expect){
+  if(typeof v==='boolean')return expect?v:!v;
+  const s=String(v).toUpperCase().trim();
+  return expect?(s==='TRUE'||s==='1'):(s==='FALSE'||s==='0'||s===''||s==='NULL');
+}
+function isResigned(m){return isBool(m.active,false);}
+function isActive(m){return isBool(m.active,true);}
 
 function renderMemberCard(m){
   const cl=col(m.id);
@@ -1465,17 +1474,17 @@ function renderMembers(){
   let list=D.members.filter(m=>{
     const mq=!q||[m.name_zh,m.name_en,m.title,m.email,m.department].join(' ').toLowerCase().includes(q);
     const mf=memberFilter==='all'||
-      (memberFilter==='full_time'&&m.employment_type==='full_time'&&!isResigned(m))||
+      (memberFilter==='full_time'&&m.employment_type!=='contractor'&&!isResigned(m))||
       (memberFilter==='contractor'&&m.employment_type==='contractor'&&!isResigned(m));
     return mq&&mf;
   });
   const el=g('member-list');
   if(!list.length){el.innerHTML='<div class="empty-state">尚無員工資料</div>';return;}
 
-  // 分組
+  // 分組（依 employment_type 和 role 分層）
   const owners=list.filter(m=>m.role==='owner'&&!isResigned(m));
   const managers=list.filter(m=>m.role==='manager'&&!isResigned(m));
-  const employees=list.filter(m=>m.role==='employee'&&m.employment_type==='full_time'&&!isResigned(m));
+  const employees=list.filter(m=>m.role==='employee'&&m.employment_type!=='contractor'&&!isResigned(m));
   const contractors=list.filter(m=>m.employment_type==='contractor'&&!isResigned(m));
   const resigned=list.filter(m=>isResigned(m));
 
@@ -1816,7 +1825,7 @@ function openSalaryModal(){
   const infoEl=g('sm-insurance-info');
   if(infoEl)infoEl.style.display='none';
   const sel=g('sm-member_id');
-  sel.innerHTML=D.members.filter(m=>m.active!==false&&m.active!=='FALSE').map(m=>`<option value="${m.id}">${m.name_zh}${m.employment_type==='contractor'?'（外包）':''}</option>`).join('');
+  sel.innerHTML=D.members.filter(m=>isActive(m)).map(m=>`<option value="${m.id}">${m.name_zh}${m.employment_type==='contractor'?'（外包）':''}</option>`).join('');
   g('sm-ov').classList.add('open');
   // 自動帶入第一位員工的底薪
   if(sel.value) setTimeout(()=>onMemberSelect(),100);
