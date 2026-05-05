@@ -225,6 +225,10 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .mc{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:16px;cursor:pointer;transition:border-color .15s}
 .mc:hover{border-color:var(--border2)}
 .mc.open{border-color:var(--teal)}
+.mc.resigned{background:#2a2a27;border-color:#3a3935}
+.mc.resigned .mc-name{color:#9b9a94}
+.mc.resigned .mc-sub{color:#6b6a64}
+.mc-group-label{font-size:12px;font-weight:500;color:var(--text3);margin:16px 0 8px;padding-bottom:6px;border-bottom:0.5px solid var(--border);text-transform:uppercase;letter-spacing:.06em}
 .mc-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .mc-info{flex:1;min-width:0}
 .mc-name{font-size:15px;font-weight:500}
@@ -517,7 +521,7 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
           </div>
           <button class="btn-add" onclick="openMemberModal()">+ 新增員工</button>
         </div>
-        <div class="member-grid" id="member-list"></div>
+        <div id="member-list"></div>
       </div>
 
       <!-- 出勤記錄 -->
@@ -1190,8 +1194,9 @@ function renderReport(){
     </div>`;
 }
 function printAttReport(){renderReport();setTimeout(()=>window.print(),300);}
-function isOwner(){return myMember&&myMember.role==='owner';}
-function isManager(){return myMember&&myMember.role==='manager';}
+function isSuperAdmin(){return myMember&&(myMember.super_admin===true||String(myMember.super_admin).toUpperCase()==='TRUE');}
+function isOwner(){return myMember&&(myMember.role==='owner'||isSuperAdmin());}
+function isManager(){return myMember&&(myMember.role==='manager'||isOwner());}
 function canSeeAllAttendance(){return isOwner();}
 function canSeeDeptAttendance(){return isManager();}
 
@@ -1402,42 +1407,88 @@ function renderMyAttendance(){
 /* Members */
 let memberFilter='all';
 function setMemberFilter(el){memberFilter=el.dataset.mf;document.querySelectorAll('[data-mf]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderMembers();}
+
+function isResigned(m){return m.active===false||String(m.active).toUpperCase()==='FALSE'||m.active===0||m.active==='0';}
+
+function renderMemberCard(m){
+  const cl=col(m.id);
+  const isOpen=m._open;
+  const resigned=isResigned(m);
+  const projs=D.projects.filter(p=>p.owner&&p.owner.includes(m.name_zh));
+  const isSA=m.super_admin===true||String(m.super_admin).toUpperCase()==='TRUE';
+  const roleColor=m.role==='owner'?'b-overdue':m.role==='manager'?'b-proposal':'b-active';
+  const avStyle=resigned?'background:#3a3935;color:#6b6a64':'background:'+cl.bg+';color:'+cl.c;
+  // 特休餘額
+  const bal=getLocalLeaveBalance(m.id);
+  const leaveStr=parseFloat(bal.days)>0?`<span style="font-size:10px;color:var(--teal-text);margin-left:4px">特休 ${bal.days}天</span>`:'';
+  return`<div class="mc${isOpen?' open':''}${resigned?' resigned':''}" onclick="toggleMember('${m.id}')">
+    <div class="mc-top">
+      <div class="av" style="width:44px;height:44px;${avStyle};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0">${ini(m.name_zh||'?')}</div>
+      <div class="mc-info">
+        <div class="mc-name">
+          ${m.name_zh||'—'}${m.name_en?' ('+m.name_en+')':''}
+          ${resigned?'<span class="badge" style="font-size:10px;background:#3a3935;color:#9b9a94;margin-left:6px">離職</span>':''}
+          ${isSA&&!resigned?'<span style="font-size:10px;color:var(--amber-text);margin-left:4px">★</span>':''}
+        </div>
+        <div class="mc-sub">
+          ${m.title||''}${m.department?' · '+m.department:''}
+          <span class="badge ${roleColor}" style="font-size:10px;margin-left:4px">${ROLE_L[m.role]||m.role}</span>
+          ${leaveStr}
+        </div>
+      </div>
+    </div>
+    <div class="mc-detail">
+      <div class="dgrid" style="grid-template-columns:1fr 1fr;gap:8px 16px">
+        <div><div class="dl">Email</div><div class="dv" style="font-size:12px">${m.email||'—'}</div></div>
+        <div><div class="dl">工作模式</div><div class="dv">${WORK_L[m.work_mode]||m.work_mode||'—'}</div></div>
+        <div><div class="dl">到職日</div><div class="dv">${fmtDate(m.start_date)}</div></div>
+        <div><div class="dl">類型</div><div class="dv">${EMP_L[m.employment_type]||m.employment_type||'—'}</div></div>
+        <div><div class="dl">底薪</div><div class="dv">${m.base_salary?'NT$ '+m.base_salary:'—'}</div></div>
+        <div><div class="dl">負責專案</div><div class="dv">${projs.length} 個</div></div>
+        ${resigned&&m.note?`<div style="grid-column:1/-1"><div class="dl">備註</div><div class="dv" style="font-size:12px;color:#9b9a94">${m.note}</div></div>`:''}
+      </div>
+      <div class="row-btns" style="margin-top:12px;margin-bottom:0">
+        <button class="btn-sm" onclick="event.stopPropagation();openEditMember('${m.id}')">編輯</button>
+        <button class="btn-sm btn-del" onclick="event.stopPropagation();delMember('${m.id}')">刪除</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderMembers(){
   const q=(g('member-search').value||'').toLowerCase();
   let list=D.members.filter(m=>{
     const mq=!q||[m.name_zh,m.name_en,m.title,m.email,m.department].join(' ').toLowerCase().includes(q);
-    const mf=memberFilter==='all'||m.employment_type===memberFilter;
+    const mf=memberFilter==='all'||
+      (memberFilter==='full_time'&&m.employment_type==='full_time'&&!isResigned(m))||
+      (memberFilter==='contractor'&&m.employment_type==='contractor'&&!isResigned(m));
     return mq&&mf;
   });
   const el=g('member-list');
   if(!list.length){el.innerHTML='<div class="empty-state">尚無員工資料</div>';return;}
-  el.innerHTML=list.map(m=>{
-    const cl=col(m.id);const isOpen=m._open;
-    const projs=D.projects.filter(p=>p.owner&&p.owner.includes(m.name_zh));
-    return`<div class="mc${isOpen?' open':''}" onclick="toggleMember('${m.id}')">
-      <div class="mc-top">
-        <div class="av" style="width:44px;height:44px;background:${cl.bg};color:${cl.c};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0">${ini(m.name_zh||'?')}</div>
-        <div class="mc-info">
-          <div class="mc-name">${m.name_zh||'—'}${m.name_en?' ('+m.name_en+')':''}</div>
-          <div class="mc-sub">${m.title||''}${m.level?' · '+m.level:''} · <span class="badge ${m.role==='owner'?'b-overdue':m.role==='manager'?'b-proposal':'b-active'}" style="font-size:10px">${ROLE_L[m.role]||m.role}</span></div>
-        </div>
-      </div>
-      <div class="mc-detail">
-        <div class="dgrid" style="grid-template-columns:1fr 1fr;gap:8px 16px">
-          <div><div class="dl">Email</div><div class="dv" style="font-size:12px">${m.email||'—'}</div></div>
-          <div><div class="dl">工作模式</div><div class="dv">${WORK_L[m.work_mode]||m.work_mode||'—'}</div></div>
-          <div><div class="dl">到職日</div><div class="dv">${fmtDate(m.start_date)}</div></div>
-          <div><div class="dl">類型</div><div class="dv">${EMP_L[m.employment_type]||m.employment_type||'—'}</div></div>
-          <div><div class="dl">底薪</div><div class="dv">${m.base_salary?'NT$ '+m.base_salary:'—'}</div></div>
-          <div><div class="dl">負責專案</div><div class="dv">${projs.length} 個</div></div>
-        </div>
-        <div class="row-btns" style="margin-top:12px;margin-bottom:0">
-          <button class="btn-sm" onclick="event.stopPropagation();openEditMember('${m.id}')">編輯</button>
-          <button class="btn-sm btn-del" onclick="event.stopPropagation();delMember('${m.id}')">刪除</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+
+  // 分組
+  const owners=list.filter(m=>m.role==='owner'&&!isResigned(m));
+  const managers=list.filter(m=>m.role==='manager'&&!isResigned(m));
+  const employees=list.filter(m=>m.role==='employee'&&m.employment_type==='full_time'&&!isResigned(m));
+  const contractors=list.filter(m=>m.employment_type==='contractor'&&!isResigned(m));
+  const resigned=list.filter(m=>isResigned(m));
+
+  let html='';
+  const renderGroup=(label,members)=>{
+    if(!members.length)return;
+    html+=`<div class="mc-group-label">${label}（${members.length}）</div>`;
+    html+=`<div class="member-grid" style="margin-bottom:8px">${members.map(renderMemberCard).join('')}</div>`;
+  };
+  renderGroup('老闆',owners);
+  renderGroup('主管',managers);
+  renderGroup('組員',employees);
+  renderGroup('外包',contractors);
+  if(resigned.length){
+    html+=`<div class="mc-group-label" style="margin-top:24px;color:#6b6a64;border-color:#3a3935">離職同仁（${resigned.length}）</div>`;
+    html+=`<div class="member-grid">${resigned.map(renderMemberCard).join('')}</div>`;
+  }
+  el.innerHTML=html;
 }
 function toggleMember(id){const m=D.members.find(x=>String(x.id)===String(id));if(m)m._open=!m._open;renderMembers();}
 
