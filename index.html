@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客戶管理系統</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#ffffff;--bg2:#f7f6f3;--bg3:#f0efe9;
+    --text:#1a1a18;--text2:#6b6a64;--text3:#9b9a94;
+    --border:#e0ddd4;--border2:#c8c6bc;
+    --teal-bg:#e1f5ee;--teal-text:#085041;--teal-border:#0f6e56;
+    --blue-bg:#e6f1fb;--blue-text:#0c447c;
+    --amber-bg:#faeeda;--amber-text:#633806;
+    --gray-bg:#f1efe8;--gray-text:#444441;
+    --purple-bg:#eeedfe;--purple-text:#3c3489;
+    --coral-bg:#faece7;--coral-text:#712b13;
+    --radius:8px;--radius-lg:12px;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{
+      --bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2b;
+      --text:#e8e6df;--text2:#9b9a94;--text3:#6b6a64;
+      --border:#3a3935;--border2:#4a4943;
+      --teal-bg:#085041;--teal-text:#9fe1cb;--teal-border:#1d9e75;
+      --blue-bg:#0c447c;--blue-text:#b5d4f4;
+      --amber-bg:#633806;--amber-text:#fac775;
+      --gray-bg:#3a3935;--gray-text:#d3d1c7;
+      --purple-bg:#3c3489;--purple-text:#cecbf6;
+      --coral-bg:#712b13;--coral-text:#f5c4b3;
+    }
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+  .app{max-width:860px;margin:0 auto;padding:24px 16px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+  .logo{font-size:18px;font-weight:600;color:var(--text)}
+  .logo span{color:var(--teal-border)}
+  .header-meta{font-size:12px;color:var(--text3)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:24px}
+  .stat{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+  .stat-label{font-size:12px;color:var(--text2);margin-bottom:4px}
+  .stat-num{font-size:26px;font-weight:600;color:var(--text)}
+  .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+  .search-wrap{flex:1;min-width:200px;position:relative}
+  .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none}
+  .search-wrap input{width:100%;padding:9px 12px 9px 34px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:14px;outline:none}
+  .search-wrap input:focus{border-color:var(--teal-border)}
+  .filters{display:flex;gap:6px;flex-wrap:wrap}
+  .pill{padding:6px 13px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:13px;cursor:pointer;transition:.15s}
+  .pill:hover{background:var(--bg2)}
+  .pill.active{background:var(--teal-bg);border-color:var(--teal-border);color:var(--teal-text);font-weight:500}
+  .btn-add{padding:9px 18px;border-radius:var(--radius);border:0.5px solid var(--teal-border);background:var(--teal-bg);color:var(--teal-text);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:.15s}
+  .btn-add:hover{opacity:.85}
+  .client-list{display:flex;flex-direction:column;gap:8px}
+  .card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;cursor:pointer;transition:border-color .15s}
+  .card:hover{border-color:var(--border2)}
+  .card.open{border-color:var(--teal-border);border-width:1px}
+  .card-row{display:flex;align-items:center;gap:12px}
+  .avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+  .info{flex:1;min-width:0}
+  .name{font-size:14px;font-weight:500}
+  .meta{font-size:12px;color:var(--text2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .badge{font-size:11px;padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+  .b-active{background:var(--teal-bg);color:var(--teal-text)}
+  .b-proposal{background:var(--amber-bg);color:var(--amber-text)}
+  .b-new{background:var(--blue-bg);color:var(--blue-text)}
+  .b-inactive{background:var(--gray-bg);color:var(--gray-text)}
+  .expand{display:none;margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)}
+  .expand.open{display:block}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-bottom:14px}
+  .dl{font-size:12px;color:var(--text2);margin-bottom:2px}
+  .dv{font-size:13px;font-weight:500;word-break:break-all}
+  textarea{width:100%;padding:9px 11px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text);font-size:13px;resize:vertical;min-height:64px;font-family:inherit;outline:none}
+  textarea:focus{border-color:var(--teal-border)}
+  .actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .btn-sm{padding:6px 12px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:12px;cursor:pointer;transition:.15s}
+  .btn-sm:hover{background:var(--bg2)}
+  .btn-del{color:#a32d2d;border-color:#f7c1c1}
+  .btn-del:hover{background:#fcebeb}
+  .empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px}
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;padding:16px}
+  .overlay.open{display:flex}
+  .modal{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border2);padding:24px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto}
+  .modal h2{font-size:16px;font-weight:600;margin-bottom:20px}
+  .fg{margin-bottom:14px}
+  .fg label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px}
+  .fg input,.fg select,.fg textarea{width:100%;padding:9px 11px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit;outline:none}
+  .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--teal-border)}
+  .fg-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal-btns{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+  .btn-cancel{padding:9px 18px;border-radius:var(--radius);border:0.5px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;cursor:pointer}
+  .btn-save{padding:9px 18px;border-radius:var(--radius);border:0.5px solid var(--teal-border);background:var(--teal-bg);color:var(--teal-text);font-size:13px;font-weight:500;cursor:pointer}
+  .btn-save:hover{opacity:.85}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:var(--radius);font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none}
+  .toast.show{opacity:1}
+  @media(max-width:520px){
+    .detail-grid{grid-template-columns:1fr}
+    .fg-row{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">客戶管理 <span>CRM</span></div>
+    <div class="header-meta" id="last-saved">資料儲存於本機瀏覽器</div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <input type="text" id="search" placeholder="搜尋公司、聯絡人、行業…" oninput="render()">
+    </div>
+    <div class="filters">
+      <button class="pill active" data-f="all" onclick="setFilter(this)">全部</button>
+      <button class="pill" data-f="active" onclick="setFilter(this)">合作中</button>
+      <button class="pill" data-f="proposal" onclick="setFilter(this)">提案中</button>
+      <button class="pill" data-f="new" onclick="setFilter(this)">新客戶</button>
+      <button class="pill" data-f="inactive" onclick="setFilter(this)">未往來</button>
+    </div>
+    <button class="btn-add" onclick="openModal()">+ 新增客戶</button>
+  </div>
+
+  <div class="client-list" id="list"></div>
+</div>
+
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal" id="modal">
+    <h2 id="modal-title">新增客戶</h2>
+    <div class="fg-row">
+      <div class="fg"><label>公司名稱 *</label><input id="f-name" placeholder="例：台北數位科技"></div>
+      <div class="fg"><label>行業別</label><input id="f-industry" placeholder="例：電商"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>聯絡人</label><input id="f-contact" placeholder="姓名"></div>
+      <div class="fg"><label>職稱</label><input id="f-title" placeholder="例：行銷總監"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Email</label><input id="f-email" type="email" placeholder="contact@company.com"></div>
+      <div class="fg"><label>電話</label><input id="f-phone" placeholder="02-xxxx-xxxx"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>預算規模（NT$）</label><input id="f-budget" placeholder="例：120,000"></div>
+      <div class="fg"><label>狀態</label>
+        <select id="f-status">
+          <option value="new">新客戶</option>
+          <option value="proposal">提案中</option>
+          <option value="active">合作中</option>
+          <option value="inactive">未往來</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>來源</label><input id="f-source" placeholder="例：介紹、Google 搜尋、展覽…"></div>
+    <div class="fg"><label>備註</label><textarea id="f-note" rows="3" placeholder="特殊需求、重要記錄…"></textarea></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-save" onclick="saveClient()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const COLORS=[
+  {bg:'#e1f5ee',color:'#085041'},
+  {bg:'#e6f1fb',color:'#0c447c'},
+  {bg:'#faeeda',color:'#633806'},
+  {bg:'#eeedfe',color:'#3c3489'},
+  {bg:'#faece7',color:'#712b13'},
+  {bg:'#eaf3de',color:'#27500a'},
+];
+const S_LABEL={active:'合作中',proposal:'提案中',inactive:'未往來',new:'新客戶'};
+const S_CLASS={active:'b-active',proposal:'b-proposal',inactive:'b-inactive',new:'b-new'};
+
+let clients=[];
+let filter='all';
+let openId=null;
+let editId=null;
+
+function load(){
+  try{clients=JSON.parse(localStorage.getItem('crm_clients')||'[]')}catch{clients=[]}
+  if(!clients.length){
+    clients=[
+      {id:1,name:'好感電商股份有限公司',industry:'電商',contact:'陳小明',title:'行銷總監',email:'chen@goodsense.tw',phone:'02-2345-6789',budget:'120,000',status:'active',source:'介紹',note:'每季固定 SEO + 廣告操作，主要聯絡窗口為陳小明'},
+      {id:2,name:'旭日餐飲集團',industry:'餐飲',contact:'林美華',title:'品牌經理',email:'lin@sunrise-food.com',phone:'02-8765-4321',budget:'80,000',status:'proposal',source:'展覽認識',note:'正在提 2025 Q3 社群行銷提案，預計下週簡報'},
+      {id:3,name:'健康樂活品牌',industry:'保健食品',contact:'張大偉',title:'執行長',email:'chang@healthjoy.tw',phone:'0912-345-678',budget:'200,000',status:'active',source:'Google 搜尋',note:'品牌年度合約，包含 KOL 合作與廣告投放'},
+      {id:4,name:'築夢室內設計',industry:'室內設計',contact:'吳建志',title:'負責人',email:'wu@dreamspace.tw',phone:'0988-765-432',budget:'40,000',status:'new',source:'朋友介紹',note:'對 Google 廣告有興趣，第一次接觸'},
+      {id:5,name:'城市運動器材',industry:'運動用品',contact:'王怡君',title:'業務主管',email:'wang@cityfit.com',phone:'03-456-7890',budget:'60,000',status:'inactive',source:'電話開發',note:'去年合作過一次活動，目前無後續'},
+    ];
+    save();
+  }
+}
+
+function save(){
+  localStorage.setItem('crm_clients',JSON.stringify(clients));
+  const now=new Date();
+  document.getElementById('last-saved').textContent='上次儲存：'+now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+}
+
+function nextId(){return clients.length?Math.max(...clients.map(c=>c.id))+1:1}
+
+function initials(name){
+  const parts=name.trim().split(/\s+/);
+  return parts.length>=2?parts[0][0]+parts[1][0]:name.slice(0,2);
+}
+
+function colorFor(id){return COLORS[id%COLORS.length]}
+
+function renderStats(){
+  const total=clients.length;
+  const active=clients.filter(c=>c.status==='active').length;
+  const proposal=clients.filter(c=>c.status==='proposal').length;
+  const newC=clients.filter(c=>c.status==='new').length;
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="stat-label">總客戶數</div><div class="stat-num">${total}</div></div>
+    <div class="stat"><div class="stat-label">合作中</div><div class="stat-num">${active}</div></div>
+    <div class="stat"><div class="stat-label">提案中</div><div class="stat-num">${proposal}</div></div>
+    <div class="stat"><div class="stat-label">新客戶</div><div class="stat-num">${newC}</div></div>
+  `;
+}
+
+function render(){
+  renderStats();
+  const q=document.getElementById('search').value.toLowerCase();
+  const filtered=clients.filter(c=>{
+    const mf=filter==='all'||c.status===filter;
+    const mq=!q||[c.name,c.industry,c.contact,c.email,c.note].join(' ').toLowerCase().includes(q);
+    return mf&&mq;
+  });
+  const list=document.getElementById('list');
+  if(!filtered.length){list.innerHTML='<div class="empty">找不到符合的客戶</div>';return;}
+  list.innerHTML=filtered.map(c=>{
+    const col=colorFor(c.id);
+    const isOpen=openId===c.id;
+    return`<div class="card${isOpen?' open':''}" id="card-${c.id}" onclick="toggle(${c.id})">
+      <div class="card-row">
+        <div class="avatar" style="background:${col.bg};color:${col.color}">${initials(c.name)}</div>
+        <div class="info">
+          <div class="name">${c.name}</div>
+          <div class="meta">${c.industry?c.industry+'・':''}${c.contact}${c.title?' ('+c.title+')':''}${c.email?'・'+c.email:''}</div>
+        </div>
+        <span class="badge ${S_CLASS[c.status]}">${S_LABEL[c.status]}</span>
+      </div>
+      <div class="expand${isOpen?' open':''}" onclick="event.stopPropagation()">
+        <div class="detail-grid">
+          <div><div class="dl">聯絡人</div><div class="dv">${c.contact||'—'}${c.title?' · '+c.title:''}</div></div>
+          <div><div class="dl">Email</div><div class="dv">${c.email||'—'}</div></div>
+          <div><div class="dl">電話</div><div class="dv">${c.phone||'—'}</div></div>
+          <div><div class="dl">預算規模</div><div class="dv">${c.budget?'NT$ '+c.budget:'—'}</div></div>
+          <div><div class="dl">來源</div><div class="dv">${c.source||'—'}</div></div>
+          <div><div class="dl">狀態</div><div class="dv">${S_LABEL[c.status]}</div></div>
+        </div>
+        <div class="dl" style="margin-bottom:5px">備註</div>
+        <textarea onchange="updateNote(${c.id},this.value)">${c.note||''}</textarea>
+        <div class="actions">
+          <button class="btn-sm" onclick="startEdit(${c.id})">編輯資料</button>
+          <button class="btn-sm btn-del" onclick="del(${c.id})">刪除客戶</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggle(id){openId=openId===id?null:id;render()}
+function setFilter(el){filter=el.dataset.f;document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));el.classList.add('active');render()}
+
+function updateNote(id,val){
+  const c=clients.find(x=>x.id===id);
+  if(c){c.note=val;save();}
+}
+
+function del(id){
+  if(!confirm('確定要刪除這位客戶嗎？'))return;
+  clients=clients.filter(c=>c.id!==id);
+  if(openId===id)openId=null;
+  save();render();toast('已刪除');
+}
+
+function openModal(){
+  editId=null;
+  document.getElementById('modal-title').textContent='新增客戶';
+  ['name','industry','contact','title','email','phone','budget','source','note'].forEach(k=>document.getElementById('f-'+k).value='');
+  document.getElementById('f-status').value='new';
+  document.getElementById('overlay').classList.add('open');
+}
+
+function startEdit(id){
+  event.stopPropagation();
+  const c=clients.find(x=>x.id===id);
+  if(!c)return;
+  editId=id;
+  document.getElementById('modal-title').textContent='編輯客戶';
+  document.getElementById('f-name').value=c.name||'';
+  document.getElementById('f-industry').value=c.industry||'';
+  document.getElementById('f-contact').value=c.contact||'';
+  document.getElementById('f-title').value=c.title||'';
+  document.getElementById('f-email').value=c.email||'';
+  document.getElementById('f-phone').value=c.phone||'';
+  document.getElementById('f-budget').value=c.budget||'';
+  document.getElementById('f-status').value=c.status||'new';
+  document.getElementById('f-source').value=c.source||'';
+  document.getElementById('f-note').value=c.note||'';
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeModal(){document.getElementById('overlay').classList.remove('open')}
+function overlayClick(e){if(e.target===document.getElementById('overlay'))closeModal()}
+
+function saveClient(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){alert('請輸入公司名稱');return;}
+  const data={
+    name,
+    industry:document.getElementById('f-industry').value.trim(),
+    contact:document.getElementById('f-contact').value.trim(),
+    title:document.getElementById('f-title').value.trim(),
+    email:document.getElementById('f-email').value.trim(),
+    phone:document.getElementById('f-phone').value.trim(),
+    budget:document.getElementById('f-budget').value.trim(),
+    status:document.getElementById('f-status').value,
+    source:document.getElementById('f-source').value.trim(),
+    note:document.getElementById('f-note').value.trim(),
+  };
+  if(editId){
+    const idx=clients.findIndex(c=>c.id===editId);
+    if(idx>-1)clients[idx]={...clients[idx],...data};
+    toast('已更新客戶資料');
+  }else{
+    clients.push({id:nextId(),...data});
+    toast('已新增客戶');
+  }
+  save();closeModal();render();
+}
+
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+load();render();
+</script>
+</body>
+</html>
