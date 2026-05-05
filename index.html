@@ -225,6 +225,65 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .toast.show{opacity:1}
 .empty-state{text-align:center;padding:40px;color:var(--text3);font-size:13px}
 @media(max-width:520px){.fgr{grid-template-columns:1fr}.dgrid{grid-template-columns:1fr 1fr}.pgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){
+  .app{padding:16px 10px}
+  nav{gap:2px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  nav::-webkit-scrollbar{display:none}
+  .nav-btn{padding:8px 12px;font-size:13px;white-space:nowrap}
+  .topbar{flex-wrap:wrap;gap:8px}
+  .user-info{font-size:12px}
+  .stats{grid-template-columns:repeat(2,1fr);gap:8px}
+  .stat-n{font-size:18px}
+  .toolbar{gap:8px;flex-wrap:wrap}
+  .sw{min-width:0;width:100%}
+  .filters{gap:4px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  .filters::-webkit-scrollbar{display:none}
+  .pill{white-space:nowrap;padding:5px 10px;font-size:12px}
+  .btn-add{width:100%;text-align:center;padding:9px}
+  .cc-header{padding:12px}
+  .cc-detail{padding:12px}
+  .dgrid{grid-template-columns:1fr 1fr;gap:8px 12px}
+  .pgrid{grid-template-columns:1fr 1fr;gap:6px 12px}
+  .pay-top{flex-wrap:wrap;gap:6px}
+  .pay-right{flex-wrap:wrap;gap:6px;width:100%}
+  .pay-amt{font-size:13px}
+  .status-select{font-size:11px;padding:3px 6px}
+  .btn-xs{font-size:10px;padding:3px 7px}
+  .fin-bar{flex-direction:column;align-items:flex-start;gap:8px}
+  .fin-bar .filters{margin-left:0!important}
+  .fin-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .fin-card{padding:14px}
+  .fin-card-n{font-size:20px}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .ptable{min-width:560px}
+  .ptable th,.ptable td{padding:8px 10px;font-size:12px;white-space:nowrap}
+  .hr-tabs{overflow-x:auto;flex-wrap:nowrap;gap:4px;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  .hr-tabs::-webkit-scrollbar{display:none}
+  .hr-tab{white-space:nowrap;padding:6px 12px;font-size:12px}
+  .clock-card{padding:20px 16px}
+  .clock-time{font-size:36px}
+  .clock-btns{flex-direction:column;gap:8px}
+  .btn-clock-in,.btn-clock-out{width:100%;padding:12px}
+  .member-grid{grid-template-columns:1fr}
+  .leave-row{flex-wrap:wrap;gap:8px}
+  .leave-right{flex-wrap:wrap;gap:6px}
+  .modal{padding:16px;max-height:95vh;margin:8px}
+  .modal h2{font-size:15px;margin-bottom:14px}
+  .fgr{grid-template-columns:1fr}
+  .fg input,.fg select,.fg textarea{font-size:16px}
+  .row-btns{gap:6px;flex-wrap:wrap}
+  .btn-sm{font-size:11px;padding:5px 10px}
+  .cc-right{gap:6px}
+  .pcount{font-size:11px;padding:2px 7px}
+  .cn{font-size:14px}
+  .pn{font-size:12px}
+  .pm{font-size:11px}
+  .inv-row{flex-wrap:wrap;gap:6px}
+  .page-title{font-size:16px}
+  .sec-title{font-size:14px}
+  .month-nav button{padding:5px 8px}
+  .month-label{font-size:13px;min-width:60px}
+}
 </style>
 </head>
 <body>
