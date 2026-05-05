@@ -227,6 +227,7 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
     <nav>
       <button class="nav-btn on" onclick="showPage('crm',this)">客戶管理</button>
       <button class="nav-btn" onclick="showPage('finance',this)">財務總覽</button>
+      <button class="nav-btn" onclick="showPage('logs',this)">登入紀錄</button>
     </nav>
 
     <!-- CRM -->
@@ -280,6 +281,24 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
         <table class="ptable">
           <thead><tr><th>客戶</th><th>專案</th><th>請款項目</th><th>金額</th><th>請款日</th><th>到期日</th><th>狀態</th><th>發票</th></tr></thead>
           <tbody id="fin-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Login Logs -->
+    <div class="page" id="page-logs">
+      <div class="page-header">
+        <div class="page-title">登入紀錄</div>
+        <button class="btn-add" onclick="loadLogs()">重新整理</button>
+      </div>
+      <div class="stats" id="log-stats"></div>
+      <div id="log-loading" class="loading" style="display:none"><div class="spinner"></div>載入中…</div>
+      <div class="table-wrap" id="log-table-wrap" style="display:none">
+        <table class="ptable">
+          <thead><tr>
+            <th>姓名</th><th>Email</th><th>登入時間</th><th>裝置</th><th>瀏覽器</th>
+          </tr></thead>
+          <tbody id="log-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -397,6 +416,13 @@ function handleCredential(response) {
   g('app').style.display = 'block';
   g('user-name').textContent = payload.name;
   g('user-avatar').src = payload.picture;
+
+  // 記錄登入
+  const ua = navigator.userAgent;
+  const device = /Mobi|Android/i.test(ua) ? '手機' : '電腦';
+  const browser = /Chrome/i.test(ua) ? 'Chrome' : /Safari/i.test(ua) ? 'Safari' : /Firefox/i.test(ua) ? 'Firefox' : /Edge/i.test(ua) ? 'Edge' : '其他';
+  api('logLogin', { email, name: payload.name, device, browser }).catch(()=>{});
+
   loadData();
 }
 
@@ -465,6 +491,44 @@ function showPage(id,el){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
   g('page-'+id).classList.add('on');el.classList.add('on');
   if(id==='finance')renderFinance();
+  if(id==='logs')loadLogs();
+}
+
+async function loadLogs(){
+  g('log-loading').style.display='block';
+  g('log-table-wrap').style.display='none';
+  try{
+    const res=await api('getAll');
+    const logs=(res.login_logs||[]).slice().reverse();
+    const today=new Date().toISOString().slice(0,10);
+    const todayCount=logs.filter(l=>l.login_at&&l.login_at.slice(0,10)===today).length;
+    const uniqueUsers=new Set(logs.map(l=>l.email)).size;
+    const thisMonth=new Date().toISOString().slice(0,7);
+    const monthCount=logs.filter(l=>l.login_at&&l.login_at.slice(0,7)===thisMonth).length;
+    g('log-stats').innerHTML=`
+      <div class="stat"><div class="stat-l">總登入次數</div><div class="stat-n">${logs.length}</div></div>
+      <div class="stat"><div class="stat-l">今日登入</div><div class="stat-n good">${todayCount}</div></div>
+      <div class="stat"><div class="stat-l">本月登入</div><div class="stat-n">${monthCount}</div></div>
+      <div class="stat"><div class="stat-l">使用人數</div><div class="stat-n">${uniqueUsers}</div></div>`;
+    if(!logs.length){
+      g('log-tbody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">尚無登入記錄</td></tr>';
+    }else{
+      g('log-tbody').innerHTML=logs.map(l=>{
+        const dt=l.login_at?new Date(l.login_at).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+        return`<tr>
+          <td style="font-weight:500">${l.name||'—'}</td>
+          <td style="color:var(--text2)">${l.email||'—'}</td>
+          <td style="color:var(--text2)">${dt}</td>
+          <td>${l.device||'—'}</td>
+          <td>${l.browser||'—'}</td>
+        </tr>`;
+      }).join('');
+    }
+    g('log-loading').style.display='none';
+    g('log-table-wrap').style.display='block';
+  }catch(e){
+    g('log-loading').innerHTML='<div style="color:var(--red-text);font-size:13px">載入失敗：'+e.message+'</div>';
+  }
 }
 
 /* ── CRM Render ── */
