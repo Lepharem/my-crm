@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>客戶管理系統</title>
+<title>營運管理系統</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#ffffff;--bg2:#f7f6f3;--bg3:#f0efe9;
+  --bg:#fff;--bg2:#f7f6f3;--bg3:#f0efe9;
   --text:#1a1a18;--text2:#6b6a64;--text3:#9b9a94;
   --border:#e0ddd4;--border2:#c8c6bc;
   --teal:#0f6e56;--teal-bg:#e1f5ee;--teal-text:#085041;
@@ -15,7 +15,8 @@
   --amber-bg:#faeeda;--amber-text:#633806;
   --gray-bg:#f1efe8;--gray-text:#444441;
   --purple-bg:#eeedfe;--purple-text:#3c3489;
-  --red-bg:#fcebeb;--red-text:#791f1f;
+  --red-bg:#fcebeb;--red-text:#791f1f;--red-border:#f0abab;
+  --green-bg:#eaf3de;--green-text:#27500a;
   --r:8px;--rl:12px;
 }
 @media(prefers-color-scheme:dark){
@@ -28,20 +29,39 @@
     --amber-bg:#633806;--amber-text:#fac775;
     --gray-bg:#3a3935;--gray-text:#d3d1c7;
     --purple-bg:#3c3489;--purple-text:#cecbf6;
-    --red-bg:#501313;--red-text:#f7c1c1;
+    --red-bg:#501313;--red-text:#f7c1c1;--red-border:#7a3333;
+    --green-bg:#173404;--green-text:#c0dd97;
   }
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
-.app{max-width:900px;margin:0 auto;padding:24px 16px}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:10px}
-.logo{font-size:18px;font-weight:600}.logo span{color:var(--teal)}
+.app{max-width:960px;margin:0 auto;padding:24px 16px}
+
+/* Nav */
+nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--border);padding-bottom:0}
+.nav-btn{padding:10px 18px;border:none;background:none;color:var(--text2);font-size:14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:.15s}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.on{color:var(--teal);border-bottom-color:var(--teal);font-weight:500}
+
+/* Page */
+.page{display:none}.page.on{display:block}
+
+/* Header */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.page-title{font-size:18px;font-weight:600}
 .saved{font-size:12px;color:var(--text3)}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:22px}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:22px}
 .stat{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);padding:14px 16px}
 .stat-l{font-size:12px;color:var(--text2);margin-bottom:3px}
-.stat-n{font-size:24px;font-weight:600}
+.stat-n{font-size:22px;font-weight:600}
+.stat-n.warn{color:#854f0b}
+.stat-n.danger{color:#a32d2d}
+.stat-n.good{color:#0f6e56}
+
+/* Toolbar */
 .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
-.sw{flex:1;min-width:200px;position:relative}
+.sw{flex:1;min-width:180px;position:relative}
 .sw svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none}
 .sw input{width:100%;padding:9px 12px 9px 34px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:14px;outline:none}
 .sw input:focus{border-color:var(--teal)}
@@ -51,6 +71,8 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .pill.on{background:var(--teal-bg);border-color:var(--teal);color:var(--teal-text);font-weight:500}
 .btn-add{padding:9px 18px;border-radius:var(--r);border:0.5px solid var(--teal);background:var(--teal-bg);color:var(--teal-text);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
 .btn-add:hover{opacity:.85}
+
+/* Client cards */
 .clients{display:flex;flex-direction:column;gap:10px}
 .cc{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);overflow:hidden;transition:border-color .15s}
 .cc:hover{border-color:var(--border2)}
@@ -66,18 +88,20 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .cc.open .chevron{transform:rotate(180deg)}
 .cc-detail{display:none;border-top:0.5px solid var(--border);padding:16px}
 .cc.open .cc-detail{display:block}
-.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px 20px;margin-bottom:16px}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 20px;margin-bottom:16px}
 .dl{font-size:11px;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em}
 .dv{font-size:13px;font-weight:500;word-break:break-all}
 .cc-actions{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
 .btn-sm{padding:6px 12px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:12px;cursor:pointer;transition:.15s}
 .btn-sm:hover{background:var(--bg2)}
-.btn-del{color:var(--red-text);border-color:#f0abab}
+.btn-del{color:var(--red-text);border-color:var(--red-border)}
 .btn-del:hover{background:var(--red-bg)}
-.proj-section{}
+
+/* Project cards */
+.proj-section{margin-bottom:0}
 .proj-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .proj-title{font-size:13px;font-weight:500;color:var(--text2)}
-.btn-add-proj{padding:5px 12px;border-radius:var(--r);border:0.5px solid var(--teal);background:var(--teal-bg);color:var(--teal-text);font-size:12px;cursor:pointer}
+.btn-add-sm{padding:5px 12px;border-radius:var(--r);border:0.5px solid var(--teal);background:var(--teal-bg);color:var(--teal-text);font-size:12px;cursor:pointer}
 .proj-list{display:flex;flex-direction:column;gap:8px}
 .proj-empty{font-size:13px;color:var(--text3);padding:12px 0;text-align:center}
 .pc{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--r);padding:13px 15px}
@@ -89,15 +113,50 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .b-proposal{background:var(--blue-bg);color:var(--blue-text)}
 .b-active{background:var(--teal-bg);color:var(--teal-text)}
 .b-closed{background:var(--gray-bg);color:var(--gray-text)}
+.b-paid{background:var(--green-bg);color:var(--green-text)}
+.b-unpaid{background:var(--amber-bg);color:var(--amber-text)}
+.b-overdue{background:var(--red-bg);color:var(--red-text)}
 .pc-expand{display:none;margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)}
 .pc-expand.open{display:block}
-.pc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;margin-bottom:12px}
+.pc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;margin-bottom:12px}
 .pc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .drive-link{font-size:12px;color:var(--teal);text-decoration:none;word-break:break-all}
 .drive-link:hover{text-decoration:underline}
+
+/* Payment records */
+.pay-section{margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)}
+.pay-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.pay-title{font-size:12px;font-weight:500;color:var(--text2)}
+.pay-list{display:flex;flex-direction:column;gap:6px}
+.pay-row{display:flex;align-items:center;gap:10px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);padding:10px 12px}
+.pay-info{flex:1;min-width:0}
+.pay-name{font-size:12px;font-weight:500}
+.pay-meta{font-size:11px;color:var(--text2);margin-top:1px}
+.pay-amount{font-size:13px;font-weight:600;white-space:nowrap}
+.pay-actions{display:flex;gap:6px;align-items:center}
+.btn-xs{padding:4px 9px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer}
+.btn-xs:hover{background:var(--border)}
+.btn-xs.mark-paid{border-color:var(--teal);color:var(--teal-text);background:var(--teal-bg)}
+.pay-empty{font-size:12px;color:var(--text3);padding:8px 0}
+
+/* Finance page */
+.fin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:24px}
+.fin-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:18px 20px}
+.fin-card-label{font-size:12px;color:var(--text2);margin-bottom:6px}
+.fin-card-num{font-size:28px;font-weight:600}
+.fin-card-sub{font-size:12px;color:var(--text3);margin-top:4px}
+.pay-table{width:100%;border-collapse:collapse;font-size:13px}
+.pay-table th{text-align:left;padding:10px 12px;font-size:11px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);letter-spacing:.04em;text-transform:uppercase}
+.pay-table td{padding:11px 12px;border-bottom:0.5px solid var(--border)}
+.pay-table tr:last-child td{border-bottom:none}
+.pay-table tr:hover td{background:var(--bg2)}
+.section-title{font-size:15px;font-weight:500;margin-bottom:14px}
+.table-wrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:24px}
+
+/* Modal */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
 .overlay.open{display:flex}
-.modal{background:var(--bg);border-radius:var(--rl);border:0.5px solid var(--border2);padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.modal{background:var(--bg);border-radius:var(--rl);border:0.5px solid var(--border2);padding:24px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto}
 .modal h2{font-size:16px;font-weight:600;margin-bottom:18px}
 .fg{margin-bottom:13px}
 .fg label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px}
@@ -116,26 +175,58 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 </head>
 <body>
 <div class="app">
-  <header>
-    <div class="logo">客戶管理 <span>CRM</span></div>
-    <div class="saved" id="saved">資料儲存於本機瀏覽器</div>
-  </header>
-  <div class="stats" id="stats"></div>
-  <div class="toolbar">
-    <div class="sw">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-      <input type="text" id="search" placeholder="搜尋公司名稱、統編、電話…" oninput="render()">
+  <nav>
+    <button class="nav-btn on" onclick="showPage('crm',this)">客戶管理</button>
+    <button class="nav-btn" onclick="showPage('finance',this)">財務總覽</button>
+  </nav>
+
+  <!-- CRM Page -->
+  <div class="page on" id="page-crm">
+    <div class="page-header">
+      <div class="page-title">客戶管理</div>
+      <div class="saved" id="saved">資料儲存於本機瀏覽器</div>
     </div>
-    <div class="filters">
-      <button class="pill on" data-f="all" onclick="setFilter(this)">全部</button>
-      <button class="pill" data-f="active" onclick="setFilter(this)">進行中專案</button>
-      <button class="pill" data-f="proposal" onclick="setFilter(this)">提案中</button>
+    <div class="stats" id="crm-stats"></div>
+    <div class="toolbar">
+      <div class="sw">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input type="text" id="search" placeholder="搜尋公司名稱、統編、電話…" oninput="renderCRM()">
+      </div>
+      <div class="filters">
+        <button class="pill on" data-f="all" onclick="setFilter(this)">全部</button>
+        <button class="pill" data-f="active" onclick="setFilter(this)">進行中</button>
+        <button class="pill" data-f="proposal" onclick="setFilter(this)">提案中</button>
+      </div>
+      <button class="btn-add" onclick="openClientModal()">+ 新增客戶</button>
     </div>
-    <button class="btn-add" onclick="openClientModal()">+ 新增客戶</button>
+    <div class="clients" id="clients"></div>
   </div>
-  <div class="clients" id="clients"></div>
+
+  <!-- Finance Page -->
+  <div class="page" id="page-finance">
+    <div class="page-header">
+      <div class="page-title">財務總覽</div>
+      <div class="filters">
+        <button class="pill on" data-fp="all" onclick="setFinFilter(this)">全部</button>
+        <button class="pill" data-fp="unpaid" onclick="setFinFilter(this)">未付款</button>
+        <button class="pill" data-fp="overdue" onclick="setFinFilter(this)">逾期</button>
+        <button class="pill" data-fp="paid" onclick="setFinFilter(this)">已收款</button>
+      </div>
+    </div>
+    <div class="fin-grid" id="fin-cards"></div>
+    <div class="section-title">請款明細</div>
+    <div class="table-wrap">
+      <table class="pay-table" id="fin-table">
+        <thead><tr>
+          <th>客戶</th><th>專案</th><th>請款項目</th><th>金額</th><th>請款日</th><th>到期日</th><th>狀態</th><th></th>
+        </tr></thead>
+        <tbody id="fin-tbody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
+<!-- Client Modal -->
 <div class="overlay" id="cm-overlay" onclick="overlayClick(event,'cm-overlay')">
   <div class="modal">
     <h2 id="cm-title">新增客戶</h2>
@@ -159,6 +250,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
   </div>
 </div>
 
+<!-- Project Modal -->
 <div class="overlay" id="pm-overlay" onclick="overlayClick(event,'pm-overlay')">
   <div class="modal">
     <h2 id="pm-title">新增專案</h2>
@@ -182,10 +274,38 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
       <div class="fg"><label>結束日期</label><input id="pm-end" type="date"></div>
     </div>
     <div class="fg"><label>Google Drive 連結</label><input id="pm-drive" placeholder="https://drive.google.com/…"></div>
-    <div class="fg"><label>備註</label><textarea id="pm-note" rows="2" placeholder="專案說明、重要記錄…"></textarea></div>
+    <div class="fg"><label>備註</label><textarea id="pm-note" rows="2" placeholder="專案說明…"></textarea></div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal('pm-overlay')">取消</button>
       <button class="btn-save" onclick="saveProject()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="overlay" id="pay-overlay" onclick="overlayClick(event,'pay-overlay')">
+  <div class="modal">
+    <h2 id="pay-title">新增請款記錄</h2>
+    <div class="fg"><label>請款項目名稱 *</label><input id="pay-name" placeholder="例：頭款 50%、第二期款…"></div>
+    <div class="fg-row">
+      <div class="fg"><label>請款金額（NT$）*</label><input id="pay-amount" placeholder="例：60,000"></div>
+      <div class="fg"><label>狀態</label>
+        <select id="pay-status">
+          <option value="unpaid">未付款</option>
+          <option value="paid">已收款</option>
+          <option value="overdue">逾期</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>請款日期</label><input id="pay-date" type="date"></div>
+      <div class="fg"><label>付款到期日</label><input id="pay-due" type="date"></div>
+    </div>
+    <div class="fg"><label>發票號碼</label><input id="pay-invoice" placeholder="例：AB12345678"></div>
+    <div class="fg"><label>備註</label><input id="pay-note" placeholder="付款方式、備注…"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('pay-overlay')">取消</button>
+      <button class="btn-save" onclick="savePayment()">儲存</button>
     </div>
   </div>
 </div>
@@ -198,33 +318,48 @@ const COLORS=[
   {bg:'#faeeda',c:'#633806'},{bg:'#eeedfe',c:'#3c3489'},
   {bg:'#faece7',c:'#712b13'},{bg:'#eaf3de',c:'#27500a'},
 ];
-const SL={proposal:'提案中',active:'進行中',closed:'結案'};
-const SC={proposal:'b-proposal',active:'b-active',closed:'b-closed'};
+const PSL={proposal:'提案中',active:'進行中',closed:'結案'};
+const PSC={proposal:'b-proposal',active:'b-active',closed:'b-closed'};
+const PYSL={unpaid:'未付款',paid:'已收款',overdue:'逾期'};
+const PYSC={unpaid:'b-unpaid',paid:'b-paid',overdue:'b-overdue'};
 
 let data={clients:[]};
-let filter='all';
+let crmFilter='all';
+let finFilter='all';
 let openClientId=null;
 let openProjIds={};
 let editClientId=null;
-let editProjId=null;
-let editProjClientId=null;
-let addProjClientId=null;
+let editProjId=null,editProjCid=null;
+let editPayId=null,editPayPid=null,editPayCid=null;
+let addProjCid=null;
+let addPayCid=null,addPayPid=null;
 
 function load(){
-  try{data=JSON.parse(localStorage.getItem('crm_v2')||'null')||{clients:[]};}catch{data={clients:[]};}
+  try{data=JSON.parse(localStorage.getItem('cms_v3')||'null')||{clients:[]};}catch{data={clients:[]};}
   if(!data.clients.length){
+    const today=new Date().toISOString().slice(0,10);
     data={clients:[
       {id:1,name:'好感電商股份有限公司',taxid:'12345678',phone:'02-2345-6789',addr:'台北市信義區松高路1號',budget:'500,000',quote:'Q2025-001',contact:'陳小明・行銷總監',email:'chen@goodsense.tw',note:'長期合作客戶',projects:[
-        {id:101,name:'2025 Google 廣告年約',status:'active',owner:'王小華',amount:'240,000',quote:'Q2025-001A',start:'2025-01-01',end:'2025-12-31',drive:'',note:'每月固定投放預算 20,000'},
-        {id:102,name:'品牌網站改版',status:'proposal',owner:'李設計',amount:'80,000',quote:'Q2025-001B',start:'',end:'',drive:'',note:'預計 Q2 執行'},
+        {id:101,name:'2025 Google 廣告年約',status:'active',owner:'王小華',amount:'240,000',quote:'Q2025-001A',start:'2025-01-01',end:'2025-12-31',drive:'',note:'每月固定投放 20,000',payments:[
+          {id:1001,name:'頭款 50%',amount:'120,000',status:'paid',date:'2025-01-05',due:'2025-01-15',invoice:'AB12340001',note:''},
+          {id:1002,name:'尾款 50%',amount:'120,000',status:'unpaid',date:'2025-07-01',due:'2025-07-15',invoice:'',note:''},
+        ]},
+        {id:102,name:'品牌網站改版',status:'proposal',owner:'李設計',amount:'80,000',quote:'Q2025-001B',start:'',end:'',drive:'',note:'預計 Q2 執行',payments:[]},
       ]},
       {id:2,name:'旭日餐飲集團',taxid:'87654321',phone:'02-8765-4321',addr:'台北市大安區忠孝東路四段200號',budget:'300,000',quote:'Q2025-002',contact:'林美華・品牌經理',email:'lin@sunrise-food.com',note:'',projects:[
-        {id:201,name:'2025 Q3 社群行銷',status:'proposal',owner:'陳企劃',amount:'90,000',quote:'Q2025-002A',start:'2025-07-01',end:'2025-09-30',drive:'',note:'下週簡報確認'},
+        {id:201,name:'2025 Q3 社群行銷',status:'proposal',owner:'陳企劃',amount:'90,000',quote:'Q2025-002A',start:'2025-07-01',end:'2025-09-30',drive:'',note:'下週簡報確認',payments:[
+          {id:2001,name:'全額請款',amount:'90,000',status:'unpaid',date:'2025-07-01',due:'2025-07-20',invoice:'',note:''},
+        ]},
       ]},
       {id:3,name:'健康樂活品牌',taxid:'11223344',phone:'0912-345-678',addr:'新北市板橋區文化路一段100號',budget:'800,000',quote:'Q2024-015',contact:'張大偉・執行長',email:'chang@healthjoy.tw',note:'年度合約',projects:[
-        {id:301,name:'KOL 合作專案',status:'active',owner:'王小華',amount:'200,000',quote:'Q2024-015A',start:'2024-07-01',end:'2025-06-30',drive:'https://drive.google.com',note:'合作 KOL 共 5 位'},
-        {id:302,name:'Meta 廣告投放',status:'closed',owner:'李媒購',amount:'360,000',quote:'Q2024-015B',start:'2024-01-01',end:'2024-12-31',drive:'',note:'已結案'},
-        {id:303,name:'2025 廣告年約',status:'active',owner:'李媒購',amount:'360,000',quote:'Q2025-015A',start:'2025-01-01',end:'2025-12-31',drive:'',note:''},
+        {id:301,name:'KOL 合作專案',status:'active',owner:'王小華',amount:'200,000',quote:'Q2024-015A',start:'2024-07-01',end:'2025-06-30',drive:'',note:'',payments:[
+          {id:3001,name:'第一期',amount:'100,000',status:'paid',date:'2024-07-05',due:'2024-07-20',invoice:'CD56780001',note:''},
+          {id:3002,name:'第二期',amount:'100,000',status:'overdue',date:'2025-01-05',due:'2025-01-20',invoice:'',note:'請催款'},
+        ]},
+        {id:302,name:'2025 廣告年約',status:'active',owner:'李媒購',amount:'360,000',quote:'Q2025-015A',start:'2025-01-01',end:'2025-12-31',drive:'',note:'',payments:[
+          {id:3003,name:'頭款',amount:'180,000',status:'paid',date:'2025-01-03',due:'2025-01-10',invoice:'CD56780002',note:''},
+          {id:3004,name:'尾款',amount:'180,000',status:'unpaid',date:'2025-07-01',due:'2025-07-15',invoice:'',note:''},
+        ]},
       ]},
     ]};
     save();
@@ -232,35 +367,47 @@ function load(){
 }
 
 function save(){
-  localStorage.setItem('crm_v2',JSON.stringify(data));
+  localStorage.setItem('cms_v3',JSON.stringify(data));
   const now=new Date();
-  document.getElementById('saved').textContent='上次儲存：'+now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+  const el=document.getElementById('saved');
+  if(el)el.textContent='上次儲存：'+now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
 }
 
-function nextClientId(){return data.clients.length?Math.max(...data.clients.map(c=>c.id))+1:1}
-function nextProjId(client){return client.projects.length?Math.max(...client.projects.map(p=>p.id))+1:1}
-function initials(name){const p=name.trim().split(/\s+/);return p.length>=2?p[0][0]+p[1][0]:name.slice(0,2)}
+function nxt(arr){return arr.length?Math.max(...arr.map(x=>x.id))+1:1}
+function initials(n){const p=n.trim().split(/\s+/);return p.length>=2?p[0][0]+p[1][0]:n.slice(0,2)}
 function col(id){return COLORS[id%COLORS.length]}
+function fmtMoney(s){return s?'NT$ '+s:'—'}
+function allPayments(){return data.clients.flatMap(c=>c.projects.flatMap(p=>p.payments.map(py=>({...py,clientName:c.name,clientId:c.id,projName:p.name,projId:p.id}))))}
 
-function renderStats(){
+/* Nav */
+function showPage(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('page-'+id).classList.add('on');
+  el.classList.add('on');
+  if(id==='finance')renderFinance();
+}
+
+/* CRM */
+function renderCRMStats(){
   const total=data.clients.length;
-  const allProjs=data.clients.flatMap(c=>c.projects);
-  const active=allProjs.filter(p=>p.status==='active').length;
-  const proposal=allProjs.filter(p=>p.status==='proposal').length;
-  document.getElementById('stats').innerHTML=`
+  const allP=data.clients.flatMap(c=>c.projects);
+  const active=allP.filter(p=>p.status==='active').length;
+  const proposal=allP.filter(p=>p.status==='proposal').length;
+  document.getElementById('crm-stats').innerHTML=`
     <div class="stat"><div class="stat-l">客戶總數</div><div class="stat-n">${total}</div></div>
-    <div class="stat"><div class="stat-l">專案總數</div><div class="stat-n">${allProjs.length}</div></div>
-    <div class="stat"><div class="stat-l">進行中</div><div class="stat-n">${active}</div></div>
-    <div class="stat"><div class="stat-l">提案中</div><div class="stat-n">${proposal}</div></div>
+    <div class="stat"><div class="stat-l">專案總數</div><div class="stat-n">${allP.length}</div></div>
+    <div class="stat"><div class="stat-l">進行中</div><div class="stat-n good">${active}</div></div>
+    <div class="stat"><div class="stat-l">提案中</div><div class="stat-n warn">${proposal}</div></div>
   `;
 }
 
-function render(){
-  renderStats();
+function renderCRM(){
+  renderCRMStats();
   const q=document.getElementById('search').value.toLowerCase();
   const clients=data.clients.filter(c=>{
     const mq=!q||[c.name,c.taxid,c.phone,c.contact,c.email].join(' ').toLowerCase().includes(q);
-    const mf=filter==='all'||(filter==='active'&&c.projects.some(p=>p.status==='active'))||(filter==='proposal'&&c.projects.some(p=>p.status==='proposal'));
+    const mf=crmFilter==='all'||(crmFilter==='active'&&c.projects.some(p=>p.status==='active'))||(crmFilter==='proposal'&&c.projects.some(p=>p.status==='proposal'));
     return mq&&mf;
   });
   const el=document.getElementById('clients');
@@ -288,7 +435,7 @@ function render(){
           <div><div class="dl">地址</div><div class="dv">${c.addr||'—'}</div></div>
           <div><div class="dl">聯絡人</div><div class="dv">${c.contact||'—'}</div></div>
           <div><div class="dl">Email</div><div class="dv">${c.email||'—'}</div></div>
-          <div><div class="dl">預算規模</div><div class="dv">${c.budget?'NT$ '+c.budget:'—'}</div></div>
+          <div><div class="dl">預算規模</div><div class="dv">${fmtMoney(c.budget)}</div></div>
           <div><div class="dl">報價單編號</div><div class="dv">${c.quote||'—'}</div></div>
           <div><div class="dl">備註</div><div class="dv">${c.note||'—'}</div></div>
         </div>
@@ -299,9 +446,9 @@ function render(){
         <div class="proj-section">
           <div class="proj-header">
             <span class="proj-title">專案 / 合約（${c.projects.length}）</span>
-            <button class="btn-add-proj" onclick="openAddProj(${c.id})">+ 新增專案</button>
+            <button class="btn-add-sm" onclick="openAddProj(${c.id})">+ 新增專案</button>
           </div>
-          <div class="proj-list">${c.projects.length?c.projects.map(p=>renderProj(c.id,p)).join(''):'<div class="proj-empty">尚無專案，點上方按鈕新增</div>'}</div>
+          <div class="proj-list">${c.projects.length?c.projects.map(p=>renderProj(c.id,p)).join(''):'<div class="proj-empty">尚無專案</div>'}</div>
         </div>
       </div>
     </div>`;
@@ -310,23 +457,28 @@ function render(){
 
 function renderProj(cid,p){
   const isOpen=openProjIds[cid+'_'+p.id];
+  const unpaid=p.payments.filter(py=>py.status==='unpaid').length;
+  const overdue=p.payments.filter(py=>py.status==='overdue').length;
+  let payBadge='';
+  if(overdue)payBadge=`<span class="badge b-overdue" style="font-size:10px">${overdue} 筆逾期</span>`;
+  else if(unpaid)payBadge=`<span class="badge b-unpaid" style="font-size:10px">${unpaid} 筆未付</span>`;
   return`<div class="pc">
     <div class="pc-row" onclick="toggleProj(${cid},${p.id})">
       <div class="pc-info">
-        <div class="pn">${p.name}</div>
+        <div class="pn">${p.name} ${payBadge}</div>
         <div class="pm">${p.owner?p.owner+'・':''}${p.amount?'NT$ '+p.amount:''}${p.start?'・'+p.start.slice(0,7):''}</div>
       </div>
-      <span class="badge ${SC[p.status]}">${SL[p.status]}</span>
+      <span class="badge ${PSC[p.status]}">${PSL[p.status]}</span>
       <svg style="width:14px;height:14px;opacity:.35;transition:transform .2s;${isOpen?'transform:rotate(180deg)':''}flex-shrink:0" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
     <div class="pc-expand${isOpen?' open':''}">
       <div class="pc-grid">
         <div><div class="dl">負責人員</div><div class="dv">${p.owner||'—'}</div></div>
-        <div><div class="dl">合約金額</div><div class="dv">${p.amount?'NT$ '+p.amount:'—'}</div></div>
+        <div><div class="dl">合約金額</div><div class="dv">${fmtMoney(p.amount)}</div></div>
         <div><div class="dl">報價單編號</div><div class="dv">${p.quote||'—'}</div></div>
         <div><div class="dl">開始日期</div><div class="dv">${p.start||'—'}</div></div>
         <div><div class="dl">結束日期</div><div class="dv">${p.end||'—'}</div></div>
-        <div><div class="dl">狀態</div><div class="dv">${SL[p.status]}</div></div>
+        <div><div class="dl">狀態</div><div class="dv">${PSL[p.status]}</div></div>
       </div>
       ${p.drive?`<div style="margin-bottom:10px"><div class="dl" style="margin-bottom:3px">Google Drive</div><a class="drive-link" href="${p.drive}" target="_blank">${p.drive}</a></div>`:''}
       ${p.note?`<div style="margin-bottom:10px"><div class="dl" style="margin-bottom:3px">備註</div><div class="dv" style="font-weight:400;font-size:13px">${p.note}</div></div>`:''}
@@ -334,14 +486,80 @@ function renderProj(cid,p){
         <button class="btn-sm" onclick="openEditProj(${cid},${p.id})">編輯專案</button>
         <button class="btn-sm btn-del" onclick="delProj(${cid},${p.id})">刪除專案</button>
       </div>
+      <div class="pay-section">
+        <div class="pay-header">
+          <span class="pay-title">請款記錄（${p.payments.length}）</span>
+          <button class="btn-xs" onclick="openAddPay(${cid},${p.id})">+ 新增請款</button>
+        </div>
+        <div class="pay-list">
+          ${p.payments.length?p.payments.map(py=>`
+            <div class="pay-row">
+              <div class="pay-info">
+                <div class="pay-name">${py.name}</div>
+                <div class="pay-meta">${py.date?'請款日 '+py.date:''}${py.due?'・到期 '+py.due:''}${py.invoice?'・發票 '+py.invoice:''}</div>
+              </div>
+              <div class="pay-amount">${fmtMoney(py.amount)}</div>
+              <div class="pay-actions">
+                <span class="badge ${PYSC[py.status]}">${PYSL[py.status]}</span>
+                ${py.status!=='paid'?`<button class="btn-xs mark-paid" onclick="markPaid(${cid},${p.id},${py.id})">標記收款</button>`:''}
+                <button class="btn-xs" onclick="openEditPay(${cid},${p.id},${py.id})">編輯</button>
+                <button class="btn-xs" style="color:var(--red-text)" onclick="delPay(${cid},${p.id},${py.id})">✕</button>
+              </div>
+            </div>`).join(''):'<div class="pay-empty">尚無請款記錄</div>'}
+        </div>
+      </div>
     </div>
   </div>`;
 }
 
-function toggleClient(id){openClientId=openClientId===id?null:id;render()}
-function toggleProj(cid,pid){const k=cid+'_'+pid;openProjIds[k]=!openProjIds[k];render()}
-function setFilter(el){filter=el.dataset.f;document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));el.classList.add('on');render()}
+function toggleClient(id){openClientId=openClientId===id?null:id;renderCRM()}
+function toggleProj(cid,pid){const k=cid+'_'+pid;openProjIds[k]=!openProjIds[k];renderCRM()}
+function setFilter(el){crmFilter=el.dataset.f;document.querySelectorAll('#page-crm .pill').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderCRM()}
 
+/* Finance */
+function parseNum(s){return parseInt((s||'0').replace(/,/g,''))||0}
+
+function renderFinance(){
+  const pays=allPayments().filter(py=>finFilter==='all'||py.status===finFilter);
+  const all=allPayments();
+  const totalUnpaid=all.filter(p=>p.status==='unpaid').reduce((s,p)=>s+parseNum(p.amount),0);
+  const totalOverdue=all.filter(p=>p.status==='overdue').reduce((s,p)=>s+parseNum(p.amount),0);
+  const totalPaid=all.filter(p=>p.status==='paid').reduce((s,p)=>s+parseNum(p.amount),0);
+  const thisMonth=new Date().toISOString().slice(0,7);
+  const monthPaid=all.filter(p=>p.status==='paid'&&p.date&&p.date.slice(0,7)===thisMonth).reduce((s,p)=>s+parseNum(p.amount),0);
+  document.getElementById('fin-cards').innerHTML=`
+    <div class="fin-card"><div class="fin-card-label">應收未收</div><div class="fin-card-num warn">NT$ ${totalUnpaid.toLocaleString()}</div><div class="fin-card-sub">${all.filter(p=>p.status==='unpaid').length} 筆未付款</div></div>
+    <div class="fin-card"><div class="fin-card-label">逾期未收</div><div class="fin-card-num danger">NT$ ${totalOverdue.toLocaleString()}</div><div class="fin-card-sub">${all.filter(p=>p.status==='overdue').length} 筆逾期</div></div>
+    <div class="fin-card"><div class="fin-card-label">本月已收</div><div class="fin-card-num good">NT$ ${monthPaid.toLocaleString()}</div><div class="fin-card-sub">${thisMonth}</div></div>
+    <div class="fin-card"><div class="fin-card-label">累計已收</div><div class="fin-card-num">NT$ ${totalPaid.toLocaleString()}</div><div class="fin-card-sub">歷史收款總額</div></div>
+  `;
+  const tbody=document.getElementById('fin-tbody');
+  if(!pays.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:24px">無符合記錄</td></tr>';return;}
+  tbody.innerHTML=pays.map(py=>`
+    <tr>
+      <td>${py.clientName}</td>
+      <td style="color:var(--text2)">${py.projName}</td>
+      <td>${py.name}</td>
+      <td style="font-weight:500">${fmtMoney(py.amount)}</td>
+      <td style="color:var(--text2)">${py.date||'—'}</td>
+      <td style="color:${py.status==='overdue'?'var(--red-text)':'var(--text2)'}">${py.due||'—'}</td>
+      <td><span class="badge ${PYSC[py.status]}">${PYSL[py.status]}</span></td>
+      <td>${py.status!=='paid'?`<button class="btn-xs mark-paid" onclick="markPaidFin(${py.clientId},${py.projId},${py.id})">標記收款</button>`:''}</td>
+    </tr>`).join('');
+}
+
+function setFinFilter(el){finFilter=el.dataset.fp;document.querySelectorAll('#page-finance .pill').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderFinance()}
+
+function markPaid(cid,pid,pyid){
+  const c=data.clients.find(x=>x.id===cid);
+  const p=c.projects.find(x=>x.id===pid);
+  const py=p.payments.find(x=>x.id===pyid);
+  if(py){py.status='paid';py.date=py.date||new Date().toISOString().slice(0,10);}
+  save();renderCRM();toast('已標記為已收款');
+}
+function markPaidFin(cid,pid,pyid){markPaid(cid,pid,pyid);renderFinance();}
+
+/* Client CRUD */
 function openClientModal(){
   editClientId=null;
   document.getElementById('cm-title').textContent='新增客戶';
@@ -364,76 +582,112 @@ function openEditClient(id){
   document.getElementById('cm-overlay').classList.add('open');
 }
 function saveClient(){
-  const name=document.getElementById('cm-name').value.trim();
-  if(!name){alert('請輸入公司名稱');return;}
+  const name=v('cm-name');if(!name){alert('請輸入公司名稱');return;}
   const d={name,taxid:v('cm-taxid'),phone:v('cm-phone'),addr:v('cm-addr'),budget:v('cm-budget'),quote:v('cm-quote'),contact:v('cm-contact'),email:v('cm-email'),note:v('cm-note')};
   if(editClientId){
     const idx=data.clients.findIndex(c=>c.id===editClientId);
     if(idx>-1)data.clients[idx]={...data.clients[idx],...d};
     toast('已更新客戶資料');
   }else{
-    data.clients.push({id:nextClientId(),projects:[],...d});
+    data.clients.push({id:nxt(data.clients),projects:[],...d});
     toast('已新增客戶');
   }
-  save();closeModal('cm-overlay');render();
+  save();closeModal('cm-overlay');renderCRM();
 }
 function delClient(id){
-  if(!confirm('確定刪除此客戶及其所有專案？'))return;
+  if(!confirm('確定刪除此客戶及其所有專案與請款記錄？'))return;
   data.clients=data.clients.filter(c=>c.id!==id);
   if(openClientId===id)openClientId=null;
-  save();render();toast('已刪除');
+  save();renderCRM();toast('已刪除');
 }
-function openAddProj(cid){
-  addProjClientId=cid;editProjId=null;editProjClientId=null;
-  document.getElementById('pm-title').textContent='新增專案';
-  ['pm-name','pm-owner','pm-amount','pm-quote','pm-start','pm-end','pm-drive','pm-note'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('pm-status').value='proposal';
-  document.getElementById('pm-overlay').classList.add('open');
-}
+
+/* Project CRUD */
+function openAddProj(cid){addProjCid=cid;editProjId=null;editProjCid=null;document.getElementById('pm-title').textContent='新增專案';['pm-name','pm-owner','pm-amount','pm-quote','pm-start','pm-end','pm-drive','pm-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm-status').value='proposal';document.getElementById('pm-overlay').classList.add('open');}
 function openEditProj(cid,pid){
   const c=data.clients.find(x=>x.id===cid);if(!c)return;
   const p=c.projects.find(x=>x.id===pid);if(!p)return;
-  editProjClientId=cid;editProjId=pid;addProjClientId=null;
+  editProjCid=cid;editProjId=pid;addProjCid=null;
   document.getElementById('pm-title').textContent='編輯專案';
-  document.getElementById('pm-name').value=p.name||'';
-  document.getElementById('pm-status').value=p.status||'proposal';
-  document.getElementById('pm-owner').value=p.owner||'';
-  document.getElementById('pm-amount').value=p.amount||'';
-  document.getElementById('pm-quote').value=p.quote||'';
-  document.getElementById('pm-start').value=p.start||'';
-  document.getElementById('pm-end').value=p.end||'';
-  document.getElementById('pm-drive').value=p.drive||'';
-  document.getElementById('pm-note').value=p.note||'';
+  document.getElementById('pm-name').value=p.name||'';document.getElementById('pm-status').value=p.status||'proposal';document.getElementById('pm-owner').value=p.owner||'';document.getElementById('pm-amount').value=p.amount||'';document.getElementById('pm-quote').value=p.quote||'';document.getElementById('pm-start').value=p.start||'';document.getElementById('pm-end').value=p.end||'';document.getElementById('pm-drive').value=p.drive||'';document.getElementById('pm-note').value=p.note||'';
   document.getElementById('pm-overlay').classList.add('open');
 }
 function saveProject(){
-  const name=document.getElementById('pm-name').value.trim();
-  if(!name){alert('請輸入專案名稱');return;}
+  const name=v('pm-name');if(!name){alert('請輸入專案名稱');return;}
   const d={name,status:document.getElementById('pm-status').value,owner:v('pm-owner'),amount:v('pm-amount'),quote:v('pm-quote'),start:v('pm-start'),end:v('pm-end'),drive:v('pm-drive'),note:v('pm-note')};
   if(editProjId){
-    const c=data.clients.find(x=>x.id===editProjClientId);
+    const c=data.clients.find(x=>x.id===editProjCid);
     const idx=c.projects.findIndex(p=>p.id===editProjId);
     if(idx>-1)c.projects[idx]={...c.projects[idx],...d};
     toast('已更新專案');
   }else{
-    const c=data.clients.find(x=>x.id===addProjClientId);
-    c.projects.push({id:nextProjId(c),...d});
+    const c=data.clients.find(x=>x.id===addProjCid);
+    c.projects.push({id:nxt(c.projects),payments:[],...d});
     toast('已新增專案');
   }
-  save();closeModal('pm-overlay');render();
+  save();closeModal('pm-overlay');renderCRM();
 }
 function delProj(cid,pid){
   if(!confirm('確定刪除此專案？'))return;
   const c=data.clients.find(x=>x.id===cid);
   c.projects=c.projects.filter(p=>p.id!==pid);
-  save();render();toast('已刪除');
+  save();renderCRM();toast('已刪除');
 }
+
+/* Payment CRUD */
+function openAddPay(cid,pid){
+  addPayCid=cid;addPayPid=pid;editPayId=null;editPayCid=null;editPayPid=null;
+  document.getElementById('pay-title').textContent='新增請款記錄';
+  ['pay-name','pay-amount','pay-date','pay-due','pay-invoice','pay-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pay-status').value='unpaid';
+  document.getElementById('pay-overlay').classList.add('open');
+}
+function openEditPay(cid,pid,pyid){
+  const c=data.clients.find(x=>x.id===cid);if(!c)return;
+  const p=c.projects.find(x=>x.id===pid);if(!p)return;
+  const py=p.payments.find(x=>x.id===pyid);if(!py)return;
+  editPayCid=cid;editPayPid=pid;editPayId=pyid;addPayCid=null;addPayPid=null;
+  document.getElementById('pay-title').textContent='編輯請款記錄';
+  document.getElementById('pay-name').value=py.name||'';
+  document.getElementById('pay-amount').value=py.amount||'';
+  document.getElementById('pay-status').value=py.status||'unpaid';
+  document.getElementById('pay-date').value=py.date||'';
+  document.getElementById('pay-due').value=py.due||'';
+  document.getElementById('pay-invoice').value=py.invoice||'';
+  document.getElementById('pay-note').value=py.note||'';
+  document.getElementById('pay-overlay').classList.add('open');
+}
+function savePayment(){
+  const name=v('pay-name');if(!name){alert('請輸入請款項目名稱');return;}
+  const amount=v('pay-amount');if(!amount){alert('請輸入請款金額');return;}
+  const d={name,amount,status:document.getElementById('pay-status').value,date:v('pay-date'),due:v('pay-due'),invoice:v('pay-invoice'),note:v('pay-note')};
+  if(editPayId){
+    const c=data.clients.find(x=>x.id===editPayCid);
+    const p=c.projects.find(x=>x.id===editPayPid);
+    const idx=p.payments.findIndex(py=>py.id===editPayId);
+    if(idx>-1)p.payments[idx]={...p.payments[idx],...d};
+    toast('已更新請款記錄');
+  }else{
+    const c=data.clients.find(x=>x.id===addPayCid);
+    const p=c.projects.find(x=>x.id===addPayPid);
+    p.payments.push({id:nxt(p.payments),...d});
+    toast('已新增請款記錄');
+  }
+  save();closeModal('pay-overlay');renderCRM();
+}
+function delPay(cid,pid,pyid){
+  if(!confirm('確定刪除此請款記錄？'))return;
+  const c=data.clients.find(x=>x.id===cid);
+  const p=c.projects.find(x=>x.id===pid);
+  p.payments=p.payments.filter(py=>py.id!==pyid);
+  save();renderCRM();toast('已刪除');
+}
+
 function v(id){return document.getElementById(id).value.trim()}
 function closeModal(id){document.getElementById(id).classList.remove('open')}
 function overlayClick(e,id){if(e.target===document.getElementById(id))closeModal(id)}
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
 
-load();render();
+load();renderCRM();
 </script>
 </body>
 </html>
