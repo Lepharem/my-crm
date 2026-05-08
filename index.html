@@ -121,8 +121,8 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .b-proposal{background:var(--blue-bg);color:var(--blue-text)}
 .b-active{background:var(--teal-bg);color:var(--teal-text)}
 .b-closed{background:var(--gray-bg);color:var(--gray-text)}
-.b-paid{background:var(--green-bg);color:var(--green-text)}
-.b-unpaid{background:var(--amber-bg);color:var(--amber-text)}
+.b-paid{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
+.b-unpaid{background:#e0f0ff;color:#1e40af;border:1px solid #93c5fd}
 .b-overdue{background:var(--red-bg);color:var(--red-text)}
 .b-invoiced{background:var(--purple-bg);color:var(--purple-text)}
 .b-pending{background:var(--amber-bg);color:var(--amber-text)}
@@ -1146,6 +1146,13 @@ function calcLateMin(rec){
 function calcEarlyMin(rec){
   if(!rec.clock_in||!rec.clock_out)return 0;
   const inT=new Date(rec.clock_in);const outT=new Date(rec.clock_out);
+  // 跨午夜下班：若下班時間早於上班時間（日期不同），視為跨日，不算早退
+  const diffMs=outT-inT;
+  if(diffMs<0)return 0; // 異常資料保護
+  const workHrs=diffMs/3600000;
+  if(workHrs>=9)return 0; // 滿9小時不算早退
+  // 跨午夜且工時合理（例如工作到凌晨2點，跨日）
+  if(outT.getDate()!==inT.getDate()&&workHrs>=6)return 0;
   const exp=new Date(inT.getTime()+9*3600000);
   return outT<exp?Math.round((exp-outT)/60000):0;
 }
@@ -1469,6 +1476,10 @@ function renderMemberCard(m){
   </div>`;
 }
 
+// 折疊狀態記憶
+const memberGroupOpen={manager:true,employee:true,contractor:false,resigned:false};
+function toggleMemberGroup(key){memberGroupOpen[key]=!memberGroupOpen[key];renderMembers();}
+
 function renderMembers(){
   const q=(g('member-search').value||'').toLowerCase();
   let list=D.members.filter(m=>{
@@ -1481,32 +1492,38 @@ function renderMembers(){
   const el=g('member-list');
   if(!list.length){el.innerHTML='<div class="empty-state">尚無員工資料</div>';return;}
 
-  // 分組（依 employment_type 和 role 分層）
   const owners=list.filter(m=>m.role==='owner'&&!isResigned(m));
   const managers=list.filter(m=>m.role==='manager'&&!isResigned(m));
   const employees=list.filter(m=>m.role==='employee'&&m.employment_type!=='contractor'&&!isResigned(m));
   const contractors=list.filter(m=>m.employment_type==='contractor'&&!isResigned(m));
   const resigned=list.filter(m=>isResigned(m));
 
-  let html='';
-  let groupCount=0;
-  const renderGroup=(members)=>{
-    if(!members.length)return;
-    if(groupCount>0)html+=`<hr style="border:none;border-top:1.5px solid var(--border2);margin:20px 0">`;
-    html+=`<div class="member-grid">${members.map(renderMemberCard).join('')}</div>`;
-    groupCount++;
+  const chevronUp=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>`;
+  const chevronDown=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>`;
+
+  const renderSection=(key,label,icon,members,dashed=false)=>{
+    if(!members.length)return'';
+    const open=q||memberGroupOpen[key];
+    const border=dashed?'border-top:1.5px dashed #4a4943':'border-top:1.5px solid var(--border2)';
+    return`<div style="${border};margin:16px 0 0;padding-top:14px">
+      <div onclick="toggleMemberGroup('${key}')" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-bottom:${open?'14px':'2px'};padding:4px 2px;border-radius:6px">
+        <span style="font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.05em;text-transform:uppercase">${icon} ${label}</span>
+        <span style="background:var(--bg2);color:var(--text3);font-size:11px;padding:1px 8px;border-radius:10px;border:0.5px solid var(--border)">${members.length}</span>
+        <span style="margin-left:auto;color:var(--text3);display:flex;align-items:center">${open?chevronUp:chevronDown}</span>
+      </div>
+      ${open?`<div class="member-grid">${members.map(renderMemberCard).join('')}</div>`:''}
+    </div>`;
   };
-  renderGroup(owners);
-  renderGroup(managers);
-  renderGroup(employees);
-  renderGroup(contractors);
-  if(resigned.length){
-    html+=`<hr style="border:none;border-top:1.5px dashed #4a4943;margin:24px 0">`;
-    html+=`<div class="member-grid">${resigned.map(renderMemberCard).join('')}</div>`;
-  }
+
+  let html='';
+  if(owners.length)html+=`<div class="member-grid" style="margin-bottom:4px">${owners.map(renderMemberCard).join('')}</div>`;
+  html+=renderSection('manager','主管','👔',managers);
+  html+=renderSection('employee','組員','💼',employees);
+  html+=renderSection('contractor','外包','🔗',contractors);
+  html+=renderSection('resigned','離職','📁',resigned,true);
   el.innerHTML=html;
 }
-function toggleMember(id){const m=D.members.find(x=>String(x.id)===String(id));if(m)m._open=!m._open;renderMembers();}
+function toggleMember(id){const m=D.members.find(x=>String(x.id)===String(id));if(m)m._open=!m._open;renderMembers();} // kept for card expand
 
 /* Attendance */
 function changeAttMonth(d){const[y,m]=attMonth.split('-').map(Number);const nd=new Date(y,m-1+d,1);attMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');renderAttendance();}
@@ -1840,4 +1857,3 @@ function toast(msg){const el=g('toast');el.textContent=msg;el.classList.add('sho
 </script>
 </body>
 </html>
- 
