@@ -593,7 +593,11 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
     <div class="fg"><label>開始日期 *</label><input id="lm-start_date" type="date" oninput="updateLeaveDays()"></div>
     <div class="fg"><label>結束日期 *</label><input id="lm-end_date" type="date" oninput="updateLeaveDays()"></div>
   </div>
-  <div class="fg"><label>請假天數（自動計算，排除假日）</label><input id="lm-days" readonly placeholder="自動計算"></div>
+  <div class="fgr">
+    <div class="fg"><label>開始時間</label><select id="lm-start_time" onchange="updateLeaveDays()"><option value="09:00">09:00</option><option value="09:30">09:30</option><option value="10:00">10:00</option><option value="10:30">10:30</option><option value="11:00">11:00</option><option value="11:30">11:30</option><option value="13:00">13:00</option><option value="13:30">13:30</option><option value="14:00">14:00</option><option value="14:30">14:30</option><option value="15:00">15:00</option><option value="15:30">15:30</option><option value="16:00">16:00</option><option value="16:30">16:30</option><option value="17:00">17:00</option><option value="17:30">17:30</option></select></div>
+    <div class="fg"><label>結束時間</label><select id="lm-end_time" onchange="updateLeaveDays()"><option value="09:30">09:30</option><option value="10:00">10:00</option><option value="10:30">10:30</option><option value="11:00">11:00</option><option value="11:30">11:30</option><option value="12:00">12:00</option><option value="13:00">13:00</option><option value="13:30">13:30</option><option value="14:00">14:00</option><option value="14:30">14:30</option><option value="15:00">15:00</option><option value="15:30">15:30</option><option value="16:00">16:00</option><option value="16:30">16:30</option><option value="17:00">17:00</option><option value="17:30">17:30</option><option value="18:00">18:00</option></select></div>
+  </div>
+  <div class="fg"><label>請假天數／時數（自動計算）</label><input id="lm-days" readonly placeholder="自動計算"></div>
   <div id="lm-exceed-warn" style="display:none;background:var(--red-bg);color:var(--red-text);padding:8px 12px;border-radius:var(--r);font-size:12px;margin-bottom:8px">請假天數超過特休餘額，請確認</div>
   <div class="fg"><label>請假原因</label><textarea id="lm-reason" rows="2"></textarea></div>
   <div class="modal-btns"><button class="btn-cancel" onclick="cm('lm-ov')">取消</button><button class="btn-save" onclick="saveLeave()">送出申請</button></div>
@@ -650,15 +654,16 @@ const ATT_C={present:'b-present',late:'b-late',absent:'b-absent',early_leave:'b-
 
 // 假別靜態資訊（可依實際 leave_types 擴充）
 const LEAVE_META={
-  '特別休假':{unit:'0.5天',pay:'全薪',rule:'依年資累計，到職滿半年起適用',proof:''},
-  '事假':{unit:'0.5小時',pay:'無薪',rule:'每年最多14天',proof:''},
-  '病假':{unit:'0.5小時',pay:'半薪',rule:'每年最多30天（住院90天）',proof:'需提供醫療證明'},
-  '生理假':{unit:'1天',pay:'半薪',rule:'每月1天，不併入病假計算',proof:''},
-  '婚假':{unit:'1天',pay:'全薪',rule:'結婚當日起30日內請畢，共8天',proof:'需提供結婚證書'},
-  '喪假':{unit:'1天',pay:'全薪',rule:'依親等不同3-8天',proof:'需提供死亡證明'},
-  '公假':{unit:'0.5小時',pay:'全薪',rule:'依法令規定',proof:''},
-  '陪產假':{unit:'1天',pay:'全薪',rule:'配偶分娩前後5天內請畢，共5天',proof:'需提供出生證明'},
-  '產假':{unit:'1天',pay:'全薪',rule:'分娩前後共56天（流產依規定）',proof:'需提供醫療證明'},
+  '特別休假':{unit:'0.5天',pay:'照常給薪（勞基法§38）',rule:'依年資累計：滿0.5年3天、1年7天、2年10天、3年14天、4年14天、5年15天，之後每年遞增1天，最多30天',proof:''},
+  '事假':{unit:'0.5小時',pay:'不給薪（勞基法§43）',rule:'每年最多14天，超過以無薪計，事假與病假合計不得超過30天',proof:''},
+  '病假':{unit:'0.5小時',pay:'半薪（勞基法§43）',rule:'普通傷病每年最多30天；住院傷病每年最多1年；普通傷病假與事假合計超過30天後續以無薪計',proof:'需提供醫師診斷證明'},
+  '生理假':{unit:'1天',pay:'半薪（性別工作平等法§14）',rule:'每月1天，全年最多3天，不併入病假計算；超過3天併入病假，當月病假未超上限者薪資照給',proof:''},
+  '婚假':{unit:'1天',pay:'照常給薪（勞基法§43）',rule:'結婚當日起30日內請畢，共8天',proof:'需提供結婚證書或喜帖'},
+  '喪假':{unit:'1天',pay:'照常給薪（勞基法§43）',rule:'父母、養父母、繼父母、配偶喪亡：8天；祖父母、子女、配偶之父母喪亡：6天；兄弟姊妹、配偶之祖父母喪亡：3天',proof:'需提供死亡證明或訃聞'},
+  '公假':{unit:'0.5小時',pay:'照常給薪（勞基法§43）',rule:'依法令規定應給予公假之情形，如：選舉投票、天災、受召集服役等',proof:'依實際狀況提供相關證明'},
+  '陪產假':{unit:'1天',pay:'照常給薪（性別工作平等法§15）',rule:'配偶分娩或配偶妊娠滿20週以上流產者，受僱者得請陪產假7天，需於配偶分娩日或流產日前後合計15日內請畢',proof:'需提供出生證明或醫院證明'},
+  '產假':{unit:'1天',pay:'照常給薪（勞基法§50；妊娠未滿3個月流產者半薪）',rule:'分娩前後共8週（56天）；妊娠3個月以上流產者4週；妊娠2個月以上未滿3個月流產者1週；妊娠未滿2個月流產者5天',proof:'需提供醫療院所出具之證明'},
+  '家庭照顧假':{unit:'0.5小時',pay:'不給薪（性別工作平等法§20）',rule:'家庭成員預防接種、發生嚴重疾病或其他重大事故須親自照顧，每年最多7天，併入事假計算',proof:'需提供相關證明文件'},
 };
 
 let D={clients:[],projects:[],payments:[],invoices:[],members:[],leave_types:[],leave_requests:[],attendance:[],salary_records:[],login_logs:[],annual_leave:[],holidays:[]};
@@ -1072,15 +1077,37 @@ function getLocalLeaveBalance(memberId){
 function updateLeaveDays(){
   const s=g('lm-start_date').value,e=g('lm-end_date').value;
   if(!s||!e)return;
-  let count=0;const cur=new Date(s);const end=new Date(e);
-  while(cur<=end){
-    const dateStr=cur.toISOString().slice(0,10);const dow=cur.getDay();
-    const isWeekend=dow===0||dow===6;
-    const isHoliday=(D.holidays||[]).some(h=>String(h.date).slice(0,10)===dateStr);
-    if(!isWeekend&&!isHoliday)count++;
-    cur.setDate(cur.getDate()+1);
+  const sel=g('lm-leave_type_id');
+  const lt=D.leave_types.find(x=>String(x.id)===String(sel.value));
+  const meta=LEAVE_META[lt?.name]||{};
+  const minUnit=meta.unit||'1天';
+  const isHourly=minUnit.includes('小時');
+
+  if(isHourly&&s===e){
+    // 同一天，以時間計算小時數
+    const st=g('lm-start_time').value||'09:00';
+    const et=g('lm-end_time').value||'18:00';
+    const [sh,sm]=st.split(':').map(Number);
+    const [eh,em]=et.split(':').map(Number);
+    let hrs=(eh*60+em-sh*60-sm)/60;
+    // 扣除午休（12:00~13:00）
+    if(sh<12&&eh>12)hrs-=1;
+    if(hrs<0.5)hrs=0.5;
+    hrs=Math.round(hrs*2)/2;
+    g('lm-days').value=hrs+'小時';
+  }else{
+    // 多天，以天數計算
+    let count=0;const cur=new Date(s);const end=new Date(e);
+    while(cur<=end){
+      const dateStr=cur.toISOString().slice(0,10);const dow=cur.getDay();
+      const isWeekend=dow===0||dow===6;
+      const isHoliday=(D.holidays||[]).some(h=>String(h.date).slice(0,10)===dateStr);
+      if(!isWeekend&&!isHoliday)count++;
+      cur.setDate(cur.getDate()+1);
+    }
+    g('lm-days').value=count+'天';
   }
-  g('lm-days').value=count;checkLeaveExceed();
+  checkLeaveExceed();
 }
 function onLeaveTypeChange(){
   const sel=g('lm-leave_type_id');
@@ -1209,7 +1236,7 @@ async function loadAttendanceStatus(){
   const today=new Date().toISOString().slice(0,10);const dow=new Date().getDay();
   const todayHoliday=(D.holidays||[]).find(h=>String(h.date).slice(0,10)===today);
   const hEl=g('clock-alert-holiday');
-  if(hEl){if(todayHoliday){hEl.textContent='今日為國定假日：'+todayHoliday.name+'，無需打卡';hEl.style.display='block';}else if(dow===0||dow===6){hEl.textContent='今日為'+(dow===6?'星期六':'星期日')+'，無需打卡';hEl.style.display='block';}else hEl.style.display='none';}
+  if(hEl){if(todayHoliday){hEl.innerHTML='今日為國定假日：'+todayHoliday.name+'，若有專案需出勤請點下方按鈕補打卡';hEl.style.display='block';}else if(dow===0||dow===6){hEl.innerHTML='今日為'+(dow===6?'星期六':'星期日')+'，若有專案需出勤請點下方按鈕補打卡';hEl.style.display='block';}else hEl.style.display='none';}
   const bal=getLocalLeaveBalance(myMember.id);
   const balEl=g('clock-leave-balance');if(balEl)balEl.textContent='特休餘額：'+bal.days+' 天（'+bal.hours+' 小時）';
   const avEl=g('clock-av');const unEl=g('clock-uname');const utEl=g('clock-utitle');
