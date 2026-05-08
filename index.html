@@ -1462,22 +1462,26 @@ function renderMembers(){
 
   // 老闆層（不分部門，直接顯示）
   const owners=list.filter(m=>m.role==='owner'&&!isResigned(m));
-  // 主管與組員（依部門分組）
-  const managers=list.filter(m=>m.role==='manager'&&!isResigned(m));
+  // 主管與組員（依部門分組，不含外包）
+  const managers=list.filter(m=>m.role==='manager'&&m.employment_type!=='contractor'&&!isResigned(m));
   const employees=list.filter(m=>m.role==='employee'&&m.employment_type!=='contractor'&&!isResigned(m));
+  // 外包獨立區塊
   const contractors=list.filter(m=>m.employment_type==='contractor'&&!isResigned(m));
   const resigned=list.filter(m=>isResigned(m));
 
-  // 取得所有部門（主管+組員）
-  const deptMembers=[...managers,...employees,...contractors];
-  const allDepts=[...new Set(deptMembers.map(m=>m.department||'未分配'))].sort((a,b)=>a==='未分配'?1:b==='未分配'?-1:a.localeCompare(b,'zh-TW'));
+  // 取得所有部門（僅主管+組員，不含外包），行政管理部置頂
+  const deptMembers=[...managers,...employees];
+  const allDepts=[...new Set(deptMembers.map(m=>m.department||'未分配'))].sort((a,b)=>{
+    if(a==='行政管理部')return -1;if(b==='行政管理部')return 1;
+    if(a==='未分配')return 1;if(b==='未分配')return -1;
+    return a.localeCompare(b,'zh-TW');
+  });
 
-  // 渲染部門區塊（主管在前，組員在後）
+  // 渲染部門區塊（主管在前，組員在後，不含外包）
   const renderDeptSection=(dept)=>{
     const dManagers=managers.filter(m=>(m.department||'未分配')===dept);
     const dEmployees=employees.filter(m=>(m.department||'未分配')===dept);
-    const dContractors=contractors.filter(m=>(m.department||'未分配')===dept);
-    const allInDept=[...dManagers,...dEmployees,...dContractors];
+    const allInDept=[...dManagers,...dEmployees];
     if(!allInDept.length)return'';
     if(!(dept in deptGroupOpen))deptGroupOpen[dept]=true;
     const open=q||deptGroupOpen[dept];
@@ -1485,15 +1489,30 @@ function renderMembers(){
     return`<div class="dept-section">
       <div class="dept-header" onclick="toggleDeptGroup('${dept}')">
         <div class="dept-title">${dept}</div>
-        <div class="dept-count">${allInDept.length} 人・${dManagers.length} 主管・${dEmployees.length+dContractors.length} 組員</div>
+        <div class="dept-count">${allInDept.length} 人・${dManagers.length} 主管・${dEmployees.length} 組員</div>
         <div class="dept-toggle">${open?chevronUp:chevronDown}</div>
       </div>
       ${open?`<div class="dept-members">
         ${dManagers.length?`<div style="font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;padding-left:2px">主管</div>
         <div class="member-grid" style="margin-bottom:12px">${dManagers.map(renderMemberCard).join('')}</div>`:''}
-        ${(dEmployees.length||dContractors.length)?`<div style="font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;padding-left:2px">組員</div>
-        <div class="member-grid">${[...dEmployees,...dContractors].map(renderMemberCard).join('')}</div>`:''}
+        ${dEmployees.length?`<div style="font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;padding-left:2px">組員</div>
+        <div class="member-grid">${dEmployees.map(renderMemberCard).join('')}</div>`:''}
       </div>`:''}
+    </div>`;
+  };
+
+  // 外包獨立區塊
+  const renderContractorSection=()=>{
+    if(!contractors.length)return'';
+    if(!('contractor' in deptGroupOpen))deptGroupOpen['contractor']=true;
+    const open=q||deptGroupOpen['contractor'];
+    return`<div style="border-top:1.5px solid var(--border2);margin-top:16px;padding-top:14px">
+      <div onclick="toggleDeptGroup('contractor')" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-bottom:${open?'12px':'2px'};padding:4px 2px">
+        <span style="font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">外包合作</span>
+        <span style="background:var(--bg2);color:var(--text3);font-size:11px;padding:1px 8px;border-radius:10px;border:0.5px solid var(--border)">${contractors.length}</span>
+        <span style="margin-left:auto;color:var(--text3);display:flex;align-items:center">${open?chevronUp:chevronDown}</span>
+      </div>
+      ${open?`<div class="member-grid">${contractors.map(renderMemberCard).join('')}</div>`:''}
     </div>`;
   };
 
@@ -1519,11 +1538,13 @@ function renderMembers(){
       <div class="member-grid">${owners.map(renderMemberCard).join('')}</div>
     </div>`;
   }
-  // 部門分組（主管+組員+外包）
+  // 部門分組（主管+組員，不含外包）
   if(allDepts.length){
     html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;padding-left:2px">各部門</div>`;
     html+=allDepts.map(d=>renderDeptSection(d)).join('');
   }
+  // 外包獨立區塊
+  html+=renderContractorSection();
   // 離職
   html+=renderResignedSection();
   el.innerHTML=html;
