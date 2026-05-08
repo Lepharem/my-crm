@@ -34,8 +34,6 @@
 }}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
 .app{max-width:980px;margin:0 auto;padding:24px 16px}
-
-/* Login */
 #login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg3)}
 .login-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:40px 36px;max-width:400px;width:100%;text-align:center}
 .login-logo{font-size:20px;font-weight:600;margin-bottom:8px}.login-logo span{color:var(--teal)}
@@ -43,10 +41,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .login-hint{font-size:12px;color:var(--text3);margin-top:16px}
 .login-err{font-size:13px;color:var(--red-text);margin-top:12px;display:none}
 .g_id_signin{display:flex!important;justify-content:center!important}
-.g_id_signin>div{margin:0 auto!important}
-.g_id_signin iframe{margin:0 auto!important;display:block!important}
-
-/* App */
 #app{display:none}
 .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .topbar-logo{font-size:16px;font-weight:600}.topbar-logo span{color:var(--teal)}
@@ -64,15 +58,11 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .loading{text-align:center;padding:60px;color:var(--text3);font-size:13px}
 .spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* Stats */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:22px}
 .stat{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);padding:14px 16px}
 .stat-l{font-size:12px;color:var(--text2);margin-bottom:3px}
 .stat-n{font-size:22px;font-weight:600}
 .good{color:#0f6e56}.warn{color:#854f0b}.danger{color:#a32d2d}
-
-/* Toolbar */
 .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
 .sw{flex:1;min-width:180px;position:relative}
 .sw svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none}
@@ -83,8 +73,6 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .pill:hover{background:var(--bg2)}
 .pill.on{background:var(--teal-bg);border-color:var(--teal);color:var(--teal-text);font-weight:500}
 .btn-add{padding:9px 18px;border-radius:var(--r);border:0.5px solid var(--teal);background:var(--teal-bg);color:var(--teal-text);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
-
-/* Cards */
 .clients{display:flex;flex-direction:column;gap:10px}
 .cc{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);overflow:hidden;transition:border-color .15s}
 .cc:hover{border-color:var(--border2)}
@@ -131,7 +119,6 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .b-present{background:var(--green-bg);color:var(--green-text)}
 .b-late{background:var(--amber-bg);color:var(--amber-text)}
 .b-absent{background:var(--red-bg);color:var(--red-text)}
-.b-early{background:var(--purple-bg);color:var(--purple-text)}
 .pexpand{display:none;margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)}
 .pexpand.open{display:block}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;margin-bottom:12px}
@@ -153,8 +140,6 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .inv-row{margin-top:8px;padding:8px 10px;background:var(--bg2);border-radius:var(--r);border:0.5px solid var(--border);font-size:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .inv-add{font-size:11px;color:var(--teal);cursor:pointer;text-decoration:underline;margin-left:auto}
 .status-select{padding:4px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);font-size:12px;cursor:pointer;outline:none}
-
-/* Finance */
 .fin-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
 .month-nav{display:flex;align-items:center;gap:6px}
 .month-nav button{padding:6px 10px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:13px;cursor:pointer}
@@ -171,8 +156,6 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .ptable td{padding:11px 13px;border-bottom:0.5px solid var(--border);vertical-align:middle}
 .ptable tr:last-child td{border-bottom:none}
 .ptable tr:hover td{background:var(--bg2)}
-
-/* Clock */
 .clock-wrap{max-width:480px;margin:0 auto}
 .clock-hero{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:32px 24px;text-align:center;margin-bottom:16px}
 .clock-user{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:20px}
@@ -180,7 +163,6 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .clock-user-info{text-align:left}
 .clock-user-name{font-size:15px;font-weight:500}
 .clock-user-sub{font-size:12px;color:var(--text2)}
-.clock-display{margin-bottom:8px}
 .clock-time{font-size:56px;font-weight:600;letter-spacing:3px;font-variant-numeric:tabular-nums;line-height:1;color:var(--text)}
 .clock-date{font-size:13px;color:var(--text2);margin-top:4px;margin-bottom:24px}
 .clock-state{margin-bottom:20px;min-height:52px}
@@ -196,65 +178,62 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .clock-time-label{font-size:11px;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em}
 .clock-time-val{font-size:16px;font-weight:600;color:var(--text)}
 .clock-time-val.empty{color:var(--text3);font-weight:400}
-.clock-action-btn{width:100%;padding:16px;border-radius:var(--r);border:none;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.5px}
+.clock-action-btn{width:100%;padding:16px;border-radius:var(--r);border:none;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s}
 .cab-in{background:var(--teal);color:#fff}
 .cab-in:hover:not(:disabled){background:#0d5e49}
-.cab-in:active:not(:disabled){transform:scale(0.98)}
 .cab-out{background:var(--bg2);color:var(--text);border:0.5px solid var(--border2)}
-.cab-out:hover:not(:disabled){background:var(--border)}
-.cab-out:active:not(:disabled){transform:scale(0.98)}
 .cab-done{background:var(--bg2);color:var(--text3);border:0.5px solid var(--border);cursor:default}
-.clock-action-btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+.clock-action-btn:disabled{opacity:.5;cursor:not-allowed}
 .clock-loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px;font-size:13px;color:var(--text3)}
 .clock-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
-.clock-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.clock-stat{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);padding:12px;text-align:center}
-.clock-stat-n{font-size:22px;font-weight:600;margin-bottom:2px}
-.clock-alert{padding:12px 14px;border-radius:var(--r);font-size:13px;margin-bottom:16px;display:none}
-.ca-warn{background:var(--amber-bg);color:var(--amber-text)}
-.ca-err{background:var(--red-bg);color:var(--red-text)}
 .att-month-stat{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
 .ams{background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center}
 .ams-n{font-size:18px;font-weight:600}
 .ams-l{font-size:11px;color:var(--text2);margin-top:2px}
+.clock-alert{padding:12px 14px;border-radius:var(--r);font-size:13px;margin-bottom:16px;display:none}
+.ca-warn{background:var(--amber-bg);color:var(--amber-text)}
 .hr-tab{padding:7px 16px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:13px;cursor:pointer;transition:.15s}
 .hr-tab:hover{background:var(--bg2)}
 .hr-tab.on{background:var(--teal-bg);border-color:var(--teal);color:var(--teal-text);font-weight:500}
 .hr-panel{display:none}.hr-panel.on{display:block}
-
-/* Member card */
 .member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-#member-list{display:block}
 .mc{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:16px;cursor:pointer;transition:border-color .15s}
 .mc:hover{border-color:var(--border2)}
 .mc.open{border-color:var(--teal)}
 .mc.resigned{background:#2a2a27;border-color:#3a3935}
-.mc.resigned .mc-name{color:#9b9a94}
-.mc.resigned .mc-sub{color:#6b6a64}
-.mc-group{margin-bottom:4px}
 .mc-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .mc-info{flex:1;min-width:0}
 .mc-name{font-size:15px;font-weight:500}
 .mc-sub{font-size:12px;color:var(--text2);margin-top:2px}
 .mc-detail{display:none;border-top:0.5px solid var(--border);padding-top:12px;margin-top:4px}
 .mc.open .mc-detail{display:block}
-
-/* 部門區塊 */
 .dept-section{margin-bottom:20px}
 .dept-header{display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:10px;user-select:none}
-.dept-title{font-size:13px;font-weight:600;color:var(--text);letter-spacing:.02em}
+.dept-title{font-size:13px;font-weight:600;color:var(--text)}
 .dept-count{background:var(--bg);color:var(--text3);font-size:11px;padding:1px 8px;border-radius:10px;border:0.5px solid var(--border)}
 .dept-toggle{margin-left:auto;color:var(--text3);display:flex;align-items:center}
-.dept-members{padding-left:4px}
-
-/* Leave */
 .leave-row{display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:8px}
 .leave-info{flex:1;min-width:0}
 .leave-name{font-size:13px;font-weight:500}
 .leave-meta{font-size:11px;color:var(--text2);margin-top:2px}
 .leave-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-
-/* Modal */
+/* 假別說明卡 */
+.leave-info-card{background:var(--teal-bg);border:0.5px solid var(--teal);border-radius:var(--r);padding:12px 14px;margin-bottom:12px;font-size:13px;color:var(--teal-text);display:none}
+.leave-info-card.show{display:block}
+.leave-info-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
+.leave-info-item{font-size:12px}
+.leave-info-label{color:var(--teal-text);opacity:.7;font-size:11px;margin-bottom:2px}
+.report-table-wrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:16px}
+.report-header{padding:16px 20px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.report-title{font-size:15px;font-weight:600}
+.report-sub{font-size:12px;color:var(--text2)}
+.rtable{width:100%;border-collapse:collapse;font-size:12px}
+.rtable th{text-align:center;padding:8px 10px;font-size:11px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2);white-space:nowrap}
+.rtable th:first-child{text-align:left}
+.rtable td{padding:10px;border-bottom:0.5px solid var(--border);text-align:center;vertical-align:middle}
+.rtable td:first-child{text-align:left;font-weight:500}
+.rtable tr:last-child td{border-bottom:none}
+.rtable tr:hover td{background:var(--bg2)}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
 .overlay.open{display:flex}
 .modal{background:var(--bg);border-radius:var(--rl);border:0.5px solid var(--border2);padding:24px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
@@ -271,97 +250,29 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:var(--r);font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 .empty-state{text-align:center;padding:40px;color:var(--text3);font-size:13px}
-
-/* 差勤月結報表 */
-.report-table-wrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:16px}
-.report-header{padding:16px 20px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.report-title{font-size:15px;font-weight:600}
-.report-sub{font-size:12px;color:var(--text2)}
-.rtable{width:100%;border-collapse:collapse;font-size:12px}
-.rtable th{text-align:center;padding:8px 10px;font-size:11px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2);white-space:nowrap}
-.rtable th:first-child{text-align:left}
-.rtable td{padding:10px 10px;border-bottom:0.5px solid var(--border);text-align:center;vertical-align:middle}
-.rtable td:first-child{text-align:left;font-weight:500}
-.rtable tr:last-child td{border-bottom:none}
-.rtable tr:hover td{background:var(--bg2)}
-.rtable .warn{color:var(--amber-text)}
-.rtable .danger{color:var(--red-text)}
-.rtable .good{color:var(--green-text)}
-.rtable .purple{color:var(--purple-text)}
-
-@media print{
-  nav,#page-crm,#page-finance,#page-clock,#page-logs,.topbar,
-  .hr-tabs,.fin-bar,.btn-add,.btn-sm,button{display:none!important}
-  #page-hr,#hr-report{display:block!important}
-  .report-table-wrap{border:none}
-  body{background:#fff}
-  .rtable{font-size:11px}
-}
+.access-denied{text-align:center;padding:60px;color:var(--text3);font-size:13px}
+.access-denied-icon{font-size:32px;margin-bottom:12px}
 @media(max-width:768px){
   .app{padding:16px 10px}
-  nav{gap:2px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  nav{gap:2px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
   nav::-webkit-scrollbar{display:none}
   .nav-btn{padding:8px 12px;font-size:13px;white-space:nowrap}
-  .topbar{flex-wrap:wrap;gap:8px}
-  .user-info{font-size:12px}
-  .stats{grid-template-columns:repeat(2,1fr);gap:8px}
-  .stat-n{font-size:18px}
+  .stats{grid-template-columns:repeat(2,1fr)}
   .toolbar{gap:8px;flex-wrap:wrap}
   .sw{min-width:0;width:100%}
-  .filters{gap:4px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  .filters{gap:4px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
   .filters::-webkit-scrollbar{display:none}
   .pill{white-space:nowrap;padding:5px 10px;font-size:12px}
-  .btn-add{width:100%;text-align:center;padding:9px}
-  .cc-header{padding:12px}
-  .cc-detail{padding:12px}
-  .dgrid{grid-template-columns:1fr 1fr;gap:8px 12px}
-  .pgrid{grid-template-columns:1fr 1fr;gap:6px 12px}
-  .pay-top{flex-wrap:wrap;gap:6px}
-  .pay-right{flex-wrap:wrap;gap:6px;width:100%}
-  .pay-amt{font-size:13px}
-  .status-select{font-size:11px;padding:3px 6px}
-  .btn-xs{font-size:10px;padding:3px 7px}
-  .fin-bar{flex-direction:column;align-items:flex-start;gap:8px}
-  .fin-bar .filters{margin-left:0!important}
-  .fin-grid{grid-template-columns:repeat(2,1fr);gap:8px}
-  .fin-card{padding:14px}
-  .fin-card-n{font-size:20px}
-  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .ptable{min-width:560px}
-  .ptable th,.ptable td{padding:8px 10px;font-size:12px;white-space:nowrap}
-  .hr-tabs{overflow-x:auto;flex-wrap:nowrap;gap:4px;-webkit-overflow-scrolling:touch;padding-bottom:2px}
-  .hr-tabs::-webkit-scrollbar{display:none}
-  .hr-tab{white-space:nowrap;padding:6px 12px;font-size:12px}
-  .clock-hero{padding:20px 16px}
-  .clock-time{font-size:40px}
-  .clock-times-row{gap:10px}
-  .clock-action-btn{padding:14px;font-size:15px}
-  .att-month-stat{grid-template-columns:repeat(2,1fr)}
-  .member-grid{grid-template-columns:1fr}
-  .leave-row{flex-wrap:wrap;gap:8px}
-  .leave-right{flex-wrap:wrap;gap:6px}
-  .modal{padding:16px;max-height:95vh;margin:8px}
-  .modal h2{font-size:15px;margin-bottom:14px}
+  .btn-add{width:100%;text-align:center}
   .fgr{grid-template-columns:1fr}
-  .fg input,.fg select,.fg textarea{font-size:16px}
-  .row-btns{gap:6px;flex-wrap:wrap}
-  .btn-sm{font-size:11px;padding:5px 10px}
-  .cc-right{gap:6px}
-  .pcount{font-size:11px;padding:2px 7px}
-  .cn{font-size:14px}
-  .pn{font-size:12px}
-  .pm{font-size:11px}
-  .inv-row{flex-wrap:wrap;gap:6px}
-  .page-title{font-size:16px}
-  .sec-title{font-size:14px}
-  .month-nav button{padding:5px 8px}
-  .month-label{font-size:13px;min-width:60px}
+  .member-grid{grid-template-columns:1fr}
+  .att-month-stat{grid-template-columns:repeat(2,1fr)}
+  .clock-time{font-size:40px}
+  .modal{padding:16px;max-height:95vh}
 }
 </style>
 </head>
 <body>
-
-<!-- Login -->
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo">營運管理 <span>系統</span></div>
@@ -375,7 +286,6 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
   </div>
 </div>
 
-<!-- App -->
 <div id="app">
   <div class="app">
     <div class="topbar">
@@ -386,10 +296,10 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
         <button class="btn-logout" onclick="logout()">登出</button>
       </div>
     </div>
-    <nav>
+    <nav id="main-nav">
       <button class="nav-btn on" onclick="showPage('crm',this)">客戶管理</button>
-      <button class="nav-btn" onclick="showPage('finance',this)">財務總覽</button>
-      <button class="nav-btn" onclick="showPage('clock',this)">打卡</button>
+      <button class="nav-btn" id="nav-finance" onclick="showPage('finance',this)">財務總覽</button>
+      <button class="nav-btn" id="nav-clock" onclick="showPage('clock',this)">打卡</button>
       <button class="nav-btn" onclick="showPage('hr',this)">人資管理</button>
       <button class="nav-btn" onclick="showPage('logs',this)">登入紀錄</button>
     </nav>
@@ -419,43 +329,43 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
       </div>
     </div>
 
-    <!-- Finance -->
+    <!-- Finance（僅老闆/超管） -->
     <div class="page" id="page-finance">
       <div class="page-header"><div class="page-title">財務總覽</div></div>
-      <div class="fin-bar">
-        <div class="month-nav">
-          <button onclick="changeMonth(-1)">&#8249;</button>
-          <span class="month-label" id="month-label"></span>
-          <button onclick="changeMonth(1)">&#8250;</button>
+      <div id="finance-body">
+        <div class="fin-bar">
+          <div class="month-nav">
+            <button onclick="changeMonth(-1)">&#8249;</button>
+            <span class="month-label" id="month-label"></span>
+            <button onclick="changeMonth(1)">&#8250;</button>
+          </div>
+          <div class="filters">
+            <button class="pill on" data-fp="all" onclick="setFinFilter(this)">全部月份</button>
+            <button class="pill" data-fp="month" onclick="setFinFilter(this)">本月</button>
+          </div>
+          <div class="filters" style="margin-left:auto">
+            <button class="pill on" data-fs="all" onclick="setStatusFilter(this)">全部狀態</button>
+            <button class="pill" data-fs="unpaid" onclick="setStatusFilter(this)">未付款</button>
+            <button class="pill" data-fs="overdue" onclick="setStatusFilter(this)">逾期</button>
+            <button class="pill" data-fs="paid" onclick="setStatusFilter(this)">已收款</button>
+          </div>
         </div>
-        <div class="filters">
-          <button class="pill on" data-fp="all" onclick="setFinFilter(this)">全部月份</button>
-          <button class="pill" data-fp="month" onclick="setFinFilter(this)">本月</button>
+        <div class="fin-grid" id="fin-cards"></div>
+        <div class="sec-title" id="fin-table-title">請款明細</div>
+        <div class="table-wrap">
+          <table class="ptable">
+            <thead><tr><th>客戶</th><th>專案</th><th>請款項目</th><th>金額</th><th>請款日</th><th>到期日</th><th>狀態</th><th>發票</th></tr></thead>
+            <tbody id="fin-tbody"></tbody>
+          </table>
         </div>
-        <div class="filters" style="margin-left:auto">
-          <button class="pill on" data-fs="all" onclick="setStatusFilter(this)">全部狀態</button>
-          <button class="pill" data-fs="unpaid" onclick="setStatusFilter(this)">未付款</button>
-          <button class="pill" data-fs="overdue" onclick="setStatusFilter(this)">逾期</button>
-          <button class="pill" data-fs="paid" onclick="setStatusFilter(this)">已收款</button>
-        </div>
-      </div>
-      <div class="fin-grid" id="fin-cards"></div>
-      <div class="sec-title" id="fin-table-title">請款明細</div>
-      <div class="table-wrap">
-        <table class="ptable">
-          <thead><tr><th>客戶</th><th>專案</th><th>請款項目</th><th>金額</th><th>請款日</th><th>到期日</th><th>狀態</th><th>發票</th></tr></thead>
-          <tbody id="fin-tbody"></tbody>
-        </table>
       </div>
     </div>
 
-    <!-- 打卡 -->
+    <!-- 打卡（外包不顯示） -->
     <div class="page" id="page-clock">
       <div class="page-header"><div class="page-title">打卡</div></div>
-      <div class="clock-alert ca-warn" id="clock-alert-nomember">
-        尚未建立員工資料，請先至「人資管理 > 員工資料」新增你的帳號（Email 需與登入帳號一致）
-      </div>
-      <div class="clock-alert" id="clock-alert-holiday" style="display:none;background:var(--blue-bg);color:var(--blue-text);padding:12px 14px;border-radius:var(--r);margin-bottom:16px;font-size:13px"></div>
+      <div class="clock-alert ca-warn" id="clock-alert-nomember" style="display:none">尚未建立員工資料，請先至「人資管理 > 員工資料」新增你的帳號</div>
+      <div class="clock-alert" id="clock-alert-holiday" style="display:none;background:var(--blue-bg);color:var(--blue-text);padding:12px 14px;border-radius:var(--r);font-size:13px"></div>
       <div class="clock-wrap">
         <div class="clock-hero">
           <div class="clock-user">
@@ -466,7 +376,7 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
               <div style="font-size:11px;color:var(--teal-text);margin-top:3px" id="clock-leave-balance"></div>
             </div>
           </div>
-          <div class="clock-display">
+          <div>
             <div class="clock-time" id="clock-time">00:00:00</div>
             <div class="clock-date" id="clock-date"></div>
           </div>
@@ -474,23 +384,12 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
             <div class="clock-state-badge cs-idle"><span class="cs-dot"></span>載入中…</div>
           </div>
           <div class="clock-times-row" id="clock-times-row" style="display:none">
-            <div class="clock-time-item">
-              <div class="clock-time-label">上班打卡</div>
-              <div class="clock-time-val" id="ct-in">—</div>
-            </div>
-            <div class="clock-time-item">
-              <div class="clock-time-label">下班打卡</div>
-              <div class="clock-time-val empty" id="ct-out">尚未打卡</div>
-            </div>
-            <div class="clock-time-item">
-              <div class="clock-time-label">累計工時</div>
-              <div class="clock-time-val" id="ct-hours">—</div>
-            </div>
+            <div class="clock-time-item"><div class="clock-time-label">上班打卡</div><div class="clock-time-val" id="ct-in">—</div></div>
+            <div class="clock-time-item"><div class="clock-time-label">下班打卡</div><div class="clock-time-val empty" id="ct-out">尚未打卡</div></div>
+            <div class="clock-time-item"><div class="clock-time-label">累計工時</div><div class="clock-time-val" id="ct-hours">—</div></div>
           </div>
           <div id="clock-btn-wrap">
-            <div class="clock-loading" id="clock-loading">
-              <div class="clock-spinner"></div>查詢打卡狀態…
-            </div>
+            <div class="clock-loading" id="clock-loading"><div class="clock-spinner"></div>查詢打卡狀態…</div>
           </div>
         </div>
         <div class="att-month-stat" id="clock-month-stat" style="display:none">
@@ -516,11 +415,9 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
         <button class="hr-tab on" data-ht="members" onclick="setHRTab(this)">員工資料</button>
         <button class="hr-tab" data-ht="attendance" onclick="setHRTab(this)">出勤記錄</button>
         <button class="hr-tab" data-ht="leave" onclick="setHRTab(this)">假勤申請</button>
-        <button class="hr-tab" data-ht="salary" onclick="setHRTab(this)" id="tab-salary" style="display:none">薪資記錄</button>
+        <button class="hr-tab" id="tab-salary" data-ht="salary" onclick="setHRTab(this)" style="display:none">薪資記錄</button>
         <button class="hr-tab" id="tab-report" data-ht="report" onclick="setHRTab(this)" style="display:none">差勤月結</button>
       </div>
-
-      <!-- 員工資料 -->
       <div class="hr-panel on" id="hr-members">
         <div class="toolbar">
           <div class="sw">
@@ -532,12 +429,10 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
             <button class="pill" data-mf="full_time" onclick="setMemberFilter(this)">正職</button>
             <button class="pill" data-mf="contractor" onclick="setMemberFilter(this)">外包</button>
           </div>
-          <button class="btn-add" onclick="openMemberModal()">+ 新增員工</button>
+          <button class="btn-add" id="btn-add-member" onclick="openMemberModal()">+ 新增員工</button>
         </div>
         <div id="member-list"></div>
       </div>
-
-      <!-- 出勤記錄 -->
       <div class="hr-panel" id="hr-attendance">
         <div class="fin-bar">
           <div class="month-nav">
@@ -556,8 +451,6 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
           </table>
         </div>
       </div>
-
-      <!-- 假勤申請 -->
       <div class="hr-panel" id="hr-leave">
         <div class="toolbar">
           <div class="filters">
@@ -566,12 +459,10 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
             <button class="pill" data-lf="approved" onclick="setLeaveFilter(this)">已核准</button>
             <button class="pill" data-lf="rejected" onclick="setLeaveFilter(this)">已駁回</button>
           </div>
-          <button class="btn-add" onclick="openLeaveModal()">+ 申請請假</button>
+          <button class="btn-add" id="btn-apply-leave" onclick="openLeaveModal()">+ 申請請假</button>
         </div>
         <div id="leave-list"></div>
       </div>
-
-      <!-- 薪資記錄（僅超級管理員與老闆可見） -->
       <div class="hr-panel" id="hr-salary">
         <div class="fin-bar">
           <div class="month-nav">
@@ -588,8 +479,6 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
           </table>
         </div>
       </div>
-
-      <!-- 差勤月結（老闆 / 超管專屬） -->
       <div class="hr-panel" id="hr-report">
         <div class="fin-bar">
           <div class="month-nav">
@@ -603,266 +492,174 @@ nav{display:flex;gap:4px;margin-bottom:28px;border-bottom:0.5px solid var(--bord
       </div>
     </div>
 
-    <!-- 登入紀錄 -->
+    <!-- 登入紀錄（僅老闆/超管） -->
     <div class="page" id="page-logs">
       <div class="page-header">
         <div class="page-title">登入紀錄</div>
         <button class="btn-add" onclick="loadLogs()">重新整理</button>
       </div>
-      <div class="stats" id="log-stats"></div>
-      <div id="log-loading" class="loading" style="display:none"><div class="spinner"></div>載入中…</div>
-      <div class="table-wrap" id="log-table-wrap" style="display:none">
-        <table class="ptable">
-          <thead><tr><th>姓名</th><th>Email</th><th>登入時間</th><th>裝置</th><th>瀏覽器</th></tr></thead>
-          <tbody id="log-tbody"></tbody>
-        </table>
+      <div id="logs-body">
+        <div class="stats" id="log-stats"></div>
+        <div id="log-loading" class="loading" style="display:none"><div class="spinner"></div>載入中…</div>
+        <div class="table-wrap" id="log-table-wrap" style="display:none">
+          <table class="ptable">
+            <thead><tr><th>姓名</th><th>Email</th><th>登入時間</th><th>裝置</th><th>瀏覽器</th></tr></thead>
+            <tbody id="log-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Client Modal -->
-<div class="overlay" id="cm-ov" onclick="oc(event,'cm-ov')">
-  <div class="modal">
-    <h2 id="cm-title">新增客戶</h2>
-    <div class="fg"><label>公司名稱 *</label><input id="cm-name"></div>
-    <div class="fgr">
-      <div class="fg"><label>統一編號</label><input id="cm-taxid" placeholder="12345678"></div>
-      <div class="fg"><label>電話</label><input id="cm-phone"></div>
-    </div>
-    <div class="fg"><label>地址</label><input id="cm-addr"></div>
-    <div class="fgr">
-      <div class="fg"><label>預算規模（NT$）</label><input id="cm-budget"></div>
-      <div class="fg"><label>報價單編號</label><input id="cm-quote"></div>
-    </div>
-    <div class="fg"><label>聯絡人</label><input id="cm-contact" placeholder="姓名・職稱"></div>
-    <div class="fg"><label>Email</label><input id="cm-email" type="email"></div>
-    <div class="fg"><label>備註</label><textarea id="cm-note" rows="2"></textarea></div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="cm('cm-ov')">取消</button>
-      <button class="btn-save" onclick="saveClient()">儲存</button>
-    </div>
-  </div>
-</div>
+<!-- Modals -->
+<div class="overlay" id="cm-ov" onclick="oc(event,'cm-ov')"><div class="modal">
+  <h2 id="cm-title">新增客戶</h2>
+  <div class="fg"><label>公司名稱 *</label><input id="cm-name"></div>
+  <div class="fgr"><div class="fg"><label>統一編號</label><input id="cm-taxid"></div><div class="fg"><label>電話</label><input id="cm-phone"></div></div>
+  <div class="fg"><label>地址</label><input id="cm-addr"></div>
+  <div class="fgr"><div class="fg"><label>預算規模（NT$）</label><input id="cm-budget"></div><div class="fg"><label>報價單編號</label><input id="cm-quote"></div></div>
+  <div class="fg"><label>聯絡人</label><input id="cm-contact"></div>
+  <div class="fg"><label>Email</label><input id="cm-email" type="email"></div>
+  <div class="fg"><label>備註</label><textarea id="cm-note" rows="2"></textarea></div>
+  <div class="modal-btns"><button class="btn-cancel" onclick="cm('cm-ov')">取消</button><button class="btn-save" onclick="saveClient()">儲存</button></div>
+</div></div>
 
-<!-- Project Modal -->
-<div class="overlay" id="pm-ov" onclick="oc(event,'pm-ov')">
-  <div class="modal">
-    <h2 id="pm-title">新增專案</h2>
-    <div class="fg"><label>專案名稱 *</label><input id="pm-name"></div>
-    <div class="fgr">
-      <div class="fg"><label>狀態</label><select id="pm-status"><option value="proposal">提案中</option><option value="active">進行中</option><option value="closed">結案</option></select></div>
-      <div class="fg"><label>負責人員</label><input id="pm-owner"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>合約金額（NT$）</label><input id="pm-amount"></div>
-      <div class="fg"><label>報價單編號</label><input id="pm-quote"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>開始日期</label><input id="pm-start" type="date"></div>
-      <div class="fg"><label>結束日期</label><input id="pm-end" type="date"></div>
-    </div>
-    <div class="fg"><label>Google Drive 連結</label><input id="pm-drive"></div>
-    <div class="fg"><label>備註</label><textarea id="pm-note" rows="2"></textarea></div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="cm('pm-ov')">取消</button>
-      <button class="btn-save" onclick="saveProject()">儲存</button>
-    </div>
-  </div>
-</div>
+<div class="overlay" id="pm-ov" onclick="oc(event,'pm-ov')"><div class="modal">
+  <h2 id="pm-title">新增專案</h2>
+  <div class="fg"><label>專案名稱 *</label><input id="pm-name"></div>
+  <div class="fgr"><div class="fg"><label>狀態</label><select id="pm-status"><option value="proposal">提案中</option><option value="active">進行中</option><option value="closed">結案</option></select></div><div class="fg"><label>負責人員</label><input id="pm-owner"></div></div>
+  <div class="fgr"><div class="fg"><label>合約金額（NT$）</label><input id="pm-amount"></div><div class="fg"><label>報價單編號</label><input id="pm-quote"></div></div>
+  <div class="fgr"><div class="fg"><label>開始日期</label><input id="pm-start" type="date"></div><div class="fg"><label>結束日期</label><input id="pm-end" type="date"></div></div>
+  <div class="fg"><label>Google Drive 連結</label><input id="pm-drive"></div>
+  <div class="fg"><label>備註</label><textarea id="pm-note" rows="2"></textarea></div>
+  <div class="modal-btns"><button class="btn-cancel" onclick="cm('pm-ov')">取消</button><button class="btn-save" onclick="saveProject()">儲存</button></div>
+</div></div>
 
-<!-- Payment Modal -->
-<div class="overlay" id="pay-ov" onclick="oc(event,'pay-ov')">
-  <div class="modal">
-    <h2 id="pay-title">新增請款記錄</h2>
-    <div class="fg"><label>請款項目名稱 *</label><input id="pay-name" placeholder="頭款 50%、1月月費…"></div>
-    <div class="fgr">
-      <div class="fg"><label>請款金額（NT$）*</label><input id="pay-amount"></div>
-      <div class="fg"><label>狀態</label><select id="pay-status"><option value="unpaid">未付款</option><option value="paid">已收款</option><option value="overdue">逾期</option></select></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>請款日期</label><input id="pay-date" type="date"></div>
-      <div class="fg"><label>付款到期日</label><input id="pay-due" type="date"></div>
-    </div>
-    <div class="fg"><label>備註</label><input id="pay-note"></div>
-    <div class="divider">發票資訊（選填）</div>
-    <div class="fgr">
-      <div class="fg"><label>發票號碼</label><input id="inv-number" placeholder="AB-12345678"></div>
-      <div class="fg"><label>發票類型</label><select id="inv-type"><option value="">— 未開立 —</option><option value="二聯式">二聯式統一發票</option><option value="三聯式">三聯式統一發票</option></select></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>發票開立日期</label><input id="inv-date" type="date"></div>
-      <div class="fg"><label>含稅金額（NT$）</label><input id="inv-amount"></div>
-    </div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="cm('pay-ov')">取消</button>
-      <button class="btn-save" onclick="savePayment()">儲存</button>
-    </div>
-  </div>
-</div>
+<div class="overlay" id="pay-ov" onclick="oc(event,'pay-ov')"><div class="modal">
+  <h2 id="pay-title">新增請款記錄</h2>
+  <div class="fg"><label>請款項目名稱 *</label><input id="pay-name"></div>
+  <div class="fgr"><div class="fg"><label>請款金額（NT$）*</label><input id="pay-amount"></div><div class="fg"><label>狀態</label><select id="pay-status"><option value="unpaid">未付款</option><option value="paid">已收款</option><option value="overdue">逾期</option></select></div></div>
+  <div class="fgr"><div class="fg"><label>請款日期</label><input id="pay-date" type="date"></div><div class="fg"><label>付款到期日</label><input id="pay-due" type="date"></div></div>
+  <div class="fg"><label>備註</label><input id="pay-note"></div>
+  <div class="divider">發票資訊（選填）</div>
+  <div class="fgr"><div class="fg"><label>發票號碼</label><input id="inv-number"></div><div class="fg"><label>發票類型</label><select id="inv-type"><option value="">— 未開立 —</option><option value="二聯式">二聯式統一發票</option><option value="三聯式">三聯式統一發票</option></select></div></div>
+  <div class="fgr"><div class="fg"><label>發票開立日期</label><input id="inv-date" type="date"></div><div class="fg"><label>含稅金額（NT$）</label><input id="inv-amount"></div></div>
+  <div class="modal-btns"><button class="btn-cancel" onclick="cm('pay-ov')">取消</button><button class="btn-save" onclick="savePayment()">儲存</button></div>
+</div></div>
 
-<!-- Member Modal -->
-<div class="overlay" id="mm-ov" onclick="oc(event,'mm-ov')">
-  <div class="modal">
-    <h2 id="mm-title">新增員工</h2>
-    <div class="fgr">
-      <div class="fg"><label>中文姓名 *</label><input id="mm-name_zh"></div>
-      <div class="fg"><label>英文姓名</label><input id="mm-name_en"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>身分證字號</label><input id="mm-id_number" placeholder="A123456789"></div>
-      <div class="fg"><label>電話</label><input id="mm-phone"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>部門</label><input id="mm-department" placeholder="例：設計部、行銷部"></div>
-      <div class="fg"><label>職稱</label><input id="mm-title" placeholder="例：資深設計師"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>職級</label><input id="mm-level" placeholder="例：Senior"></div>
-      <div class="fg"><label>角色</label>
-        <select id="mm-role">
-          <option value="employee">組員</option>
-          <option value="manager">主管</option>
-          <option value="owner">老闆</option>
-        </select>
-      </div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>工作模式</label>
-        <select id="mm-work_mode">
-          <option value="office">辦公室</option>
-          <option value="remote">遠端</option>
-          <option value="hybrid">混合</option>
-        </select>
-      </div>
-      <div class="fg"><label>僱用類型</label>
-        <select id="mm-employment_type">
-          <option value="full_time">全職</option>
-          <option value="part_time">兼職</option>
-          <option value="contractor">約聘</option>
-        </select>
-      </div>
-    </div>
-    <div class="fg"><label>公司 Email</label><input id="mm-email" type="email"></div>
+<div class="overlay" id="mm-ov" onclick="oc(event,'mm-ov')"><div class="modal">
+  <h2 id="mm-title">新增員工</h2>
+  <div class="fgr"><div class="fg"><label>中文姓名 *</label><input id="mm-name_zh"></div><div class="fg"><label>英文姓名</label><input id="mm-name_en"></div></div>
+  <div class="fgr"><div class="fg"><label>身分證字號</label><input id="mm-id_number"></div><div class="fg"><label>電話</label><input id="mm-phone"></div></div>
+  <div class="fgr"><div class="fg"><label>部門</label><input id="mm-department" placeholder="例：設計部、行銷部"></div><div class="fg"><label>職稱</label><input id="mm-title_field" placeholder="例：資深設計師"></div></div>
+  <div class="fgr">
+    <div class="fg"><label>角色</label><select id="mm-role"><option value="employee">組員</option><option value="manager">主管</option><option value="owner">老闆</option></select></div>
+    <div class="fg"><label>工作模式</label><select id="mm-work_mode"><option value="office">辦公室</option><option value="remote">遠端</option><option value="hybrid">混合</option></select></div>
+  </div>
+  <div class="fgr">
+    <div class="fg"><label>僱用類型</label><select id="mm-employment_type"><option value="full_time">全職</option><option value="part_time">兼職</option><option value="contractor">約聘（外包）</option></select></div>
     <div class="fg"><label>到職日期</label><input id="mm-start_date" type="date"></div>
-    <div class="divider">薪資資訊</div>
-    <div class="fgr">
-      <div class="fg"><label>薪資類型</label>
-        <select id="mm-salary_type">
-          <option value="monthly">月薪</option>
-          <option value="hourly">時薪</option>
-        </select>
-      </div>
-      <div class="fg"><label>底薪（NT$）</label><input id="mm-base_salary" placeholder="例：45,000"></div>
-    </div>
-    <div class="fg"><label>津貼說明</label><input id="mm-allowances" placeholder="例：交通 2,000、伙食 2,400"></div>
-    <div class="fgr">
-      <div class="fg"><label>銀行代碼</label><input id="mm-bank_code" placeholder="例：004"></div>
-      <div class="fg"><label>薪轉帳號</label><input id="mm-bank_account"></div>
-    </div>
-    <div class="divider">緊急聯絡人</div>
-    <div class="fgr">
-      <div class="fg"><label>緊急聯絡人</label><input id="mm-emergency_contact"></div>
-      <div class="fg"><label>緊急電話</label><input id="mm-emergency_phone"></div>
-    </div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="cm('mm-ov')">取消</button>
-      <button class="btn-save" onclick="saveMember()">儲存</button>
-    </div>
   </div>
-</div>
+  <div class="fg"><label>公司 Email</label><input id="mm-email" type="email"></div>
+  <div class="divider">薪資資訊</div>
+  <div class="fgr"><div class="fg"><label>薪資類型</label><select id="mm-salary_type"><option value="monthly">月薪</option><option value="hourly">時薪</option><option value="per_case">按件計酬</option></select></div><div class="fg"><label>底薪／計酬單價（NT$）</label><input id="mm-base_salary"></div></div>
+  <div class="fg"><label>津貼說明</label><input id="mm-allowances"></div>
+  <div class="fgr"><div class="fg"><label>銀行代碼</label><input id="mm-bank_code"></div><div class="fg"><label>薪轉帳號</label><input id="mm-bank_account"></div></div>
+  <div class="divider">緊急聯絡人</div>
+  <div class="fgr"><div class="fg"><label>緊急聯絡人</label><input id="mm-emergency_contact"></div><div class="fg"><label>緊急電話</label><input id="mm-emergency_phone"></div></div>
+  <div class="modal-btns"><button class="btn-cancel" onclick="cm('mm-ov')">取消</button><button class="btn-save" onclick="saveMember()">儲存</button></div>
+</div></div>
 
-<!-- Leave Modal -->
-<div class="overlay" id="lm-ov" onclick="oc(event,'lm-ov')">
-  <div class="modal">
-    <h2 id="lm-title">申請請假</h2>
-    <div id="lm-balance-box" style="display:none;background:var(--teal-bg);color:var(--teal-text);padding:10px 12px;border-radius:var(--r);font-size:13px;margin-bottom:14px">
-      <div style="font-weight:500;margin-bottom:4px">特休餘額</div>
-      <div>已授予：<span id="lm-balance-granted">—</span> 天 ／ 已使用：<span id="lm-balance-used">—</span> 天 ／ 剩餘：<span id="lm-balance-days">—</span> 天（<span id="lm-balance-hours">—</span> 小時）</div>
-    </div>
-    <div class="fg"><label>假別 *</label>
-      <select id="lm-leave_type_id" onchange="onLeaveTypeChange();updateLeaveDays()"></select>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>開始日期 *</label><input id="lm-start_date" type="date" oninput="updateLeaveDays()"></div>
-      <div class="fg"><label>結束日期 *</label><input id="lm-end_date" type="date" oninput="updateLeaveDays()"></div>
-    </div>
-    <div class="fg"><label>請假天數（自動計算，排除假日）</label><input id="lm-days" readonly placeholder="自動計算"></div>
-    <div id="lm-exceed-warn" style="display:none;background:var(--red-bg);color:var(--red-text);padding:8px 12px;border-radius:var(--r);font-size:12px;margin-bottom:8px">
-      請假天數超過特休餘額，請確認
-    </div>
-    <div class="fg"><label>請假原因</label><textarea id="lm-reason" rows="2"></textarea></div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="cm('lm-ov')">取消</button>
-      <button class="btn-save" onclick="saveLeave()">送出申請</button>
-    </div>
+<div class="overlay" id="lm-ov" onclick="oc(event,'lm-ov')"><div class="modal">
+  <h2 id="lm-title">申請請假</h2>
+  <div id="lm-balance-box" style="display:none;background:var(--teal-bg);color:var(--teal-text);padding:10px 12px;border-radius:var(--r);font-size:13px;margin-bottom:14px">
+    <div style="font-weight:500;margin-bottom:4px">特休餘額</div>
+    <div>已授予：<span id="lm-balance-granted">—</span> 天 ／ 已使用：<span id="lm-balance-used">—</span> 天 ／ 剩餘：<span id="lm-balance-days">—</span> 天（<span id="lm-balance-hours">—</span> 小時）</div>
   </div>
-</div>
+  <div class="fg"><label>假別 *</label><select id="lm-leave_type_id" onchange="onLeaveTypeChange();updateLeaveDays()"></select></div>
+  <!-- 假別說明卡 -->
+  <div class="leave-info-card" id="leave-info-card">
+    <div style="font-weight:500;margin-bottom:6px" id="lic-name">—</div>
+    <div class="leave-info-row">
+      <div class="leave-info-item"><div class="leave-info-label">可請天數</div><div id="lic-days">—</div></div>
+      <div class="leave-info-item"><div class="leave-info-label">最小請假單位</div><div id="lic-unit">—</div></div>
+      <div class="leave-info-item"><div class="leave-info-label">計薪方式</div><div id="lic-pay">—</div></div>
+    </div>
+    <div style="margin-top:8px;font-size:12px" id="lic-rule"></div>
+    <div style="margin-top:4px;font-size:12px;color:var(--amber-text)" id="lic-proof"></div>
+  </div>
+  <div class="fgr">
+    <div class="fg"><label>開始日期 *</label><input id="lm-start_date" type="date" oninput="updateLeaveDays()"></div>
+    <div class="fg"><label>結束日期 *</label><input id="lm-end_date" type="date" oninput="updateLeaveDays()"></div>
+  </div>
+  <div class="fg"><label>請假天數（自動計算，排除假日）</label><input id="lm-days" readonly placeholder="自動計算"></div>
+  <div id="lm-exceed-warn" style="display:none;background:var(--red-bg);color:var(--red-text);padding:8px 12px;border-radius:var(--r);font-size:12px;margin-bottom:8px">請假天數超過特休餘額，請確認</div>
+  <div class="fg"><label>請假原因</label><textarea id="lm-reason" rows="2"></textarea></div>
+  <div class="modal-btns"><button class="btn-cancel" onclick="cm('lm-ov')">取消</button><button class="btn-save" onclick="saveLeave()">送出申請</button></div>
+</div></div>
 
-<!-- Salary Modal -->
-<div class="overlay" id="sm-ov" onclick="oc(event,'sm-ov')">
-  <div class="modal">
-    <h2 id="sm-title">新增薪資記錄</h2>
-    <div class="fgr">
-      <div class="fg"><label>員工 *</label><select id="sm-member_id" onchange="onMemberSelect()"></select></div>
-      <div class="fgr" style="gap:8px">
-        <div class="fg"><label>年</label><input id="sm-year" type="number" placeholder="2025"></div>
-        <div class="fg"><label>月</label><input id="sm-month" type="number" placeholder="1" min="1" max="12"></div>
-      </div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>底薪（NT$）</label><input id="sm-base_salary" oninput="calcNet()" onchange="autoCalcInsurance()"></div>
-      <div class="fg"><label>津貼（NT$）</label><input id="sm-allowances" oninput="calcNet()"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>獎金（NT$）</label><input id="sm-bonus" oninput="calcNet()"></div>
-      <div class="fg"><label>其他扣除（NT$）</label><input id="sm-deductions" oninput="calcNet()"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>勞保費（NT$）</label><input id="sm-labor_insurance" oninput="calcNet()" placeholder="輸入底薪後自動帶入"></div>
-      <div class="fg"><label>健保費（NT$）</label><input id="sm-health_insurance" oninput="calcNet()" placeholder="輸入底薪後自動帶入"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>所得稅（NT$）</label><input id="sm-tax" oninput="calcNet()"></div>
-      <div id="sm-insurance-info" style="display:none;font-size:11px;color:var(--teal-text);background:var(--teal-bg);padding:6px 10px;border-radius:var(--r);margin-bottom:8px"></div>
-      <div class="fg"><label>實領薪資（NT$）</label><input id="sm-net_salary" readonly style="font-weight:600;color:var(--teal-text)"></div>
-    </div>
-    <div class="fgr">
-      <div class="fg"><label>發薪日期</label><input id="sm-pay_date" type="date"></div>
-      <div class="fg"><label>備註</label><input id="sm-note"></div>
-    </div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="cm('sm-ov')">取消</button>
-      <button class="btn-save" onclick="saveSalary()">儲存</button>
-    </div>
+<div class="overlay" id="sm-ov" onclick="oc(event,'sm-ov')"><div class="modal">
+  <h2 id="sm-title">新增薪資記錄</h2>
+  <div class="fgr">
+    <div class="fg"><label>員工 *</label><select id="sm-member_id" onchange="onMemberSelect()"></select></div>
+    <div class="fgr" style="gap:8px"><div class="fg"><label>年</label><input id="sm-year" type="number"></div><div class="fg"><label>月</label><input id="sm-month" type="number" min="1" max="12"></div></div>
   </div>
-</div>
+  <div class="fgr"><div class="fg"><label>底薪（NT$）</label><input id="sm-base_salary" oninput="calcNet()" onchange="autoCalcInsurance()"></div><div class="fg"><label>津貼（NT$）</label><input id="sm-allowances" oninput="calcNet()"></div></div>
+  <div class="fgr"><div class="fg"><label>獎金（NT$）</label><input id="sm-bonus" oninput="calcNet()"></div><div class="fg"><label>其他扣除（NT$）</label><input id="sm-deductions" oninput="calcNet()"></div></div>
+  <div class="fgr"><div class="fg"><label>勞保費（NT$）</label><input id="sm-labor_insurance" oninput="calcNet()"></div><div class="fg"><label>健保費（NT$）</label><input id="sm-health_insurance" oninput="calcNet()"></div></div>
+  <div class="fgr"><div class="fg"><label>所得稅（NT$）</label><input id="sm-tax" oninput="calcNet()"></div><div class="fg"><label>實領薪資（NT$）</label><input id="sm-net_salary" readonly style="font-weight:600;color:var(--teal-text)"></div></div>
+  <div id="sm-insurance-info" style="display:none;font-size:11px;color:var(--teal-text);background:var(--teal-bg);padding:6px 10px;border-radius:var(--r);margin-bottom:8px"></div>
+  <div class="fgr"><div class="fg"><label>發薪日期</label><input id="sm-pay_date" type="date"></div><div class="fg"><label>備註</label><input id="sm-note"></div></div>
+  <div class="modal-btns"><button class="btn-cancel" onclick="cm('sm-ov')">取消</button><button class="btn-save" onclick="saveSalary()">儲存</button></div>
+</div></div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-// ── 核心工具函式 ──
-function isBool(v,expect){
-  if(typeof v==='boolean')return expect?v:!v;
-  const s=String(v).toUpperCase().trim();
-  return expect?(s==='TRUE'||s==='1'):(s==='FALSE'||s==='0'||s===''||s==='NULL');
-}
+// ── 工具 ──
+function isBool(v,expect){if(typeof v==='boolean')return expect?v:!v;const s=String(v).toUpperCase().trim();return expect?(s==='TRUE'||s==='1'):(s==='FALSE'||s==='0'||s===''||s==='NULL');}
 function isResigned(m){return isBool(m.active,false);}
 function isActive(m){return isBool(m.active,true);}
+function isContractor(m){return m.employment_type==='contractor';}
+const g=id=>document.getElementById(id);
+const v=id=>(g(id).value||'').trim();
+function cm(id){g(id).classList.remove('open')}
+function oc(e,id){if(e.target===g(id))cm(id)}
+function toast(msg){const el=g('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500)}
+function fm(s){return s?'NT$ '+s:'—'}
+function pn(s){return parseInt((s||'0').replace(/,/g,''))||0}
+function fmtTime(iso){if(!iso)return'—';const d=new Date(iso);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');}
+function fmtDate(iso){if(!iso)return'—';return String(iso).slice(0,10);}
+function ini(n){const p=(n||'').trim().split(/\s+/);return p.length>=2?p[0][0]+p[1][0]:(n||'').slice(0,2)}
+function hashStr(s){let h=0;for(let i=0;i<s.length;i++)h=(Math.imul(31,h)+s.charCodeAt(i))|0;return h}
+const COLORS=[{bg:'#e1f5ee',c:'#085041'},{bg:'#e6f1fb',c:'#0c447c'},{bg:'#faeeda',c:'#633806'},{bg:'#eeedfe',c:'#3c3489'},{bg:'#faece7',c:'#712b13'},{bg:'#eaf3de',c:'#27500a'}];
+function col(id){return COLORS[Math.abs(hashStr(String(id)))%COLORS.length]}
 
 const API='https://script.google.com/macros/s/AKfycbxXaeXM8YJD8qenB64lXlekWXgv6L4_bbJkZq1988i0URk9_LeiCWv9VF6AbtCvrgrT/exec';
 const ALLOWED_DOMAIN='lepharem';
-const COLORS=[{bg:'#e1f5ee',c:'#085041'},{bg:'#e6f1fb',c:'#0c447c'},{bg:'#faeeda',c:'#633806'},{bg:'#eeedfe',c:'#3c3489'},{bg:'#faece7',c:'#712b13'},{bg:'#eaf3de',c:'#27500a'}];
 const PSL={proposal:'提案中',active:'進行中',closed:'結案'};
 const PSC={proposal:'b-proposal',active:'b-active',closed:'b-closed'};
-const PYSL={unpaid:'未付款',paid:'已收款',overdue:'逾期'};
 const ROLE_L={owner:'老闆',manager:'主管',employee:'組員'};
 const WORK_L={office:'辦公室',remote:'遠端',hybrid:'混合'};
-const EMP_L={full_time:'全職',part_time:'兼職',contractor:'約聘'};
+const EMP_L={full_time:'全職',part_time:'兼職',contractor:'約聘外包'};
 const LEAVE_STATUS_L={pending:'待審核',approved:'已核准',rejected:'已駁回'};
 const LEAVE_STATUS_C={pending:'b-pending',approved:'b-approved',rejected:'b-rejected'};
 const ATT_L={present:'正常',late:'遲到',absent:'缺勤',early_leave:'早退',late_early:'遲到+早退'};
 const ATT_C={present:'b-present',late:'b-late',absent:'b-absent',early_leave:'b-proposal',late_early:'b-overdue'};
+
+// 假別靜態資訊（可依實際 leave_types 擴充）
+const LEAVE_META={
+  '特別休假':{unit:'0.5天',pay:'全薪',rule:'依年資累計，到職滿半年起適用',proof:''},
+  '事假':{unit:'0.5小時',pay:'無薪',rule:'每年最多14天',proof:''},
+  '病假':{unit:'0.5小時',pay:'半薪',rule:'每年最多30天（住院90天）',proof:'需提供醫療證明'},
+  '生理假':{unit:'1天',pay:'半薪',rule:'每月1天，不併入病假計算',proof:''},
+  '婚假':{unit:'1天',pay:'全薪',rule:'結婚當日起30日內請畢，共8天',proof:'需提供結婚證書'},
+  '喪假':{unit:'1天',pay:'全薪',rule:'依親等不同3-8天',proof:'需提供死亡證明'},
+  '公假':{unit:'0.5小時',pay:'全薪',rule:'依法令規定',proof:''},
+  '陪產假':{unit:'1天',pay:'全薪',rule:'配偶分娩前後5天內請畢，共5天',proof:'需提供出生證明'},
+  '產假':{unit:'1天',pay:'全薪',rule:'分娩前後共56天（流產依規定）',proof:'需提供醫療證明'},
+};
 
 let D={clients:[],projects:[],payments:[],invoices:[],members:[],leave_types:[],leave_requests:[],attendance:[],salary_records:[],login_logs:[],annual_leave:[],holidays:[]};
 let crmF='all',finF='all',statusF='all',leaveF='all';
@@ -873,19 +670,35 @@ let addPcid=null,addPayCid=null,addPayPid=null;
 let finMonth=new Date().toISOString().slice(0,7);
 let attMonth=new Date().toISOString().slice(0,7);
 let salMonth=new Date().toISOString().slice(0,7);
+let reportMonth=new Date().toISOString().slice(0,7);
 let currentUser=null,myMember=null;
-let clockInterval=null;
-let clockLocked=false;
+let clockInterval=null,clockLocked=false;
 let currentClockIn=null,currentClockOut=null;
+let attDeptFilter='all';
+let memberFilter='all';
+const memberGroupOpen={};
+const deptGroupOpen={};
 
-// ── 權限判斷 ──
+// ── 權限 ──
 function isSuperAdmin(){return myMember&&isBool(myMember.super_admin,true);}
 function isOwner(){return myMember&&(myMember.role==='owner'||isSuperAdmin());}
 function isManager(){return myMember&&(myMember.role==='manager'||isOwner());}
-// 薪資可見性：僅超管與老闆
 function canSeeSalary(){return isOwner();}
 function canSeeAllAttendance(){return isOwner();}
 function canSeeDeptAttendance(){return isManager();}
+function canSeeFinance(){return isOwner();}
+function canSeeLogs(){return isOwner();}
+// 特休時數：老闆/超管看所有人，其他只看自己（由 renderMemberCard 控制）
+function canSeeLeaveBalance(targetMemberId){
+  if(isOwner())return true;
+  return myMember&&String(myMember.id)===String(targetMemberId);
+}
+// 離職區塊：僅老闆/超管
+function canSeeResigned(){return isOwner();}
+// 編輯員工：僅老闆/超管
+function canEditMember(){return isOwner();}
+// 外包不用看打卡
+function needsClock(){return myMember&&!isContractor(myMember);}
 
 // ── Login ──
 function handleCredential(response){
@@ -907,7 +720,6 @@ function handleCredential(response){
 function parseJwt(token){const b=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return JSON.parse(decodeURIComponent(atob(b).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));}
 function logout(){currentUser=null;myMember=null;g('app').style.display='none';g('login-screen').style.display='flex';if(clockInterval){clearInterval(clockInterval);clockInterval=null;}google.accounts.id.disableAutoSelect();}
 
-// ── API ──
 async function api(action,body={}){
   const res=await fetch(API+'?action='+action,{method:'POST',body:JSON.stringify({action,...body})});
   const json=await res.json();
@@ -917,25 +729,36 @@ async function api(action,body={}){
 
 async function loadData(){
   try{
-    g('crm-loading').style.display='block';
-    g('crm-body').style.display='none';
+    g('crm-loading').style.display='block';g('crm-body').style.display='none';
     const all=await api('getAll');
-    D.clients=all.clients||[];D.projects=all.projects||[];
-    D.payments=all.payments||[];D.invoices=all.invoices||[];
-    D.members=all.members||[];D.leave_types=all.leave_types||[];
-    D.leave_requests=all.leave_requests||[];D.attendance=all.attendance||[];
-    D.salary_records=all.salary_records||[];D.login_logs=all.login_logs||[];
+    D.clients=all.clients||[];D.projects=all.projects||[];D.payments=all.payments||[];D.invoices=all.invoices||[];
+    D.members=all.members||[];D.leave_types=all.leave_types||[];D.leave_requests=all.leave_requests||[];
+    D.attendance=all.attendance||[];D.salary_records=all.salary_records||[];D.login_logs=all.login_logs||[];
     D.annual_leave=all.annual_leave||[];D.holidays=all.holidays||[];
     myMember=D.members.find(m=>m.email===currentUser?.email)||null;
+    applyPermissions();
     const now=new Date();
     g('sync-info').textContent='上次同步 '+now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
-    g('crm-loading').style.display='none';
-    g('crm-body').style.display='block';
-    renderCRM();
-    startClock();
+    g('crm-loading').style.display='none';g('crm-body').style.display='block';
+    renderCRM();startClock();
   }catch(e){
     g('crm-loading').innerHTML='<div style="color:var(--red-text);font-size:13px">載入失敗：'+e.message+'<br><button onclick="loadData()" style="margin-top:12px;padding:6px 14px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg);cursor:pointer">重新載入</button></div>';
   }
+}
+
+function applyPermissions(){
+  // 財務總覽導航
+  const navFin=g('nav-finance');
+  if(navFin)navFin.style.display=canSeeFinance()?'':'none';
+  // 打卡導航（外包不顯示）
+  const navClock=g('nav-clock');
+  if(navClock)navClock.style.display=needsClock()?'':'none';
+  // 新增員工按鈕（僅老闆/超管）
+  const btnAdd=g('btn-add-member');
+  if(btnAdd)btnAdd.style.display=canEditMember()?'':'none';
+  // 假勤申請按鈕（外包不顯示）
+  const btnLeave=g('btn-apply-leave');
+  if(btnLeave)btnLeave.style.display=(!myMember||isContractor(myMember))?'none':'';
 }
 
 // ── Nav ──
@@ -943,16 +766,21 @@ function showPage(id,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
   g('page-'+id).classList.add('on');el.classList.add('on');
-  if(id==='finance')renderFinance();
-  if(id==='logs')loadLogs();
-  if(id==='hr'){renderHR();}
+  if(id==='finance'){
+    if(!canSeeFinance()){g('finance-body').innerHTML='<div class="access-denied"><div class="access-denied-icon">锁</div><div>此頁面僅限老闆及超級管理員查看</div></div>';return;}
+    renderFinance();
+  }
+  if(id==='logs'){
+    if(!canSeeLogs()){g('logs-body').innerHTML='<div class="access-denied"><div>此頁面僅限老闆及超級管理員查看</div></div>';return;}
+    loadLogs();
+  }
+  if(id==='hr')renderHR();
   if(id==='clock'){startClock();loadAttendanceStatus();}
 }
 function setHRTab(el){
   document.querySelectorAll('.hr-tab').forEach(t=>t.classList.remove('on'));
   document.querySelectorAll('.hr-panel').forEach(p=>p.classList.remove('on'));
-  el.classList.add('on');
-  g('hr-'+el.dataset.ht).classList.add('on');
+  el.classList.add('on');g('hr-'+el.dataset.ht).classList.add('on');
   if(el.dataset.ht==='attendance')renderAttendance();
   if(el.dataset.ht==='members')renderMembers();
   if(el.dataset.ht==='leave')renderLeave();
@@ -964,24 +792,12 @@ function setHRTab(el){
 function clientProjects(cid){return D.projects.filter(p=>String(p.client_id)===String(cid));}
 function projectPayments(pid){return D.payments.filter(p=>String(p.project_id)===String(pid));}
 function paymentInvoice(pyid){return D.invoices.find(i=>String(i.payment_id)===String(pyid))||null;}
-function allPaysFlat(){return D.payments.map(py=>{const proj=D.projects.find(p=>String(p.id)===String(py.project_id))||{};const client=D.clients.find(c=>String(c.id)===String(proj.client_id))||{};const inv=paymentInvoice(py.id);return{...py,pname:proj.name||'',cname:client.name||'',cid:client.id,pid:proj.id,invoice:inv};});}
-function ini(n){const p=(n||'').trim().split(/\s+/);return p.length>=2?p[0][0]+p[1][0]:(n||'').slice(0,2)}
-function col(id){return COLORS[Math.abs(hashStr(String(id)))%COLORS.length]}
-function hashStr(s){let h=0;for(let i=0;i<s.length;i++)h=(Math.imul(31,h)+s.charCodeAt(i))|0;return h}
-function fm(s){return s?'NT$ '+s:'—'}
-function pn(s){return parseInt((s||'0').replace(/,/g,''))||0}
-function fmtTime(iso){if(!iso)return'—';const d=new Date(iso);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');}
-function fmtDate(iso){if(!iso)return'—';return String(iso).slice(0,10);}
+function allPaysFlat(){return D.payments.map(py=>{const proj=D.projects.find(p=>String(p.id)===String(py.project_id))||{};const client=D.clients.find(c=>String(c.id)===String(proj.client_id))||{};return{...py,pname:proj.name||'',cname:client.name||'',cid:client.id,pid:proj.id,invoice:paymentInvoice(py.id)};});}
 
 function renderCRM(){
-  const total=D.clients.length;
   const act=D.projects.filter(p=>p.status==='active').length;
   const prop=D.projects.filter(p=>p.status==='proposal').length;
-  g('crm-stats').innerHTML=`
-    <div class="stat"><div class="stat-l">客戶總數</div><div class="stat-n">${total}</div></div>
-    <div class="stat"><div class="stat-l">專案總數</div><div class="stat-n">${D.projects.length}</div></div>
-    <div class="stat"><div class="stat-l">進行中</div><div class="stat-n good">${act}</div></div>
-    <div class="stat"><div class="stat-l">提案中</div><div class="stat-n warn">${prop}</div></div>`;
+  g('crm-stats').innerHTML=`<div class="stat"><div class="stat-l">客戶總數</div><div class="stat-n">${D.clients.length}</div></div><div class="stat"><div class="stat-l">專案總數</div><div class="stat-n">${D.projects.length}</div></div><div class="stat"><div class="stat-l">進行中</div><div class="stat-n good">${act}</div></div><div class="stat"><div class="stat-l">提案中</div><div class="stat-n warn">${prop}</div></div>`;
   const q=(g('search').value||'').toLowerCase();
   const list=D.clients.filter(c=>{
     const mq=!q||[c.name,c.taxid,c.phone,c.contact,c.email].join(' ').toLowerCase().includes(q);
@@ -994,32 +810,11 @@ function renderCRM(){
   el.innerHTML=list.map(c=>{
     const cl=col(c.id);const isOpen=openCid===String(c.id);
     const projs=clientProjects(c.id);const ac=projs.filter(p=>p.status==='active').length;
-    return`<div class="cc${isOpen?' open':''}" id="cc-${c.id}">
-      <div class="cc-header" onclick="toggleC('${c.id}')">
-        <div class="av" style="background:${cl.bg};color:${cl.c}">${ini(c.name)}</div>
-        <div class="ci"><div class="cn">${c.name}</div><div class="cm">${c.taxid?'統編 '+c.taxid+'・':''}${c.phone||''}${c.contact?'・'+c.contact:''}</div></div>
-        <div class="cc-right"><span class="pcount">${projs.length} 個專案${ac?' · '+ac+' 進行中':''}</span>
-        <svg class="chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      </div>
-      <div class="cc-detail">
-        <div class="dgrid">
-          <div><div class="dl">統一編號</div><div class="dv">${c.taxid||'—'}</div></div>
-          <div><div class="dl">電話</div><div class="dv">${c.phone||'—'}</div></div>
-          <div><div class="dl">地址</div><div class="dv">${c.addr||'—'}</div></div>
-          <div><div class="dl">聯絡人</div><div class="dv">${c.contact||'—'}</div></div>
-          <div><div class="dl">Email</div><div class="dv">${c.email||'—'}</div></div>
-          <div><div class="dl">預算規模</div><div class="dv">${fm(c.budget)}</div></div>
-          <div><div class="dl">報價單編號</div><div class="dv">${c.quote||'—'}</div></div>
-          <div><div class="dl">備註</div><div class="dv">${c.note||'—'}</div></div>
-        </div>
-        <div class="row-btns">
-          <button class="btn-sm" onclick="openEditC('${c.id}')">編輯客戶資料</button>
-          <button class="btn-sm btn-del" onclick="delC('${c.id}')">刪除客戶</button>
-        </div>
-        <div class="proj-hdr"><span class="proj-label">專案 / 合約（${projs.length}）</span><button class="btn-addsm" onclick="openAddP('${c.id}')">+ 新增專案</button></div>
-        <div class="plist">${projs.length?projs.map(p=>rProj(c.id,p)).join(''):'<div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center">尚無專案</div>'}</div>
-      </div>
-    </div>`;
+    return`<div class="cc${isOpen?' open':''}" id="cc-${c.id}"><div class="cc-header" onclick="toggleC('${c.id}')"><div class="av" style="background:${cl.bg};color:${cl.c}">${ini(c.name)}</div><div class="ci"><div class="cn">${c.name}</div><div class="cm">${c.taxid?'統編 '+c.taxid+'・':''}${c.phone||''}${c.contact?'・'+c.contact:''}</div></div><div class="cc-right"><span class="pcount">${projs.length} 個專案${ac?' · '+ac+' 進行中':''}</span><svg class="chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      <div class="cc-detail"><div class="dgrid"><div><div class="dl">統一編號</div><div class="dv">${c.taxid||'—'}</div></div><div><div class="dl">電話</div><div class="dv">${c.phone||'—'}</div></div><div><div class="dl">地址</div><div class="dv">${c.addr||'—'}</div></div><div><div class="dl">聯絡人</div><div class="dv">${c.contact||'—'}</div></div><div><div class="dl">Email</div><div class="dv">${c.email||'—'}</div></div><div><div class="dl">預算規模</div><div class="dv">${fm(c.budget)}</div></div></div>
+      <div class="row-btns"><button class="btn-sm" onclick="openEditC('${c.id}')">編輯客戶資料</button><button class="btn-sm btn-del" onclick="delC('${c.id}')">刪除客戶</button></div>
+      <div class="proj-hdr"><span class="proj-label">專案（${projs.length}）</span><button class="btn-addsm" onclick="openAddP('${c.id}')">+ 新增專案</button></div>
+      <div class="plist">${projs.length?projs.map(p=>rProj(c.id,p)).join(''):'<div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center">尚無專案</div>'}</div></div></div>`;
   }).join('');
 }
 
@@ -1028,71 +823,34 @@ function rProj(cid,p){
   const pays=projectPayments(p.id);
   const od=pays.filter(py=>py.status==='overdue').length;
   const up=pays.filter(py=>py.status==='unpaid').length;
-  let badge=od?`<span class="badge b-overdue" style="font-size:10px">${od} 逾期</span>`:up?`<span class="badge b-unpaid" style="font-size:10px">${up} 未付</span>`:'';
-  return`<div class="pc">
-    <div class="pc-row" onclick="toggleP('${cid}','${p.id}')">
-      <div class="pc-info"><div class="pn">${p.name} ${badge}</div><div class="pm">${p.owner?p.owner+'・':''}${p.amount?'NT$ '+p.amount:''}${p.start?'・'+String(p.start).slice(0,7):''}</div></div>
-      <span class="badge ${PSC[p.status]}">${PSL[p.status]}</span>
-      <svg style="width:14px;height:14px;opacity:.35;transition:transform .2s;${isOpen?'transform:rotate(180deg)':''}flex-shrink:0" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
+  const badge=od?`<span class="badge b-overdue" style="font-size:10px">${od} 逾期</span>`:up?`<span class="badge b-unpaid" style="font-size:10px">${up} 未付</span>`:'';
+  return`<div class="pc"><div class="pc-row" onclick="toggleP('${cid}','${p.id}')"><div class="pc-info"><div class="pn">${p.name} ${badge}</div><div class="pm">${p.owner?p.owner+'・':''}${p.amount?'NT$ '+p.amount:''}${p.start?'・'+String(p.start).slice(0,7):''}</div></div><span class="badge ${PSC[p.status]}">${PSL[p.status]}</span><svg style="width:14px;height:14px;opacity:.35;transition:transform .2s;${isOpen?'transform:rotate(180deg)':''}flex-shrink:0" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <div class="pexpand${isOpen?' open':''}">
-      <div class="pgrid">
-        <div><div class="dl">負責人員</div><div class="dv">${p.owner||'—'}</div></div>
-        <div><div class="dl">合約金額</div><div class="dv">${fm(p.amount)}</div></div>
-        <div><div class="dl">報價單編號</div><div class="dv">${p.quote||'—'}</div></div>
-        <div><div class="dl">開始日期</div><div class="dv">${fmtDate(p.start)}</div></div>
-        <div><div class="dl">結束日期</div><div class="dv">${fmtDate(p.end)}</div></div>
-        <div><div class="dl">狀態</div><div class="dv">${PSL[p.status]}</div></div>
-      </div>
+      <div class="pgrid"><div><div class="dl">負責人員</div><div class="dv">${p.owner||'—'}</div></div><div><div class="dl">合約金額</div><div class="dv">${fm(p.amount)}</div></div><div><div class="dl">開始日期</div><div class="dv">${fmtDate(p.start)}</div></div><div><div class="dl">結束日期</div><div class="dv">${fmtDate(p.end)}</div></div></div>
       ${p.drive?`<div style="margin-bottom:10px"><div class="dl" style="margin-bottom:3px">Google Drive</div><a class="drive-link" href="${p.drive}" target="_blank">${p.drive}</a></div>`:''}
-      ${p.note?`<div style="margin-bottom:10px"><div class="dl" style="margin-bottom:3px">備註</div><div class="dv" style="font-weight:400;font-size:13px">${p.note}</div></div>`:''}
-      <div class="pact">
-        <button class="btn-sm" onclick="openEditP('${cid}','${p.id}')">編輯專案</button>
-        <button class="btn-sm" onclick="genShareLink('${cid}','${p.id}','${p.name}')">客戶連結</button>
-        <button class="btn-sm btn-del" onclick="delP('${cid}','${p.id}')">刪除專案</button>
-      </div>
-      <div class="pay-sec">
-        <div class="pay-hdr"><span class="pay-label">請款記錄（${pays.length}）</span><button class="btn-xs" onclick="openAddPay('${cid}','${p.id}')">+ 新增請款</button></div>
-        <div class="pay-list">${pays.length?pays.map(py=>rPay(cid,p.id,py)).join(''):'<div style="font-size:12px;color:var(--text3);padding:6px 0">尚無請款記錄</div>'}</div>
-      </div>
-    </div>
-  </div>`;
+      <div class="pact"><button class="btn-sm" onclick="openEditP('${cid}','${p.id}')">編輯專案</button><button class="btn-sm" onclick="genShareLink('${cid}','${p.id}','${p.name}')">客戶連結</button><button class="btn-sm btn-del" onclick="delP('${cid}','${p.id}')">刪除專案</button></div>
+      <div class="pay-sec"><div class="pay-hdr"><span class="pay-label">請款記錄（${pays.length}）</span><button class="btn-xs" onclick="openAddPay('${cid}','${p.id}')">+ 新增請款</button></div>
+      <div class="pay-list">${pays.length?pays.map(py=>rPay(cid,p.id,py)).join(''):'<div style="font-size:12px;color:var(--text3);padding:6px 0">尚無請款記錄</div>'}</div></div>
+    </div></div>`;
 }
 
 function rPay(cid,pid,py){
   const inv=paymentInvoice(py.id);
-  return`<div class="pay-card">
-    <div class="pay-top">
-      <div class="pay-info"><div class="pay-name">${py.name}</div><div class="pay-meta">${py.date?'請款 '+py.date:''}${py.due?'・到期 '+py.due:''}${py.note?'・'+py.note:''}</div></div>
-      <div class="pay-right">
-        <span class="pay-amt">${fm(py.amount)}</span>
-        <select class="status-select" onchange="updatePayStatus('${cid}','${pid}','${py.id}',this.value)">
-          <option value="unpaid"${py.status==='unpaid'?' selected':''}>未付款</option>
-          <option value="paid"${py.status==='paid'?' selected':''}>已收款</option>
-          <option value="overdue"${py.status==='overdue'?' selected':''}>逾期</option>
-        </select>
-        <button class="btn-xs" onclick="openEditPay('${cid}','${pid}','${py.id}')">編輯</button>
-        <button class="btn-xs" style="color:var(--red-text)" onclick="delPay('${cid}','${pid}','${py.id}')">刪除</button>
-      </div>
-    </div>
-    ${inv?`<div class="inv-row"><span style="color:var(--text3);font-size:11px;min-width:48px">發票</span><span style="font-weight:500">${inv.number||'—'}</span><span class="badge b-invoiced" style="font-size:10px">${inv.type||''}</span><span style="color:var(--text2);font-size:11px">${inv.date?'開立 '+inv.date:''}</span><span style="color:var(--text2);font-size:11px">${inv.amount?'含稅 NT$ '+inv.amount:''}</span><span class="inv-add" onclick="openEditPay('${cid}','${pid}','${py.id}')">編輯發票</span></div>`:`<div class="inv-row"><span style="color:var(--text3);font-size:11px;min-width:48px">發票</span><span style="color:var(--text3);font-size:11px">尚未開立</span><span class="inv-add" onclick="openEditPay('${cid}','${pid}','${py.id}')">登錄發票</span></div>`}
+  return`<div class="pay-card"><div class="pay-top"><div class="pay-info"><div class="pay-name">${py.name}</div><div class="pay-meta">${py.date?'請款 '+py.date:''}${py.due?'・到期 '+py.due:''}${py.note?'・'+py.note:''}</div></div><div class="pay-right"><span class="pay-amt">${fm(py.amount)}</span><select class="status-select" onchange="updatePayStatus('${cid}','${pid}','${py.id}',this.value)"><option value="unpaid"${py.status==='unpaid'?' selected':''}>未付款</option><option value="paid"${py.status==='paid'?' selected':''}>已收款</option><option value="overdue"${py.status==='overdue'?' selected':''}>逾期</option></select><button class="btn-xs" onclick="openEditPay('${cid}','${pid}','${py.id}')">編輯</button><button class="btn-xs" style="color:var(--red-text)" onclick="delPay('${cid}','${pid}','${py.id}')">刪除</button></div></div>
+    ${inv?`<div class="inv-row"><span style="color:var(--text3);font-size:11px;min-width:48px">發票</span><span style="font-weight:500">${inv.number||'—'}</span><span class="badge b-invoiced" style="font-size:10px">${inv.type||''}</span><span style="color:var(--text2);font-size:11px">${inv.date?'開立 '+inv.date:''}</span><span class="inv-add" onclick="openEditPay('${cid}','${pid}','${py.id}')">編輯發票</span></div>`:`<div class="inv-row"><span style="color:var(--text3);font-size:11px;min-width:48px">發票</span><span style="color:var(--text3);font-size:11px">尚未開立</span><span class="inv-add" onclick="openEditPay('${cid}','${pid}','${py.id}')">登錄發票</span></div>`}
   </div>`;
 }
 
 function toggleC(id){openCid=openCid===String(id)?null:String(id);renderCRM()}
 function toggleP(cid,pid){const k=cid+'_'+pid;openPids[k]=!openPids[k];renderCRM()}
 function setCRMFilter(el){crmF=el.dataset.f;document.querySelectorAll('#page-crm .pill').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderCRM()}
-
-async function updatePayStatus(cid,pid,pyid,val){
-  try{await api('updateStatus',{sheet:'payments',id:pyid,status:val});const py=D.payments.find(x=>String(x.id)===String(pyid));if(py)py.status=val;renderCRM();if(g('page-finance').classList.contains('on'))renderFinance();toast('狀態已更新');}catch(e){toast('更新失敗：'+e.message);}
-}
-async function genShareLink(cid,pid,pname){
-  try{toast('產生連結中…');const res=await api('genToken',{project_id:pid,client_id:cid});const url=API+'?action=getPublicProject&token='+res.token;prompt(`「${pname}」的客戶分享連結：`,url);}catch(e){toast('產生失敗：'+e.message);}
-}
+async function updatePayStatus(cid,pid,pyid,val){try{await api('updateStatus',{sheet:'payments',id:pyid,status:val});const py=D.payments.find(x=>String(x.id)===String(pyid));if(py)py.status=val;renderCRM();if(g('page-finance').classList.contains('on'))renderFinance();toast('狀態已更新');}catch(e){toast('更新失敗：'+e.message);}}
+async function genShareLink(cid,pid,pname){try{toast('產生連結中…');const res=await api('genToken',{project_id:pid,client_id:cid});prompt(`「${pname}」的客戶分享連結：`,API+'?action=getPublicProject&token='+res.token);}catch(e){toast('產生失敗：'+e.message);}}
 
 // ── Finance ──
 function changeMonth(d){const[y,m]=finMonth.split('-').map(Number);const nd=new Date(y,m-1+d,1);finMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');renderFinance()}
 function renderFinance(){
+  if(!canSeeFinance())return;
   const[y,m]=finMonth.split('-').map(Number);
   const mn=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
   g('month-label').textContent=y+'年 '+mn[m-1];
@@ -1105,82 +863,309 @@ function renderFinance(){
   const totalOverdue=all.filter(p=>p.status==='overdue').reduce((s,p)=>s+pn(p.amount),0);
   const monthPaid=monthPays.filter(p=>p.status==='paid').reduce((s,p)=>s+pn(p.amount),0);
   const monthTotal=monthPays.reduce((s,p)=>s+pn(p.amount),0);
-  g('fin-cards').innerHTML=`
-    <div class="fin-card"><div class="fin-card-l">應收未收（全部）</div><div class="fin-card-n warn">NT$ ${totalUnpaid.toLocaleString()}</div><div class="fin-card-s">${all.filter(p=>p.status==='unpaid').length} 筆</div></div>
-    <div class="fin-card"><div class="fin-card-l">逾期未收（全部）</div><div class="fin-card-n danger">NT$ ${totalOverdue.toLocaleString()}</div><div class="fin-card-s">${all.filter(p=>p.status==='overdue').length} 筆</div></div>
-    <div class="fin-card"><div class="fin-card-l">${mn[m-1]}已收款</div><div class="fin-card-n good">NT$ ${monthPaid.toLocaleString()}</div><div class="fin-card-s">${monthPays.filter(p=>p.status==='paid').length} 筆</div></div>
-    <div class="fin-card"><div class="fin-card-l">${mn[m-1]}請款總額</div><div class="fin-card-n">NT$ ${monthTotal.toLocaleString()}</div><div class="fin-card-s">${monthPays.length} 筆</div></div>`;
+  g('fin-cards').innerHTML=`<div class="fin-card"><div class="fin-card-l">應收未收（全部）</div><div class="fin-card-n warn">NT$ ${totalUnpaid.toLocaleString()}</div><div class="fin-card-s">${all.filter(p=>p.status==='unpaid').length} 筆</div></div><div class="fin-card"><div class="fin-card-l">逾期未收（全部）</div><div class="fin-card-n danger">NT$ ${totalOverdue.toLocaleString()}</div><div class="fin-card-s">${all.filter(p=>p.status==='overdue').length} 筆</div></div><div class="fin-card"><div class="fin-card-l">${mn[m-1]}已收款</div><div class="fin-card-n good">NT$ ${monthPaid.toLocaleString()}</div><div class="fin-card-s">${monthPays.filter(p=>p.status==='paid').length} 筆</div></div><div class="fin-card"><div class="fin-card-l">${mn[m-1]}請款總額</div><div class="fin-card-n">NT$ ${monthTotal.toLocaleString()}</div><div class="fin-card-s">${monthPays.length} 筆</div></div>`;
   const tbody=g('fin-tbody');
   if(!shown.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:24px">無符合記錄</td></tr>';return;}
-  tbody.innerHTML=shown.map(py=>`<tr>
-    <td>${py.cname}</td><td style="color:var(--text2)">${py.pname}</td><td>${py.name}</td>
-    <td style="font-weight:500">${fm(py.amount)}</td>
-    <td style="color:var(--text2)">${py.date||'—'}</td>
-    <td style="color:${py.status==='overdue'?'var(--red-text)':'var(--text2)'}">${py.due||'—'}</td>
-    <td><select class="status-select" onchange="updatePayStatus('${py.cid}','${py.pid}','${py.id}',this.value)">
-      <option value="unpaid"${py.status==='unpaid'?' selected':''}>未付款</option>
-      <option value="paid"${py.status==='paid'?' selected':''}>已收款</option>
-      <option value="overdue"${py.status==='overdue'?' selected':''}>逾期</option>
-    </select></td>
-    <td>${py.invoice?`<span class="badge b-invoiced" style="font-size:10px">${py.invoice.number}</span>`:'<span style="color:var(--text3);font-size:11px">未開立</span>'}</td>
-  </tr>`).join('');
+  tbody.innerHTML=shown.map(py=>`<tr><td>${py.cname}</td><td style="color:var(--text2)">${py.pname}</td><td>${py.name}</td><td style="font-weight:500">${fm(py.amount)}</td><td style="color:var(--text2)">${py.date||'—'}</td><td style="color:${py.status==='overdue'?'var(--red-text)':'var(--text2)'}">${py.due||'—'}</td><td><select class="status-select" onchange="updatePayStatus('${py.cid}','${py.pid}','${py.id}',this.value)"><option value="unpaid"${py.status==='unpaid'?' selected':''}>未付款</option><option value="paid"${py.status==='paid'?' selected':''}>已收款</option><option value="overdue"${py.status==='overdue'?' selected':''}>逾期</option></select></td><td>${py.invoice?`<span class="badge b-invoiced" style="font-size:10px">${py.invoice.number}</span>`:'<span style="color:var(--text3);font-size:11px">未開立</span>'}</td></tr>`).join('');
 }
 function setFinFilter(el){finF=el.dataset.fp;document.querySelectorAll('[data-fp]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderFinance()}
 function setStatusFilter(el){statusF=el.dataset.fs;document.querySelectorAll('[data-fs]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderFinance()}
 
 // ── HR ──
 function renderHR(){
-  // 薪資分頁：僅超管與老闆可見
-  const tabSal=g('tab-salary');
-  if(tabSal)tabSal.style.display=canSeeSalary()?'':'none';
-  // 差勤月結：僅超管與老闆可見
-  const tabReport=g('tab-report');
-  if(tabReport)tabReport.style.display=isOwner()?'':'none';
+  g('tab-salary').style.display=canSeeSalary()?'':'none';
+  g('tab-report').style.display=isOwner()?'':'none';
   renderMembers();
 }
 
-// ── 差勤月結報表 ──
-let reportMonth=new Date().toISOString().slice(0,7);
-function changeReportMonth(d){
-  const[y,m]=reportMonth.split('-').map(Number);
-  const nd=new Date(y,m-1+d,1);
-  reportMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');
-  renderReport();
+// ── Members ──
+function setMemberFilter(el){memberFilter=el.dataset.mf;document.querySelectorAll('[data-mf]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderMembers();}
+function toggleMemberGroup(key){memberGroupOpen[key]=!memberGroupOpen[key];renderMembers();}
+function toggleDeptGroup(key){deptGroupOpen[key]=!(deptGroupOpen[key]===false);renderMembers();}
+function toggleMember(id){const m=D.members.find(x=>String(x.id)===String(id));if(m)m._open=!m._open;renderMembers();}
+
+function renderMemberCard(m){
+  const cl=col(m.id);const resigned=isResigned(m);
+  const isSA=isBool(m.super_admin,true);
+  const roleColor=m.role==='owner'?'b-overdue':m.role==='manager'?'b-proposal':'b-active';
+  const avStyle=resigned?'background:#3a3935;color:#6b6a64':'background:'+cl.bg+';color:'+cl.c;
+  const showBal=canSeeLeaveBalance(m.id)&&!isContractor(m);
+  const bal=showBal?getLocalLeaveBalance(m.id):null;
+  const leaveStr=bal&&parseFloat(bal.days)>0?`<span style="font-size:10px;color:var(--teal-text);margin-left:4px">特休 ${bal.days}天</span>`:'';
+  const showSalary=canSeeSalary();
+  // 遠端天數：僅老闆/超管
+  const remoteRow=isOwner()&&m.remote_days?`<div><div class="dl">本月遠端</div><div class="dv">${m.remote_days} 天</div></div>`:'';
+
+  return`<div class="mc${m._open?' open':''}${resigned?' resigned':''}" onclick="toggleMember('${m.id}')">
+    <div class="mc-top">
+      <div class="av" style="width:44px;height:44px;${avStyle};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0">${ini(m.name_zh||'?')}</div>
+      <div class="mc-info">
+        <div class="mc-name">${m.name_zh||'—'}${m.name_en?' ('+m.name_en+')':''}
+          ${resigned?'<span class="badge" style="font-size:10px;background:#3a3935;color:#9b9a94;margin-left:6px">離職</span>':''}
+          ${isSA&&!resigned?'<span style="font-size:10px;color:var(--amber-text);margin-left:4px">★</span>':''}
+        </div>
+        <div class="mc-sub">${m.title||''}${m.department?' · '+m.department:''}
+          <span class="badge ${roleColor}" style="font-size:10px;margin-left:4px">${isContractor(m)?'外包':ROLE_L[m.role]||m.role}</span>
+          ${leaveStr}
+        </div>
+      </div>
+    </div>
+    <div class="mc-detail">
+      <div class="dgrid" style="grid-template-columns:1fr 1fr;gap:8px 16px">
+        <div><div class="dl">Email</div><div class="dv" style="font-size:12px;display:flex;align-items:center;gap:6px">${m.email||'—'}${m.email?`<a href="https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(m.email)}" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--blue-bg);color:var(--blue-text);text-decoration:none;white-space:nowrap">寄信</a>`:''}
+        </div></div>
+        <div><div class="dl">工作模式</div><div class="dv">${WORK_L[m.work_mode]||m.work_mode||'—'}</div></div>
+        <div><div class="dl">到職日</div><div class="dv">${fmtDate(m.start_date)}</div></div>
+        <div><div class="dl">類型</div><div class="dv">${EMP_L[m.employment_type]||m.employment_type||'—'}</div></div>
+        ${showSalary?`<div><div class="dl">底薪</div><div class="dv">${m.base_salary?'NT$ '+m.base_salary:'—'}</div></div>`:''}
+        ${remoteRow}
+        <div><div class="dl">負責專案</div><div class="dv">${D.projects.filter(p=>p.owner&&p.owner.includes(m.name_zh)).length} 個</div></div>
+        ${resigned&&m.note?`<div style="grid-column:1/-1"><div class="dl">備註</div><div class="dv" style="font-size:12px;color:#9b9a94">${m.note}</div></div>`:''}
+      </div>
+      ${canEditMember()?`<div class="row-btns" style="margin-top:12px;margin-bottom:0">
+        <button class="btn-sm" onclick="event.stopPropagation();openEditMember('${m.id}')">編輯</button>
+        <button class="btn-sm btn-del" onclick="event.stopPropagation();delMember('${m.id}')">刪除</button>
+      </div>`:''}
+    </div>
+  </div>`;
 }
-function calcWorkdays(year,month){
-  const days=[];const d=new Date(year,month-1,1);
-  while(d.getMonth()===month-1){
-    const dow=d.getDay();const dateStr=d.toISOString().slice(0,10);
+
+function renderMembers(){
+  const q=(g('member-search').value||'').toLowerCase();
+  let list=D.members.filter(m=>{
+    const mq=!q||[m.name_zh,m.name_en,m.title,m.email,m.department].join(' ').toLowerCase().includes(q);
+    const mf=memberFilter==='all'||
+      (memberFilter==='full_time'&&!isContractor(m)&&!isResigned(m))||
+      (memberFilter==='contractor'&&isContractor(m)&&!isResigned(m));
+    return mq&&mf;
+  });
+  const el=g('member-list');
+  if(!list.length){el.innerHTML='<div class="empty-state">尚無員工資料</div>';return;}
+
+  const chevUp=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>`;
+  const chevDn=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>`;
+
+  const owners=list.filter(m=>m.role==='owner'&&!isResigned(m));
+  const managers=list.filter(m=>m.role==='manager'&&!isContractor(m)&&!isResigned(m));
+  const employees=list.filter(m=>m.role==='employee'&&!isContractor(m)&&!isResigned(m));
+  const contractors=list.filter(m=>isContractor(m)&&!isResigned(m));
+  const resigned=list.filter(m=>isResigned(m));
+
+  const allDepts=[...new Set([...managers,...employees].map(m=>m.department||'未分配'))].sort((a,b)=>{
+    if(a==='行政管理部')return -1;if(b==='行政管理部')return 1;
+    if(a==='未分配')return 1;if(b==='未分配')return -1;
+    return a.localeCompare(b,'zh-TW');
+  });
+
+  const renderDeptSection=dept=>{
+    const dm=managers.filter(m=>(m.department||'未分配')===dept);
+    const de=employees.filter(m=>(m.department||'未分配')===dept);
+    if(!dm.length&&!de.length)return'';
+    if(!(dept in deptGroupOpen))deptGroupOpen[dept]=true;
+    const open=q||deptGroupOpen[dept];
+    return`<div class="dept-section">
+      <div class="dept-header" onclick="toggleDeptGroup('${dept}')">
+        <div class="dept-title">${dept}</div>
+        <div class="dept-count">${dm.length+de.length} 人・${dm.length} 主管・${de.length} 組員</div>
+        <div class="dept-toggle">${open?chevUp:chevDn}</div>
+      </div>
+      ${open?`<div>
+        ${dm.length?`<div style="font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;padding-left:2px">主管</div><div class="member-grid" style="margin-bottom:12px">${dm.map(renderMemberCard).join('')}</div>`:''}
+        ${de.length?`<div style="font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;padding-left:2px">組員</div><div class="member-grid">${de.map(renderMemberCard).join('')}</div>`:''}
+      </div>`:''}
+    </div>`;
+  };
+
+  const renderContractorSection=()=>{
+    if(!contractors.length)return'';
+    if(!('contractor' in deptGroupOpen))deptGroupOpen['contractor']=true;
+    const open=q||deptGroupOpen['contractor'];
+    return`<div style="border-top:1.5px solid var(--border2);margin-top:16px;padding-top:14px">
+      <div onclick="toggleDeptGroup('contractor')" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-bottom:${open?'12px':'4px'}">
+        <span style="font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">外包合作</span>
+        <span style="background:var(--bg2);color:var(--text3);font-size:11px;padding:1px 8px;border-radius:10px;border:0.5px solid var(--border)">${contractors.length}</span>
+        <span style="margin-left:auto;color:var(--text3)">${open?chevUp:chevDn}</span>
+      </div>
+      ${open?`<div class="member-grid">${contractors.map(renderMemberCard).join('')}</div>`:''}
+    </div>`;
+  };
+
+  const renderResignedSection=()=>{
+    if(!resigned.length||!canSeeResigned())return'';
+    if(!('resigned' in memberGroupOpen))memberGroupOpen['resigned']=false;
+    const open=q||memberGroupOpen['resigned'];
+    return`<div style="border-top:1.5px dashed var(--border2);margin-top:16px;padding-top:14px">
+      <div onclick="toggleMemberGroup('resigned')" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-bottom:${open?'12px':'4px'}">
+        <span style="font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">離職人員</span>
+        <span style="background:var(--bg2);color:var(--text3);font-size:11px;padding:1px 8px;border-radius:10px;border:0.5px solid var(--border)">${resigned.length}</span>
+        <span style="margin-left:auto;color:var(--text3)">${open?chevUp:chevDn}</span>
+      </div>
+      ${open?`<div class="member-grid">${resigned.map(renderMemberCard).join('')}</div>`:''}
+    </div>`;
+  };
+
+  let html='';
+  if(owners.length)html+=`<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;padding-left:2px">經營層</div><div class="member-grid">${owners.map(renderMemberCard).join('')}</div></div>`;
+  if(allDepts.length){html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;padding-left:2px">各部門</div>`;html+=allDepts.map(renderDeptSection).join('');}
+  html+=renderContractorSection();
+  html+=renderResignedSection();
+  el.innerHTML=html;
+}
+
+// ── Attendance ──
+function changeAttMonth(d){const[y,m]=attMonth.split('-').map(Number);const nd=new Date(y,m-1+d,1);attMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');renderAttendance();}
+function renderAttendance(){
+  const[y,mo]=attMonth.split('-').map(Number);
+  const mn=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  g('att-month-label').textContent=y+'年 '+mn[mo-1];
+  let visibleIds=null;
+  if(canSeeAllAttendance())visibleIds=null;
+  else if(canSeeDeptAttendance()){const dept=myMember?.department||'';visibleIds=D.members.filter(m=>m.department===dept).map(m=>String(m.id));}
+  else visibleIds=myMember?[String(myMember.id)]:[];
+  let recs=D.attendance.filter(a=>String(a.date).slice(0,7)===attMonth);
+  if(visibleIds!==null)recs=recs.filter(a=>visibleIds.includes(String(a.member_id)));
+  const fw=g('att-filter-wrap');
+  if(fw&&canSeeAllAttendance()){
+    const depts=[...new Set(D.members.filter(m=>!isContractor(m)).map(m=>m.department).filter(Boolean))];
+    fw.innerHTML=`<button class="pill${attDeptFilter==='all'?' on':''}" data-am="all" onclick="setAttFilter(this)">全員</button>`+depts.map(d=>`<button class="pill${attDeptFilter===d?' on':''}" data-am="${d}" onclick="setAttFilter(this)">${d}</button>`).join('');
+  }
+  if(attDeptFilter!=='all'){const ids=D.members.filter(m=>m.department===attDeptFilter).map(m=>String(m.id));recs=recs.filter(a=>ids.includes(String(a.member_id)));}
+  const tbody=g('att-tbody');
+  if(!recs.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">本月無出勤記錄</td></tr>';return;}
+  tbody.innerHTML=recs.map(a=>{const m=D.members.find(x=>String(x.id)===String(a.member_id));return`<tr><td style="font-weight:500">${m?m.name_zh:'—'}</td><td style="color:var(--text2)">${m?m.department||'—':'—'}</td><td>${fmtDate(a.date)}</td><td>${fmtTime(a.clock_in)}</td><td>${a.clock_out?fmtTime(a.clock_out):'—'}</td><td>${a.work_hours?Number(a.work_hours).toFixed(1)+'h':'—'}</td><td><span class="badge ${ATT_C[a.status]||'b-present'}">${ATT_L[a.status]||a.status}</span></td></tr>`;}).join('');
+}
+function setAttFilter(el){attDeptFilter=el.dataset.am;document.querySelectorAll('[data-am]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderAttendance();}
+
+// ── Leave ──
+function setLeaveFilter(el){leaveF=el.dataset.lf;document.querySelectorAll('[data-lf]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderLeave();}
+function renderLeave(){
+  // 外包不顯示假勤
+  if(myMember&&isContractor(myMember)){g('leave-list').innerHTML='<div class="empty-state">外包人員不適用假勤申請</div>';return;}
+  const list=leaveF==='all'?D.leave_requests:D.leave_requests.filter(l=>l.status===leaveF);
+  const el=g('leave-list');
+  if(!list.length){el.innerHTML='<div class="empty-state">尚無請假記錄</div>';return;}
+  el.innerHTML=list.map(l=>{
+    const m=D.members.find(x=>String(x.id)===String(l.member_id));
+    const lt=D.leave_types.find(x=>String(x.id)===String(l.leave_type_id));
+    const canReview=isManager();
+    return`<div class="leave-row"><div class="leave-info"><div class="leave-name">${m?m.name_zh:'—'} · ${lt?lt.name:'—'} · ${l.days||'?'}天</div><div class="leave-meta">${fmtDate(l.start_date)} ~ ${fmtDate(l.end_date)}${l.reason?' · '+l.reason:''}</div></div>
+      <div class="leave-right"><span class="badge ${LEAVE_STATUS_C[l.status]}">${LEAVE_STATUS_L[l.status]}</span>
+      ${canReview&&l.status==='pending'?`<button class="btn-xs" style="border-color:#0f6e56;color:#085041;background:var(--teal-bg)" onclick="reviewLeave('${l.id}','approved')">核准</button><button class="btn-xs btn-del" onclick="reviewLeave('${l.id}','rejected')">駁回</button>`:''}
+      <button class="btn-xs" style="color:var(--red-text)" onclick="delLeave('${l.id}')">刪除</button></div></div>`;
+  }).join('');
+}
+async function reviewLeave(id,status){try{await api('reviewLeave',{id,status,approved_by:currentUser?.email||''});const l=D.leave_requests.find(x=>String(x.id)===String(id));if(l)l.status=status;renderLeave();toast(status==='approved'?'已核准':'已駁回');}catch(e){toast('操作失敗：'+e.message);}}
+async function delLeave(id){if(!confirm('確定刪除此請假記錄？'))return;try{await api('delete',{sheet:'leave_requests',id});D.leave_requests=D.leave_requests.filter(x=>String(x.id)!==String(id));renderLeave();toast('已刪除');}catch(e){toast('刪除失敗：'+e.message);}}
+
+// ── 特休餘額 ──
+function getLeaveTypeIsAnnual(ltId){const lt=D.leave_types.find(t=>String(t.id)===String(ltId));return lt&&(lt.name.includes('特休')||lt.name.includes('特別休假'));}
+function getLocalLeaveBalance(memberId){
+  const now=new Date().toISOString().slice(0,10);
+  const records=(D.annual_leave||[]).filter(r=>String(r.member_id)===String(memberId)&&String(r.year_start).slice(0,10)<=now&&String(r.expire_date).slice(0,10)>now);
+  const granted=records.reduce((s,r)=>s+parseFloat(r.remaining_days||0),0);
+  const usedDays=(D.leave_requests||[]).filter(lr=>getLeaveTypeIsAnnual(lr.leave_type_id)&&String(lr.member_id)===String(memberId)&&lr.status==='approved').reduce((s,lr)=>s+parseFloat(lr.days||0),0);
+  const remaining=Math.max(0,granted-usedDays);
+  return{days:remaining.toFixed(1),hours:(remaining*8).toFixed(0),granted:granted.toFixed(1),used:usedDays.toFixed(1)};
+}
+
+// ── Leave Modal ──
+function updateLeaveDays(){
+  const s=g('lm-start_date').value,e=g('lm-end_date').value;
+  if(!s||!e)return;
+  let count=0;const cur=new Date(s);const end=new Date(e);
+  while(cur<=end){
+    const dateStr=cur.toISOString().slice(0,10);const dow=cur.getDay();
     const isWeekend=dow===0||dow===6;
     const isHoliday=(D.holidays||[]).some(h=>String(h.date).slice(0,10)===dateStr);
-    if(!isWeekend&&!isHoliday)days.push(dateStr);
-    d.setDate(d.getDate()+1);
+    if(!isWeekend&&!isHoliday)count++;
+    cur.setDate(cur.getDate()+1);
   }
-  return days;
+  g('lm-days').value=count;checkLeaveExceed();
 }
-function calcLateMin(rec){
-  if(!rec.clock_in)return 0;
-  const t=new Date(rec.clock_in);const h=t.getHours()+t.getMinutes()/60;
-  return h>10.5?Math.round((h-10.5)*60):0;
+function onLeaveTypeChange(){
+  const sel=g('lm-leave_type_id');
+  const lt=D.leave_types.find(x=>String(x.id)===String(sel.value));
+  const isAnnual=lt&&(lt.name.includes('特休')||lt.name.includes('特別休假'));
+  const balBox=g('lm-balance-box');
+  if(isAnnual&&myMember){
+    const bal=getLocalLeaveBalance(myMember.id);
+    g('lm-balance-granted').textContent=bal.granted;g('lm-balance-used').textContent=bal.used;
+    g('lm-balance-days').textContent=bal.days;g('lm-balance-hours').textContent=bal.hours;
+    if(balBox)balBox.style.display='block';
+  }else{if(balBox)balBox.style.display='none';}
+  // 假別說明卡
+  const card=g('leave-info-card');
+  if(lt){
+    const ltName=lt.name;
+    const meta=LEAVE_META[ltName]||{};
+    const maxD=String(lt.max_days)==='999'?'無上限':lt.max_days+'天';
+    g('lic-name').textContent=ltName;
+    g('lic-days').textContent=maxD;
+    g('lic-unit').textContent=meta.unit||'1天';
+    g('lic-pay').textContent=meta.pay||'—';
+    g('lic-rule').textContent=meta.rule?'規範：'+meta.rule:'';
+    g('lic-proof').textContent=meta.proof?'需附證明：'+meta.proof:'';
+    card.classList.add('show');
+  }else{card.classList.remove('show');}
+  checkLeaveExceed();
 }
-function calcEarlyMin(rec){
-  if(!rec.clock_in||!rec.clock_out)return 0;
-  const inT=new Date(rec.clock_in);const outT=new Date(rec.clock_out);
-  const diffMs=outT-inT;
-  if(diffMs<0)return 0;
-  const workHrs=diffMs/3600000;
-  if(workHrs>=9)return 0;
-  if(outT.getDate()!==inT.getDate()&&workHrs>=6)return 0;
-  const exp=new Date(inT.getTime()+9*3600000);
-  return outT<exp?Math.round((exp-outT)/60000):0;
+function checkLeaveExceed(){
+  const warnEl=g('lm-exceed-warn');if(!warnEl)return;
+  const sel=g('lm-leave_type_id');
+  const lt=D.leave_types.find(x=>String(x.id)===String(sel.value));
+  const isAnnual=lt&&(lt.name.includes('特休')||lt.name.includes('特別休假'));
+  if(isAnnual&&myMember){const days=parseFloat(g('lm-days').value)||0;const bal=getLocalLeaveBalance(myMember.id);warnEl.style.display=days>parseFloat(bal.days)?'block':'none';}
+  else warnEl.style.display='none';
 }
+function openLeaveModal(){
+  if(myMember&&isContractor(myMember)){toast('外包人員不適用請假功能');return;}
+  editLeaveId=null;g('lm-title').textContent='申請請假';
+  g('lm-start_date').value='';g('lm-end_date').value='';g('lm-days').value='';g('lm-reason').value='';
+  g('lm-balance-box').style.display='none';g('lm-exceed-warn').style.display='none';
+  g('leave-info-card').classList.remove('show');
+  const sel=g('lm-leave_type_id');
+  sel.innerHTML=D.leave_types.map(lt=>`<option value="${lt.id}">${lt.name}（${String(lt.max_days)==='999'?'無上限':lt.max_days+'天'}）</option>`).join('');
+  g('lm-ov').classList.add('open');onLeaveTypeChange();
+}
+async function saveLeave(){
+  if(!myMember){alert('請先在員工資料中登錄你的帳號');return;}
+  if(isContractor(myMember)){toast('外包人員不適用請假功能');return;}
+  const s=v('lm-start_date'),e=v('lm-end_date');
+  if(!s||!e){alert('請選擇請假日期');return;}
+  const days=parseFloat(g('lm-days').value)||0;
+  if(days<=0){alert('請假天數為 0，請確認日期範圍（假日和週末不計入）');return;}
+  const d={member_id:myMember.id,leave_type_id:g('lm-leave_type_id').value,start_date:s,end_date:e,days,reason:v('lm-reason')};
+  if(editLeaveId)d.id=editLeaveId;
+  try{const res=await api('saveLeaveRequest',d);if(!editLeaveId)D.leave_requests.push({...d,id:res.id,status:'pending'});const all=await api('getAll');D.annual_leave=all.annual_leave||[];toast('已送出申請');cm('lm-ov');renderLeave();}catch(e){toast('送出失敗：'+e.message);}
+}
+
+// ── Salary ──
+function changeSalMonth(d){const[y,m]=salMonth.split('-').map(Number);const nd=new Date(y,m-1+d,1);salMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');renderSalary();}
+function renderSalary(){
+  if(!canSeeSalary()){g('sal-tbody').innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">無權限查看薪資資料</td></tr>';return;}
+  const[y,mo]=salMonth.split('-').map(Number);
+  const mn=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  g('sal-month-label').textContent=y+'年 '+mn[mo-1];
+  const recs=D.salary_records.filter(s=>String(s.year)===String(y)&&String(s.month)===String(mo));
+  const tbody=g('sal-tbody');
+  if(!recs.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">本月無薪資記錄</td></tr>';return;}
+  tbody.innerHTML=recs.map(s=>{const m=D.members.find(x=>String(x.id)===String(s.member_id));return`<tr><td style="font-weight:500">${m?m.name_zh:'—'}</td><td>${s.base_salary?'NT$ '+s.base_salary:'—'}</td><td>${s.allowances?'NT$ '+s.allowances:'—'}</td><td>${s.bonus?'NT$ '+s.bonus:'—'}</td><td style="color:var(--red-text)">${s.labor_insurance?'-'+s.labor_insurance:'—'}</td><td style="color:var(--red-text)">${s.health_insurance?'-'+s.health_insurance:'—'}</td><td style="color:var(--red-text)">${s.tax?'-'+s.tax:'—'}</td><td style="font-weight:600;color:var(--teal-text)">${s.net_salary?'NT$ '+s.net_salary:'—'}</td><td style="color:var(--text2)">${fmtDate(s.pay_date)}</td></tr>`;}).join('');
+}
+function calcNet(){const base=pn(g('sm-base_salary').value);const allow=pn(g('sm-allowances').value);const bonus=pn(g('sm-bonus').value);const ded=pn(g('sm-deductions').value);const labor=pn(g('sm-labor_insurance').value);const health=pn(g('sm-health_insurance').value);const tax=pn(g('sm-tax').value);const net=base+allow+bonus-ded-labor-health-tax;g('sm-net_salary').value=net>0?net.toLocaleString():'0';}
+function onMemberSelect(){const mid=g('sm-member_id').value;const m=D.members.find(x=>String(x.id)===String(mid));if(!m)return;if(m.base_salary){g('sm-base_salary').value=m.base_salary;g('sm-allowances').value=m.allowances||'';autoCalcInsurance();}}
+async function autoCalcInsurance(){const base=pn(g('sm-base_salary').value);if(!base)return;try{const res=await api('calcInsurance',{salary:base,year:g('sm-year').value||new Date().getFullYear()});g('sm-labor_insurance').value=res.labor.employee;g('sm-health_insurance').value=res.health.employee;const infoEl=g('sm-insurance-info');if(infoEl){infoEl.textContent=`勞保級距 NT$ ${res.labor.insured_amount.toLocaleString()}・健保級距 NT$ ${res.health.insured_amount.toLocaleString()}`;infoEl.style.display='block';}calcNet();toast('已自動帶入勞保健保');}catch(e){toast('保費計算失敗，請手動填入');}}
+
+// ── Report ──
+function changeReportMonth(d){const[y,m]=reportMonth.split('-').map(Number);const nd=new Date(y,m-1+d,1);reportMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');renderReport();}
+function calcWorkdays(year,month){const days=[];const d=new Date(year,month-1,1);while(d.getMonth()===month-1){const dow=d.getDay();const ds=d.toISOString().slice(0,10);if(dow!==0&&dow!==6&&!(D.holidays||[]).some(h=>String(h.date).slice(0,10)===ds))days.push(ds);d.setDate(d.getDate()+1);}return days;}
+function calcLateMin(rec){if(!rec.clock_in)return 0;const t=new Date(rec.clock_in);const h=t.getHours()+t.getMinutes()/60;return h>10.5?Math.round((h-10.5)*60):0;}
+function calcEarlyMin(rec){if(!rec.clock_in||!rec.clock_out)return 0;const inT=new Date(rec.clock_in);const outT=new Date(rec.clock_out);const ms=outT-inT;if(ms<0)return 0;const hrs=ms/3600000;if(hrs>=9)return 0;if(outT.getDate()!==inT.getDate()&&hrs>=6)return 0;const exp=new Date(inT.getTime()+9*3600000);return outT<exp?Math.round((exp-outT)/60000):0;}
 function renderReport(){
   const[y,mo]=reportMonth.split('-').map(Number);
   const mn=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
   g('report-month-label').textContent=y+'年 '+mn[mo-1];
-  const workdays=calcWorkdays(y,mo);
-  const shouldDays=workdays.length;
-  const members=D.members.filter(m=>isActive(m));
+  const shouldDays=calcWorkdays(y,mo).length;
+  const members=D.members.filter(m=>isActive(m)&&!isContractor(m));
   const rows=members.map(m=>{
     const recs=D.attendance.filter(a=>String(a.member_id)===String(m.id)&&String(a.date).slice(0,7)===reportMonth);
     const present=recs.filter(a=>a.status==='present').length;
@@ -1191,636 +1176,95 @@ function renderReport(){
     const totalHrs=recs.reduce((s,a)=>s+parseFloat(a.work_hours||0),0);
     const lateMin=recs.reduce((s,a)=>s+calcLateMin(a),0);
     const earlyMin=recs.reduce((s,a)=>s+calcEarlyMin(a),0);
-    const leaveRecs=D.leave_requests.filter(lr=>String(lr.member_id)===String(m.id)&&lr.status==='approved'&&(lr.start_date||'').slice(0,7)===reportMonth);
-    const leaveStr=leaveRecs.map(lr=>{const lt=D.leave_types.find(t=>String(t.id)===String(lr.leave_type_id));return(lt?lt.name:'假')+lr.days+'天';}).join('、')||'—';
+    const leaveStr=D.leave_requests.filter(lr=>String(lr.member_id)===String(m.id)&&lr.status==='approved'&&(lr.start_date||'').slice(0,7)===reportMonth).map(lr=>{const lt=D.leave_types.find(t=>String(t.id)===String(lr.leave_type_id));return(lt?lt.name:'假')+lr.days+'天';}).join('、')||'—';
     return{m,shouldDays,actualDays,present,late,early,absent,totalHrs,lateMin,earlyMin,leaveStr};
   });
-  const content=g('report-content');
-  content.innerHTML=`
-    <div class="report-table-wrap">
-      <div class="report-header">
-        <div>
-          <div class="report-title">樂法網路行銷有限公司　差勤月結報表</div>
-          <div class="report-sub">${y}年${mn[mo-1]}　應出勤 ${shouldDays} 天　共 ${members.length} 人</div>
-        </div>
-      </div>
-      <div style="overflow-x:auto">
-      <table class="rtable">
-        <thead><tr>
-          <th>姓名</th><th>部門</th><th>應出勤</th><th>實際出勤</th>
-          <th>正常</th>
-          <th>遲到（次/分）</th>
-          <th>早退（次/分）</th>
-          <th>缺勤</th><th>總工時</th><th>請假記錄</th>
-        </tr></thead>
-        <tbody>
-          ${rows.map(r=>`<tr>
-            <td>${r.m.name_zh||'—'}</td>
-            <td style="color:var(--text2)">${r.m.department||'—'}</td>
-            <td>${r.shouldDays}</td>
-            <td>${r.actualDays}</td>
-            <td class="good">${r.present||'—'}</td>
-            <td class="${r.late>0?'warn':''}">${r.late>0?r.late+'次 '+r.lateMin+'分':'—'}</td>
-            <td class="${r.early>0?'purple':''}">${r.early>0?r.early+'次 '+r.earlyMin+'分':'—'}</td>
-            <td class="${r.absent>0?'danger':''}">${r.absent>0?r.absent:'—'}</td>
-            <td>${r.totalHrs.toFixed(1)}h</td>
-            <td style="color:var(--text2);font-size:11px;text-align:left">${r.leaveStr}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-      </div>
-    </div>
-    <div style="font-size:12px;color:var(--text3);text-align:right;margin-top:8px">
-      報表產出：${new Date().toLocaleString('zh-TW')}　製表：${currentUser?.name||'—'}
-    </div>`;
+  g('report-content').innerHTML=`<div class="report-table-wrap"><div class="report-header"><div><div class="report-title">樂法網路行銷有限公司　差勤月結報表</div><div class="report-sub">${y}年${mn[mo-1]}　應出勤 ${shouldDays} 天　共 ${members.length} 人</div></div></div><div style="overflow-x:auto"><table class="rtable"><thead><tr><th>姓名</th><th>部門</th><th>應出勤</th><th>實際出勤</th><th>正常</th><th>遲到（次/分）</th><th>早退（次/分）</th><th>缺勤</th><th>總工時</th><th>請假記錄</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.m.name_zh||'—'}</td><td style="color:var(--text2)">${r.m.department||'—'}</td><td>${r.shouldDays}</td><td>${r.actualDays}</td><td class="good">${r.present||'—'}</td><td class="${r.late>0?'warn':''}">${r.late>0?r.late+'次 '+r.lateMin+'分':'—'}</td><td class="${r.early>0?'purple':''}">${r.early>0?r.early+'次 '+r.earlyMin+'分':'—'}</td><td class="${r.absent>0?'danger':''}">${r.absent>0?r.absent:'—'}</td><td>${r.totalHrs.toFixed(1)}h</td><td style="color:var(--text2);font-size:11px;text-align:left">${r.leaveStr}</td></tr>`).join('')}</tbody></table></div></div><div style="font-size:12px;color:var(--text3);text-align:right;margin-top:8px">報表產出：${new Date().toLocaleString('zh-TW')}　製表：${currentUser?.name||'—'}</div>`;
 }
 function printAttReport(){renderReport();setTimeout(()=>window.print(),300);}
 
 // ── Clock ──
-function startClock(){
-  if(clockInterval)clearInterval(clockInterval);
-  tickClock();
-  clockInterval=setInterval(tickClock,1000);
-}
+function startClock(){if(clockInterval)clearInterval(clockInterval);tickClock();clockInterval=setInterval(tickClock,1000);}
 function tickClock(){
   const now=new Date();
-  const el=g('clock-time');
-  if(el)el.textContent=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+  const el=g('clock-time');if(el)el.textContent=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
   const days=['日','一','二','三','四','五','六'];
-  const el2=g('clock-date');
-  if(el2)el2.textContent=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日（週'+days[now.getDay()]+'）';
-  if(currentClockIn&&!currentClockOut){
-    const hrs=((now-new Date(currentClockIn))/3600000);
-    const el3=g('ct-hours');
-    if(el3)el3.textContent=hrs.toFixed(1)+'h';
-  }
+  const el2=g('clock-date');if(el2)el2.textContent=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日（週'+days[now.getDay()]+'）';
+  if(currentClockIn&&!currentClockOut){const el3=g('ct-hours');if(el3)el3.textContent=((now-new Date(currentClockIn))/3600000).toFixed(1)+'h';}
 }
-
 function setClockState(state,rec){
-  const stateEl=g('clock-state');
-  const timesRow=g('clock-times-row');
-  const btnWrap=g('clock-btn-wrap');
-  const loadingEl=g('clock-loading');
+  const stateEl=g('clock-state'),timesRow=g('clock-times-row'),btnWrap=g('clock-btn-wrap'),loadingEl=g('clock-loading');
   if(loadingEl)loadingEl.style.display='none';
-  currentClockIn=rec?.clock_in||null;
-  currentClockOut=rec?.clock_out||null;
-  if(state==='idle'){
-    stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>今日尚未打卡</div>';
-    timesRow.style.display='none';
-    btnWrap.innerHTML=`<button class="clock-action-btn cab-in" onclick="doClock('in')">上班打卡</button>`;
-  }else if(state==='in'){
-    stateEl.innerHTML='<div class="clock-state-badge cs-in"><span class="cs-dot"></span>上班中</div>';
-    timesRow.style.display='flex';
-    g('ct-in').textContent=fmtTime(rec.clock_in);
-    g('ct-out').textContent='尚未打卡';
-    g('ct-out').className='clock-time-val empty';
-    g('ct-hours').textContent='計算中…';
-    btnWrap.innerHTML=`<button class="clock-action-btn cab-out" onclick="doClock('out')">下班打卡</button>`;
-  }else if(state==='done'){
-    const hrs=Number(rec.work_hours).toFixed(1);
-    stateEl.innerHTML=`<div class="clock-state-badge cs-done"><span class="cs-dot"></span>今日出勤完成・工時 ${hrs} 小時</div>`;
-    timesRow.style.display='flex';
-    g('ct-in').textContent=fmtTime(rec.clock_in);
-    g('ct-out').textContent=fmtTime(rec.clock_out);
-    g('ct-out').className='clock-time-val';
-    g('ct-hours').textContent=hrs+'h';
-    btnWrap.innerHTML=`<button class="clock-action-btn cab-done" disabled>今日打卡完成</button>`;
-  }else if(state==='nomember'){
-    stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>尚未建立員工資料</div>';
-    timesRow.style.display='none';
-    btnWrap.innerHTML=`<button class="clock-action-btn cab-done" disabled>請先建立員工資料</button>`;
-  }
+  currentClockIn=rec?.clock_in||null;currentClockOut=rec?.clock_out||null;
+  if(state==='idle'){stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>今日尚未打卡</div>';timesRow.style.display='none';btnWrap.innerHTML=`<button class="clock-action-btn cab-in" onclick="doClock('in')">上班打卡</button>`;}
+  else if(state==='in'){stateEl.innerHTML='<div class="clock-state-badge cs-in"><span class="cs-dot"></span>上班中</div>';timesRow.style.display='flex';g('ct-in').textContent=fmtTime(rec.clock_in);g('ct-out').textContent='尚未打卡';g('ct-out').className='clock-time-val empty';g('ct-hours').textContent='計算中…';btnWrap.innerHTML=`<button class="clock-action-btn cab-out" onclick="doClock('out')">下班打卡</button>`;}
+  else if(state==='done'){const hrs=Number(rec.work_hours).toFixed(1);stateEl.innerHTML=`<div class="clock-state-badge cs-done"><span class="cs-dot"></span>今日出勤完成・工時 ${hrs} 小時</div>`;timesRow.style.display='flex';g('ct-in').textContent=fmtTime(rec.clock_in);g('ct-out').textContent=fmtTime(rec.clock_out);g('ct-out').className='clock-time-val';g('ct-hours').textContent=hrs+'h';btnWrap.innerHTML=`<button class="clock-action-btn cab-done" disabled>今日打卡完成</button>`;}
+  else if(state==='nomember'){stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>尚未建立員工資料</div>';timesRow.style.display='none';btnWrap.innerHTML=`<button class="clock-action-btn cab-done" disabled>請先建立員工資料</button>`;}
+  else if(state==='contractor'){stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>外包人員不需打卡</div>';timesRow.style.display='none';btnWrap.innerHTML=`<button class="clock-action-btn cab-done" disabled>外包人員不適用</button>`;}
 }
-
 async function loadAttendanceStatus(){
-  const alertEl=g('clock-alert-nomember');
-  const monthStat=g('clock-month-stat');
-  if(alertEl)alertEl.style.display='none';
+  const alertEl=g('clock-alert-nomember');if(alertEl)alertEl.style.display='none';
   if(!myMember){if(alertEl)alertEl.style.display='block';setClockState('nomember',null);return;}
-  const today=new Date().toISOString().slice(0,10);
-  const dow=new Date().getDay();
-  const isWeekend=dow===0||dow===6;
+  if(isContractor(myMember)){setClockState('contractor',null);return;}
+  const today=new Date().toISOString().slice(0,10);const dow=new Date().getDay();
   const todayHoliday=(D.holidays||[]).find(h=>String(h.date).slice(0,10)===today);
-  const holidayAlertEl=g('clock-alert-holiday');
-  if(holidayAlertEl){
-    if(todayHoliday){holidayAlertEl.textContent='今日為國定假日：'+todayHoliday.name+'，無需打卡';holidayAlertEl.style.display='block';}
-    else if(isWeekend){holidayAlertEl.textContent='今日為'+(dow===6?'星期六':'星期日')+'，無需打卡';holidayAlertEl.style.display='block';}
-    else{holidayAlertEl.style.display='none';}
-  }
-  if(myMember){
-    const bal=getLocalLeaveBalance(myMember.id);
-    const balEl=g('clock-leave-balance');
-    if(balEl)balEl.textContent='特休餘額：'+bal.days+' 天（'+bal.hours+' 小時）';
-  }
+  const hEl=g('clock-alert-holiday');
+  if(hEl){if(todayHoliday){hEl.textContent='今日為國定假日：'+todayHoliday.name+'，無需打卡';hEl.style.display='block';}else if(dow===0||dow===6){hEl.textContent='今日為'+(dow===6?'星期六':'星期日')+'，無需打卡';hEl.style.display='block';}else hEl.style.display='none';}
+  const bal=getLocalLeaveBalance(myMember.id);
+  const balEl=g('clock-leave-balance');if(balEl)balEl.textContent='特休餘額：'+bal.days+' 天（'+bal.hours+' 小時）';
   const avEl=g('clock-av');const unEl=g('clock-uname');const utEl=g('clock-utitle');
-  if(avEl)avEl.src=currentUser?.picture||'';
-  if(unEl)unEl.textContent=myMember.name_zh||currentUser?.name||'—';
-  if(utEl)utEl.textContent=(myMember.title||'')+(myMember.department?' · '+myMember.department:'');
+  if(avEl)avEl.src=currentUser?.picture||'';if(unEl)unEl.textContent=myMember.name_zh||'—';if(utEl)utEl.textContent=(myMember.title||'')+(myMember.department?' · '+myMember.department:'');
   try{
-    const res=await api('getAttendanceStatus',{member_id:myMember.id});
-    const rec=res.data;
-    if(!rec)setClockState('idle',null);
-    else if(rec.clock_in&&!rec.clock_out)setClockState('in',rec);
-    else if(rec.clock_in&&rec.clock_out)setClockState('done',rec);
+    const res=await api('getAttendanceStatus',{member_id:myMember.id});const rec=res.data;
+    if(!rec)setClockState('idle',null);else if(rec.clock_in&&!rec.clock_out)setClockState('in',rec);else if(rec.clock_in&&rec.clock_out)setClockState('done',rec);
     const thisMonth=new Date().toISOString().slice(0,7);
     const myRecs=D.attendance.filter(a=>String(a.member_id)===String(myMember.id)&&String(a.date).slice(0,7)===thisMonth);
-    const present=myRecs.filter(a=>a.status==='present').length;
-    const late=myRecs.filter(a=>a.status==='late'||a.status==='late_early').length;
-    const earlyLeave=myRecs.filter(a=>a.status==='early_leave'||a.status==='late_early').length;
-    const totalHrs=myRecs.reduce((s,a)=>s+parseFloat(a.work_hours||0),0);
-    if(monthStat){monthStat.style.display='grid';g('cms-present').textContent=present;g('cms-late').textContent=late;g('cms-early').textContent=earlyLeave;g('cms-hours').textContent=totalHrs.toFixed(1)+'h';}
+    const ms=g('clock-month-stat');if(ms){ms.style.display='grid';g('cms-present').textContent=myRecs.filter(a=>a.status==='present').length;g('cms-late').textContent=myRecs.filter(a=>a.status==='late'||a.status==='late_early').length;g('cms-early').textContent=myRecs.filter(a=>a.status==='early_leave'||a.status==='late_early').length;g('cms-hours').textContent=myRecs.reduce((s,a)=>s+parseFloat(a.work_hours||0),0).toFixed(1)+'h';}
     renderMyAttendance();
-  }catch(e){
-    const stateEl=g('clock-state');
-    if(stateEl)stateEl.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>載入失敗，請重新整理</div>';
-    const btnWrap=g('clock-btn-wrap');
-    if(btnWrap)btnWrap.innerHTML=`<button class="clock-action-btn cab-done" onclick="loadAttendanceStatus()">重新載入</button>`;
-  }
+  }catch(e){const st=g('clock-state');if(st)st.innerHTML='<div class="clock-state-badge cs-idle"><span class="cs-dot"></span>載入失敗，請重新整理</div>';const bw=g('clock-btn-wrap');if(bw)bw.innerHTML=`<button class="clock-action-btn cab-done" onclick="loadAttendanceStatus()">重新載入</button>`;}
 }
-
 async function doClock(type){
   if(clockLocked){toast('打卡處理中，請稍候…');return;}
   if(!myMember){toast('請先建立員工資料');return;}
+  if(isContractor(myMember)){toast('外包人員不需打卡');return;}
   clockLocked=true;
-  const btnWrap=g('clock-btn-wrap');
-  if(btnWrap)btnWrap.innerHTML='<div class="clock-loading"><div class="clock-spinner"></div>打卡中…</div>';
+  const bw=g('clock-btn-wrap');if(bw)bw.innerHTML='<div class="clock-loading"><div class="clock-spinner"></div>打卡中…</div>';
   try{
-    const action=type==='in'?'clockIn':'clockOut';
-    const res=await api(action,{member_id:myMember.id,location:WORK_L[myMember.work_mode]||''});
-    const all=await api('getAll');
-    D.attendance=all.attendance||[];
-    if(type==='in'){const now=new Date();const isLate=now.getHours()+now.getMinutes()/60>10.5;toast(isLate?'上班打卡成功（遲到）':'上班打卡成功');}
-    else{toast('下班打卡成功，工時 '+Number(res.work_hours).toFixed(1)+' 小時');}
+    const res=await api(type==='in'?'clockIn':'clockOut',{member_id:myMember.id,location:WORK_L[myMember.work_mode]||''});
+    const all=await api('getAll');D.attendance=all.attendance||[];
+    if(type==='in'){const now=new Date();toast(now.getHours()+now.getMinutes()/60>10.5?'上班打卡成功（遲到）':'上班打卡成功');}
+    else toast('下班打卡成功，工時 '+Number(res.work_hours).toFixed(1)+' 小時');
     await loadAttendanceStatus();
   }catch(e){
     const code=e.message||'';
-    if(code.includes('ALREADY_IN')||code.includes('已經打過上班卡'))toast('今天已經打過上班卡了');
-    else if(code.includes('ALREADY_OUT')||code.includes('已經打過下班卡'))toast('今天已經打過下班卡了');
-    else if(code.includes('NO_IN')||code.includes('請先打上班卡'))toast('請先打上班卡');
+    if(code.includes('ALREADY_IN'))toast('今天已經打過上班卡了');
+    else if(code.includes('ALREADY_OUT'))toast('今天已經打過下班卡了');
+    else if(code.includes('NO_IN'))toast('請先打上班卡');
     else toast('打卡失敗：'+code);
     await loadAttendanceStatus();
-  }finally{
-    setTimeout(()=>{clockLocked=false;},2000);
-  }
+  }finally{setTimeout(()=>{clockLocked=false;},2000);}
 }
-
 function renderMyAttendance(){
   if(!myMember)return;
   const days=['日','一','二','三','四','五','六'];
-  const recs=D.attendance.filter(a=>String(a.member_id)===String(myMember.id))
-    .sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,20);
-  const tbody=g('my-attendance');
-  if(!tbody)return;
-  tbody.innerHTML=recs.length?recs.map(a=>{
-    const d=new Date(String(a.date).slice(0,10));
-    const isToday=String(a.date).slice(0,10)===new Date().toISOString().slice(0,10);
-    return`<tr${isToday?' style="background:var(--teal-bg)"':''}>
-      <td style="font-weight:${isToday?'600':'400'}">${String(a.date).slice(0,10)}</td>
-      <td style="color:var(--text2)">週${days[d.getDay()]}</td>
-      <td>${fmtTime(a.clock_in)}</td>
-      <td>${a.clock_out?fmtTime(a.clock_out):'<span style="color:var(--text3)">未打卡</span>'}</td>
-      <td>${a.work_hours?Number(a.work_hours).toFixed(1)+'h':'—'}</td>
-      <td><span class="badge ${ATT_C[a.status]||'b-present'}">${ATT_L[a.status]||a.status||'—'}</span></td>
-    </tr>`;
-  }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">尚無打卡記錄</td></tr>';
+  const recs=D.attendance.filter(a=>String(a.member_id)===String(myMember.id)).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,20);
+  const tbody=g('my-attendance');if(!tbody)return;
+  tbody.innerHTML=recs.length?recs.map(a=>{const d=new Date(String(a.date).slice(0,10));const isToday=String(a.date).slice(0,10)===new Date().toISOString().slice(0,10);return`<tr${isToday?' style="background:var(--teal-bg)"':''}><td style="font-weight:${isToday?'600':'400'}">${String(a.date).slice(0,10)}</td><td style="color:var(--text2)">週${days[d.getDay()]}</td><td>${fmtTime(a.clock_in)}</td><td>${a.clock_out?fmtTime(a.clock_out):'<span style="color:var(--text3)">未打卡</span>'}</td><td>${a.work_hours?Number(a.work_hours).toFixed(1)+'h':'—'}</td><td><span class="badge ${ATT_C[a.status]||'b-present'}">${ATT_L[a.status]||a.status||'—'}</span></td></tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">尚無打卡記錄</td></tr>';
 }
 
-// ── Members ──
-let memberFilter='all';
-const memberGroupOpen={owner:true,manager:true,employee:true,contractor:false,resigned:false};
-const deptGroupOpen={};
-
-function setMemberFilter(el){memberFilter=el.dataset.mf;document.querySelectorAll('[data-mf]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderMembers();}
-function toggleMemberGroup(key){memberGroupOpen[key]=!memberGroupOpen[key];renderMembers();}
-function toggleDeptGroup(key){deptGroupOpen[key]=!deptGroupOpen[key];renderMembers();}
-function toggleMember(id){const m=D.members.find(x=>String(x.id)===String(id));if(m)m._open=!m._open;renderMembers();}
-
-function renderMemberCard(m){
-  const cl=col(m.id);
-  const isOpen=m._open;
-  const resigned=isResigned(m);
-  const projs=D.projects.filter(p=>p.owner&&p.owner.includes(m.name_zh));
-  const isSA=m.super_admin===true||String(m.super_admin).toUpperCase()==='TRUE';
-  const roleColor=m.role==='owner'?'b-overdue':m.role==='manager'?'b-proposal':'b-active';
-  const avStyle=resigned?'background:#3a3935;color:#6b6a64':'background:'+cl.bg+';color:'+cl.c;
-  const bal=getLocalLeaveBalance(m.id);
-  const leaveStr=parseFloat(bal.days)>0?`<span style="font-size:10px;color:var(--teal-text);margin-left:4px">特休 ${bal.days}天</span>`:'';
-
-  // 薪資欄位：僅超管與老闆可見
-  const salaryRow=canSeeSalary()
-    ?`<div><div class="dl">底薪</div><div class="dv">${m.base_salary?'NT$ '+m.base_salary:'—'}</div></div>`
-    :'';
-
-  return`<div class="mc${isOpen?' open':''}${resigned?' resigned':''}" onclick="toggleMember('${m.id}')">
-    <div class="mc-top">
-      <div class="av" style="width:44px;height:44px;${avStyle};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0">${ini(m.name_zh||'?')}</div>
-      <div class="mc-info">
-        <div class="mc-name">
-          ${m.name_zh||'—'}${m.name_en?' ('+m.name_en+')':''}
-          ${resigned?'<span class="badge" style="font-size:10px;background:#3a3935;color:#9b9a94;margin-left:6px">離職</span>':''}
-          ${isSA&&!resigned?'<span style="font-size:10px;color:var(--amber-text);margin-left:4px">★</span>':''}
-        </div>
-        <div class="mc-sub">
-          ${m.title||''}${m.department?' · '+m.department:''}
-          <span class="badge ${roleColor}" style="font-size:10px;margin-left:4px">${ROLE_L[m.role]||m.role}</span>
-          ${leaveStr}
-        </div>
-      </div>
-    </div>
-    <div class="mc-detail">
-      <div class="dgrid" style="grid-template-columns:1fr 1fr;gap:8px 16px">
-        <div><div class="dl">Email</div><div class="dv" style="font-size:12px">${m.email||'—'}</div></div>
-        <div><div class="dl">工作模式</div><div class="dv">${WORK_L[m.work_mode]||m.work_mode||'—'}</div></div>
-        <div><div class="dl">到職日</div><div class="dv">${fmtDate(m.start_date)}</div></div>
-        <div><div class="dl">類型</div><div class="dv">${EMP_L[m.employment_type]||m.employment_type||'—'}</div></div>
-        ${salaryRow}
-        <div><div class="dl">負責專案</div><div class="dv">${projs.length} 個</div></div>
-        ${resigned&&m.note?`<div style="grid-column:1/-1"><div class="dl">備註</div><div class="dv" style="font-size:12px;color:#9b9a94">${m.note}</div></div>`:''}
-      </div>
-      <div class="row-btns" style="margin-top:12px;margin-bottom:0">
-        <button class="btn-sm" onclick="event.stopPropagation();openEditMember('${m.id}')">編輯</button>
-        <button class="btn-sm btn-del" onclick="event.stopPropagation();delMember('${m.id}')">刪除</button>
-      </div>
-    </div>
-  </div>`;
-}
-
-function renderMembers(){
-  const q=(g('member-search').value||'').toLowerCase();
-  let list=D.members.filter(m=>{
-    const mq=!q||[m.name_zh,m.name_en,m.title,m.email,m.department].join(' ').toLowerCase().includes(q);
-    const mf=memberFilter==='all'||
-      (memberFilter==='full_time'&&m.employment_type!=='contractor'&&!isResigned(m))||
-      (memberFilter==='contractor'&&m.employment_type==='contractor'&&!isResigned(m));
-    return mq&&mf;
-  });
-  const el=g('member-list');
-  if(!list.length){el.innerHTML='<div class="empty-state">尚無員工資料</div>';return;}
-
-  const chevronUp=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>`;
-  const chevronDown=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>`;
-
-  // 老闆層（不分部門，直接顯示）
-  const owners=list.filter(m=>m.role==='owner'&&!isResigned(m));
-  // 主管與組員（依部門分組，不含外包）
-  const managers=list.filter(m=>m.role==='manager'&&m.employment_type!=='contractor'&&!isResigned(m));
-  const employees=list.filter(m=>m.role==='employee'&&m.employment_type!=='contractor'&&!isResigned(m));
-  // 外包獨立區塊
-  const contractors=list.filter(m=>m.employment_type==='contractor'&&!isResigned(m));
-  const resigned=list.filter(m=>isResigned(m));
-
-  // 取得所有部門（僅主管+組員，不含外包），行政管理部置頂
-  const deptMembers=[...managers,...employees];
-  const allDepts=[...new Set(deptMembers.map(m=>m.department||'未分配'))].sort((a,b)=>{
-    if(a==='行政管理部')return -1;if(b==='行政管理部')return 1;
-    if(a==='未分配')return 1;if(b==='未分配')return -1;
-    return a.localeCompare(b,'zh-TW');
-  });
-
-  // 渲染部門區塊（主管在前，組員在後，不含外包）
-  const renderDeptSection=(dept)=>{
-    const dManagers=managers.filter(m=>(m.department||'未分配')===dept);
-    const dEmployees=employees.filter(m=>(m.department||'未分配')===dept);
-    const allInDept=[...dManagers,...dEmployees];
-    if(!allInDept.length)return'';
-    if(!(dept in deptGroupOpen))deptGroupOpen[dept]=true;
-    const open=q||deptGroupOpen[dept];
-    const deptKey='dept_'+dept;
-    return`<div class="dept-section">
-      <div class="dept-header" onclick="toggleDeptGroup('${dept}')">
-        <div class="dept-title">${dept}</div>
-        <div class="dept-count">${allInDept.length} 人・${dManagers.length} 主管・${dEmployees.length} 組員</div>
-        <div class="dept-toggle">${open?chevronUp:chevronDown}</div>
-      </div>
-      ${open?`<div class="dept-members">
-        ${dManagers.length?`<div style="font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;padding-left:2px">主管</div>
-        <div class="member-grid" style="margin-bottom:12px">${dManagers.map(renderMemberCard).join('')}</div>`:''}
-        ${dEmployees.length?`<div style="font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;padding-left:2px">組員</div>
-        <div class="member-grid">${dEmployees.map(renderMemberCard).join('')}</div>`:''}
-      </div>`:''}
-    </div>`;
-  };
-
-  // 外包獨立區塊
-  const renderContractorSection=()=>{
-    if(!contractors.length)return'';
-    if(!('contractor' in deptGroupOpen))deptGroupOpen['contractor']=true;
-    const open=q||deptGroupOpen['contractor'];
-    return`<div style="border-top:1.5px solid var(--border2);margin-top:16px;padding-top:14px">
-      <div onclick="toggleDeptGroup('contractor')" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-bottom:${open?'12px':'2px'};padding:4px 2px">
-        <span style="font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">外包合作</span>
-        <span style="background:var(--bg2);color:var(--text3);font-size:11px;padding:1px 8px;border-radius:10px;border:0.5px solid var(--border)">${contractors.length}</span>
-        <span style="margin-left:auto;color:var(--text3);display:flex;align-items:center">${open?chevronUp:chevronDown}</span>
-      </div>
-      ${open?`<div class="member-grid">${contractors.map(renderMemberCard).join('')}</div>`:''}
-    </div>`;
-  };
-
-  // 離職區塊
-  const renderResignedSection=()=>{
-    if(!resigned.length)return'';
-    const open=q||memberGroupOpen['resigned'];
-    return`<div style="border-top:1.5px dashed var(--border2);margin-top:16px;padding-top:14px">
-      <div onclick="toggleMemberGroup('resigned')" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-bottom:${open?'12px':'2px'};padding:4px 2px">
-        <span style="font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase">離職人員</span>
-        <span style="background:var(--bg2);color:var(--text3);font-size:11px;padding:1px 8px;border-radius:10px;border:0.5px solid var(--border)">${resigned.length}</span>
-        <span style="margin-left:auto;color:var(--text3);display:flex;align-items:center">${open?chevronUp:chevronDown}</span>
-      </div>
-      ${open?`<div class="member-grid">${resigned.map(renderMemberCard).join('')}</div>`:''}
-    </div>`;
-  };
-
-  let html='';
-  // 老闆層
-  if(owners.length){
-    html+=`<div style="margin-bottom:16px">
-      <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;padding-left:2px">經營層</div>
-      <div class="member-grid">${owners.map(renderMemberCard).join('')}</div>
-    </div>`;
-  }
-  // 部門分組（主管+組員，不含外包）
-  if(allDepts.length){
-    html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;padding-left:2px">各部門</div>`;
-    html+=allDepts.map(d=>renderDeptSection(d)).join('');
-  }
-  // 外包獨立區塊
-  html+=renderContractorSection();
-  // 離職
-  html+=renderResignedSection();
-  el.innerHTML=html;
-}
-
-// ── Attendance ──
-function changeAttMonth(d){const[y,m]=attMonth.split('-').map(Number);const nd=new Date(y,m-1+d,1);attMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');renderAttendance();}
-let attDeptFilter='all';
-
-function renderAttendance(){
-  const[y,mo]=attMonth.split('-').map(Number);
-  const mn=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-  g('att-month-label').textContent=y+'年 '+mn[mo-1];
-
-  let visibleMemberIds=null;
-  if(canSeeAllAttendance()){visibleMemberIds=null;}
-  else if(canSeeDeptAttendance()){
-    const myDept=myMember?.department||'';
-    visibleMemberIds=D.members.filter(m=>m.department===myDept).map(m=>String(m.id));
-  }else{
-    visibleMemberIds=myMember?[String(myMember.id)]:[];
-  }
-
-  let recs=D.attendance.filter(a=>String(a.date).slice(0,7)===attMonth);
-  if(visibleMemberIds!==null)recs=recs.filter(a=>visibleMemberIds.includes(String(a.member_id)));
-
-  // 部門篩選器
-  const filterWrap=g('att-filter-wrap');
-  if(filterWrap&&canSeeAllAttendance()){
-    const depts=[...new Set(D.members.map(m=>m.department).filter(Boolean))];
-    filterWrap.innerHTML=`<button class="pill${attDeptFilter==='all'?' on':''}" data-am="all" onclick="setAttFilter(this)">全員</button>`+
-      depts.map(d=>`<button class="pill${attDeptFilter===d?' on':''}" data-am="${d}" onclick="setAttFilter(this)">${d}</button>`).join('');
-  }
-
-  if(attDeptFilter!=='all'){
-    const deptMids=D.members.filter(m=>m.department===attDeptFilter).map(m=>String(m.id));
-    recs=recs.filter(a=>deptMids.includes(String(a.member_id)));
-  }
-
-  const tbody=g('att-tbody');
-  if(!recs.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">本月無出勤記錄</td></tr>';return;}
-  tbody.innerHTML=recs.map(a=>{
-    const m=D.members.find(x=>String(x.id)===String(a.member_id));
-    return`<tr>
-      <td style="font-weight:500">${m?m.name_zh:'—'}</td>
-      <td style="color:var(--text2)">${m?m.department||'—':'—'}</td>
-      <td>${fmtDate(a.date)}</td>
-      <td>${fmtTime(a.clock_in)}</td>
-      <td>${a.clock_out?fmtTime(a.clock_out):'—'}</td>
-      <td>${a.work_hours?Number(a.work_hours).toFixed(1)+'h':'—'}</td>
-      <td><span class="badge ${ATT_C[a.status]||'b-present'}">${ATT_L[a.status]||a.status}</span></td>
-    </tr>`;
-  }).join('');
-}
-
-function setAttFilter(el){
-  attDeptFilter=el.dataset.am;
-  document.querySelectorAll('[data-am]').forEach(p=>p.classList.remove('on'));
-  el.classList.add('on');
-  renderAttendance();
-}
-
-// ── Leave ──
-function setLeaveFilter(el){leaveF=el.dataset.lf;document.querySelectorAll('[data-lf]').forEach(p=>p.classList.remove('on'));el.classList.add('on');renderLeave();}
-function renderLeave(){
-  const list=leaveF==='all'?D.leave_requests:D.leave_requests.filter(l=>l.status===leaveF);
-  const el=g('leave-list');
-  if(!list.length){el.innerHTML='<div class="empty-state">尚無請假記錄</div>';return;}
-  el.innerHTML=list.map(l=>{
-    const m=D.members.find(x=>String(x.id)===String(l.member_id));
-    const lt=D.leave_types.find(x=>String(x.id)===String(l.leave_type_id));
-    const canReview=myMember&&(myMember.role==='owner'||myMember.role==='manager');
-    return`<div class="leave-row">
-      <div class="leave-info">
-        <div class="leave-name">${m?m.name_zh:'—'} · ${lt?lt.name:'—'} · ${l.days||'?'}天</div>
-        <div class="leave-meta">${fmtDate(l.start_date)} ~ ${fmtDate(l.end_date)}${l.reason?' · '+l.reason:''}</div>
-      </div>
-      <div class="leave-right">
-        <span class="badge ${LEAVE_STATUS_C[l.status]}">${LEAVE_STATUS_L[l.status]}</span>
-        ${canReview&&l.status==='pending'?`<button class="btn-xs" style="border-color:#0f6e56;color:#085041;background:var(--teal-bg)" onclick="reviewLeave('${l.id}','approved')">核准</button><button class="btn-xs btn-del" onclick="reviewLeave('${l.id}','rejected')">駁回</button>`:''}
-        <button class="btn-xs" style="color:var(--red-text)" onclick="delLeave('${l.id}')">刪除</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-async function reviewLeave(id,status){
-  try{await api('reviewLeave',{id,status,approved_by:currentUser?.email||''});const l=D.leave_requests.find(x=>String(x.id)===String(id));if(l)l.status=status;renderLeave();toast(status==='approved'?'已核准':'已駁回');}catch(e){toast('操作失敗：'+e.message);}
-}
-async function delLeave(id){
-  if(!confirm('確定刪除此請假記錄？'))return;
-  try{await api('delete',{sheet:'leave_requests',id});D.leave_requests=D.leave_requests.filter(x=>String(x.id)!==String(id));renderLeave();toast('已刪除');}catch(e){toast('刪除失敗：'+e.message);}
-}
-
-// ── 特休餘額計算（修正版）──
-// 邏輯：從 annual_leave 取得已授予天數，再扣除「已核准」的特休申請天數
-function getLeaveTypeId(name){
-  const lt=D.leave_types.find(t=>t.name===name||t.name.includes('特休')||t.name.includes('特別休假'));
-  return lt?String(lt.id):null;
-}
-
-function getLocalLeaveBalance(memberId){
-  const now=new Date().toISOString().slice(0,10);
-  // 取得有效期內的特休紀錄
-  const records=(D.annual_leave||[]).filter(r=>{
-    return String(r.member_id)===String(memberId)
-      &&String(r.year_start).slice(0,10)<=now
-      &&String(r.expire_date).slice(0,10)>now;
-  });
-  const granted=records.reduce((s,r)=>s+parseFloat(r.remaining_days||0),0);
-
-  // 扣除已核准的特休申請天數
-  const annualLeaveTypeId=getLeaveTypeId('特別休假');
-  const usedDays=(D.leave_requests||[]).filter(lr=>{
-    const isAnnual=annualLeaveTypeId
-      ?String(lr.leave_type_id)===annualLeaveTypeId
-      :(D.leave_types.find(t=>String(t.id)===String(lr.leave_type_id))?.name||'').includes('特休');
-    return String(lr.member_id)===String(memberId)&&lr.status==='approved'&&isAnnual;
-  }).reduce((s,lr)=>s+parseFloat(lr.days||0),0);
-
-  const remaining=Math.max(0,granted-usedDays);
-  return{
-    days:remaining.toFixed(1),
-    hours:(remaining*8).toFixed(0),
-    granted:granted.toFixed(1),
-    used:usedDays.toFixed(1)
-  };
-}
-
-// ── Leave Modal ──
-function updateLeaveDays(){
-  const s=g('lm-start_date').value;
-  const e=g('lm-end_date').value;
-  if(!s||!e)return;
-  let count=0;
-  const cur=new Date(s);const end=new Date(e);
-  while(cur<=end){
-    const dateStr=cur.toISOString().slice(0,10);
-    const dow=cur.getDay();
-    const isWeekend=dow===0||dow===6;
-    const isHoliday=(D.holidays||[]).some(h=>String(h.date).slice(0,10)===dateStr);
-    if(!isWeekend&&!isHoliday)count++;
-    cur.setDate(cur.getDate()+1);
-  }
-  g('lm-days').value=count;
-  checkLeaveExceed();
-}
-function onLeaveTypeChange(){
-  const sel=g('lm-leave_type_id');
-  const lt=D.leave_types.find(x=>String(x.id)===String(sel.value));
-  const isAnnual=lt&&(lt.name.includes('特休')||lt.name.includes('特別休假'));
-  const balBox=g('lm-balance-box');
-  if(isAnnual&&myMember){
-    const bal=getLocalLeaveBalance(myMember.id);
-    g('lm-balance-granted').textContent=bal.granted;
-    g('lm-balance-used').textContent=bal.used;
-    g('lm-balance-days').textContent=bal.days;
-    g('lm-balance-hours').textContent=bal.hours;
-    if(balBox)balBox.style.display='block';
-  }else{
-    if(balBox)balBox.style.display='none';
-  }
-  checkLeaveExceed();
-}
-function checkLeaveExceed(){
-  const warnEl=g('lm-exceed-warn');if(!warnEl)return;
-  const sel=g('lm-leave_type_id');
-  const lt=D.leave_types.find(x=>String(x.id)===String(sel.value));
-  const isAnnual=lt&&(lt.name.includes('特休')||lt.name.includes('特別休假'));
-  if(isAnnual&&myMember){
-    const days=parseFloat(g('lm-days').value)||0;
-    const bal=getLocalLeaveBalance(myMember.id);
-    warnEl.style.display=days>parseFloat(bal.days)?'block':'none';
-  }else{warnEl.style.display='none';}
-}
-function openLeaveModal(){
-  editLeaveId=null;g('lm-title').textContent='申請請假';
-  g('lm-start_date').value='';g('lm-end_date').value='';g('lm-days').value='';g('lm-reason').value='';
-  const balBox=g('lm-balance-box');if(balBox)balBox.style.display='none';
-  const warnEl=g('lm-exceed-warn');if(warnEl)warnEl.style.display='none';
-  const sel=g('lm-leave_type_id');
-  sel.innerHTML=D.leave_types.map(lt=>`<option value="${lt.id}">${lt.name}（最多${String(lt.max_days)==='999'?'無上限':lt.max_days+'天'}）</option>`).join('');
-  g('lm-ov').classList.add('open');onLeaveTypeChange();
-}
-async function saveLeave(){
-  if(!myMember){alert('請先在員工資料中登錄你的帳號');return;}
-  const s=v('lm-start_date');const e=v('lm-end_date');
-  if(!s||!e){alert('請選擇請假日期');return;}
-  const days=parseFloat(g('lm-days').value)||0;
-  if(days<=0){alert('請假天數為 0，請確認日期範圍（假日和週末不計入）');return;}
-  const d={member_id:myMember.id,leave_type_id:g('lm-leave_type_id').value,start_date:s,end_date:e,days,reason:v('lm-reason')};
-  if(editLeaveId)d.id=editLeaveId;
-  try{
-    const res=await api('saveLeaveRequest',d);
-    if(!editLeaveId)D.leave_requests.push({...d,id:res.id,status:'pending'});
-    const all=await api('getAll');D.annual_leave=all.annual_leave||[];
-    toast('已送出申請');cm('lm-ov');renderLeave();
-  }catch(e){toast('送出失敗：'+e.message);}
-}
-
-// ── Salary ──
-function changeSalMonth(d){const[y,m]=salMonth.split('-').map(Number);const nd=new Date(y,m-1+d,1);salMonth=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0');renderSalary();}
-function renderSalary(){
-  // 雙重保護：非老闆/超管不渲染
-  if(!canSeeSalary()){g('sal-tbody').innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">無權限查看薪資資料</td></tr>';return;}
-  const[y,mo]=salMonth.split('-').map(Number);
-  const mn=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-  g('sal-month-label').textContent=y+'年 '+mn[mo-1];
-  const recs=D.salary_records.filter(s=>String(s.year)===String(y)&&String(s.month)===String(mo));
-  const tbody=g('sal-tbody');
-  if(!recs.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">本月無薪資記錄</td></tr>';return;}
-  tbody.innerHTML=recs.map(s=>{
-    const m=D.members.find(x=>String(x.id)===String(s.member_id));
-    return`<tr>
-      <td style="font-weight:500">${m?m.name_zh:'—'}</td>
-      <td>${s.base_salary?'NT$ '+s.base_salary:'—'}</td>
-      <td>${s.allowances?'NT$ '+s.allowances:'—'}</td>
-      <td>${s.bonus?'NT$ '+s.bonus:'—'}</td>
-      <td style="color:var(--red-text)">${s.labor_insurance?'-'+s.labor_insurance:'—'}</td>
-      <td style="color:var(--red-text)">${s.health_insurance?'-'+s.health_insurance:'—'}</td>
-      <td style="color:var(--red-text)">${s.tax?'-'+s.tax:'—'}</td>
-      <td style="font-weight:600;color:var(--teal-text)">${s.net_salary?'NT$ '+s.net_salary:'—'}</td>
-      <td style="color:var(--text2)">${fmtDate(s.pay_date)}</td>
-    </tr>`;
-  }).join('');
-}
-
-function calcNet(){
-  const base=pn(g('sm-base_salary').value);const allow=pn(g('sm-allowances').value);
-  const bonus=pn(g('sm-bonus').value);const ded=pn(g('sm-deductions').value);
-  const labor=pn(g('sm-labor_insurance').value);const health=pn(g('sm-health_insurance').value);
-  const tax=pn(g('sm-tax').value);
-  const net=base+allow+bonus-ded-labor-health-tax;
-  g('sm-net_salary').value=net>0?net.toLocaleString():'0';
-}
-function onMemberSelect(){
-  const mid=g('sm-member_id').value;const m=D.members.find(x=>String(x.id)===String(mid));
-  if(!m)return;
-  if(m.base_salary){g('sm-base_salary').value=m.base_salary;g('sm-allowances').value=m.allowances||'';autoCalcInsurance();}
-}
-async function autoCalcInsurance(){
-  const base=pn(g('sm-base_salary').value);if(!base)return;
-  const year=g('sm-year').value||new Date().getFullYear();
-  try{
-    g('sm-labor_insurance').placeholder='計算中…';g('sm-health_insurance').placeholder='計算中…';
-    const res=await api('calcInsurance',{salary:base,year});
-    g('sm-labor_insurance').value=res.labor.employee;g('sm-health_insurance').value=res.health.employee;
-    g('sm-labor_insurance').placeholder='';g('sm-health_insurance').placeholder='';
-    const infoEl=g('sm-insurance-info');
-    if(infoEl){infoEl.textContent=`勞保投保級距 NT$ ${res.labor.insured_amount.toLocaleString()}・健保投保級距 NT$ ${res.health.insured_amount.toLocaleString()}`;infoEl.style.display='block';}
-    calcNet();toast('已自動帶入勞保健保');
-  }catch(e){
-    g('sm-labor_insurance').placeholder='自動計算失敗，請手動填入';
-    g('sm-health_insurance').placeholder='自動計算失敗，請手動填入';
-  }
-}
-
-// ── Login Logs ──
+// ── Logs ──
 async function loadLogs(){
+  if(!canSeeLogs())return;
   g('log-loading').style.display='block';g('log-table-wrap').style.display='none';
   try{
-    const res=await api('getAll');
-    const logs=(res.login_logs||[]).slice().reverse();
-    const today=new Date().toISOString().slice(0,10);
-    const todayCount=logs.filter(l=>l.login_at&&l.login_at.slice(0,10)===today).length;
+    const res=await api('getAll');const logs=(res.login_logs||[]).slice().reverse();
+    const today=new Date().toISOString().slice(0,10);const thisMonth=new Date().toISOString().slice(0,7);
+    // 以 email 為單位計算人數
     const uniqueUsers=new Set(logs.map(l=>l.email)).size;
-    const thisMonth=new Date().toISOString().slice(0,7);
+    const todayUsers=new Set(logs.filter(l=>l.login_at&&l.login_at.slice(0,10)===today).map(l=>l.email)).size;
     const monthCount=logs.filter(l=>l.login_at&&l.login_at.slice(0,7)===thisMonth).length;
-    g('log-stats').innerHTML=`
-      <div class="stat"><div class="stat-l">總登入次數</div><div class="stat-n">${logs.length}</div></div>
-      <div class="stat"><div class="stat-l">今日登入</div><div class="stat-n good">${todayCount}</div></div>
-      <div class="stat"><div class="stat-l">本月登入</div><div class="stat-n">${monthCount}</div></div>
-      <div class="stat"><div class="stat-l">使用人數</div><div class="stat-n">${uniqueUsers}</div></div>`;
-    g('log-tbody').innerHTML=logs.length?logs.map(l=>{
-      const dt=l.login_at?new Date(l.login_at).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
-      return`<tr><td style="font-weight:500">${l.name||'—'}</td><td style="color:var(--text2)">${l.email||'—'}</td><td style="color:var(--text2)">${dt}</td><td>${l.device||'—'}</td><td>${l.browser||'—'}</td></tr>`;
-    }).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">尚無登入記錄</td></tr>';
+    g('log-stats').innerHTML=`<div class="stat"><div class="stat-l">總登入次數</div><div class="stat-n">${logs.length}</div></div><div class="stat"><div class="stat-l">今日登入人數</div><div class="stat-n good">${todayUsers}</div></div><div class="stat"><div class="stat-l">本月登入次數</div><div class="stat-n">${monthCount}</div></div><div class="stat"><div class="stat-l">使用帳號數</div><div class="stat-n">${uniqueUsers}</div></div>`;
+    g('log-tbody').innerHTML=logs.length?logs.map(l=>{const dt=l.login_at?new Date(l.login_at).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';return`<tr><td style="font-weight:500">${l.name||'—'}</td><td style="color:var(--text2)">${l.email||'—'}</td><td style="color:var(--text2)">${dt}</td><td>${l.device||'—'}</td><td>${l.browser||'—'}</td></tr>`;}).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">尚無登入記錄</td></tr>';
     g('log-loading').style.display='none';g('log-table-wrap').style.display='block';
   }catch(e){g('log-loading').innerHTML='<div style="color:var(--red-text);font-size:13px">載入失敗：'+e.message+'</div>';}
 }
@@ -1830,80 +1274,63 @@ function openClientModal(){editCid=null;g('cm-title').textContent='新增客戶'
 function openEditC(id){const c=D.clients.find(x=>String(x.id)===String(id));if(!c)return;editCid=id;g('cm-title').textContent='編輯客戶資料';g('cm-name').value=c.name||'';g('cm-taxid').value=c.taxid||'';g('cm-phone').value=c.phone||'';g('cm-addr').value=c.addr||'';g('cm-budget').value=c.budget||'';g('cm-quote').value=c.quote||'';g('cm-contact').value=c.contact||'';g('cm-email').value=c.email||'';g('cm-note').value=c.note||'';g('cm-ov').classList.add('open');}
 async function saveClient(){const name=v('cm-name');if(!name){alert('請輸入公司名稱');return;}const d={name,taxid:v('cm-taxid'),phone:v('cm-phone'),addr:v('cm-addr'),budget:v('cm-budget'),quote:v('cm-quote'),contact:v('cm-contact'),email:v('cm-email'),note:v('cm-note')};if(editCid)d.id=editCid;try{const res=await api('saveClient',d);if(!editCid)D.clients.push({...d,id:res.id});else{const i=D.clients.findIndex(c=>String(c.id)===String(editCid));if(i>-1)D.clients[i]={...D.clients[i],...d};}toast(editCid?'已更新':'已新增客戶');cm('cm-ov');renderCRM();}catch(e){toast('儲存失敗：'+e.message);}}
 async function delC(id){if(!confirm('確定刪除此客戶及所有資料？'))return;try{await api('delete',{sheet:'clients',id});D.clients=D.clients.filter(c=>String(c.id)!==String(id));D.projects=D.projects.filter(p=>String(p.client_id)!==String(id));if(openCid===String(id))openCid=null;toast('已刪除');renderCRM();}catch(e){toast('刪除失敗：'+e.message);}}
-
 function openAddP(cid){addPcid=cid;editPid=null;editPcid=null;g('pm-title').textContent='新增專案';['pm-name','pm-owner','pm-amount','pm-quote','pm-start','pm-end','pm-drive','pm-note'].forEach(id=>g(id).value='');g('pm-status').value='proposal';g('pm-ov').classList.add('open')}
 function openEditP(cid,pid){const p=D.projects.find(x=>String(x.id)===String(pid));if(!p)return;editPcid=cid;editPid=pid;addPcid=null;g('pm-title').textContent='編輯專案';g('pm-name').value=p.name||'';g('pm-status').value=p.status||'proposal';g('pm-owner').value=p.owner||'';g('pm-amount').value=p.amount||'';g('pm-quote').value=p.quote||'';g('pm-start').value=p.start||'';g('pm-end').value=p.end||'';g('pm-drive').value=p.drive||'';g('pm-note').value=p.note||'';g('pm-ov').classList.add('open');}
 async function saveProject(){const name=v('pm-name');if(!name){alert('請輸入專案名稱');return;}const d={name,status:g('pm-status').value,owner:v('pm-owner'),amount:v('pm-amount'),quote:v('pm-quote'),start:v('pm-start'),end:v('pm-end'),drive:v('pm-drive'),note:v('pm-note'),client_id:editPcid||addPcid};if(editPid)d.id=editPid;try{const res=await api('saveProject',d);if(!editPid)D.projects.push({...d,id:res.id});else{const i=D.projects.findIndex(p=>String(p.id)===String(editPid));if(i>-1)D.projects[i]={...D.projects[i],...d};}toast(editPid?'已更新專案':'已新增專案');cm('pm-ov');renderCRM();}catch(e){toast('儲存失敗：'+e.message);}}
 async function delP(cid,pid){if(!confirm('確定刪除此專案？'))return;try{await api('delete',{sheet:'projects',id:pid});D.projects=D.projects.filter(p=>String(p.id)!==String(pid));toast('已刪除');renderCRM();}catch(e){toast('刪除失敗：'+e.message);}}
-
 function openAddPay(cid,pid){addPayCid=cid;addPayPid=pid;editPayId=null;editPayPid=null;editPayCid=null;g('pay-title').textContent='新增請款記錄';['pay-name','pay-amount','pay-date','pay-due','pay-note','inv-number','inv-date','inv-amount'].forEach(id=>g(id).value='');g('pay-status').value='unpaid';g('inv-type').value='';g('pay-ov').classList.add('open');}
 function openEditPay(cid,pid,pyid){const py=D.payments.find(x=>String(x.id)===String(pyid));if(!py)return;editPayCid=cid;editPayPid=pid;editPayId=pyid;addPayCid=null;addPayPid=null;g('pay-title').textContent='編輯請款記錄';g('pay-name').value=py.name||'';g('pay-amount').value=py.amount||'';g('pay-status').value=py.status||'unpaid';g('pay-date').value=py.date||'';g('pay-due').value=py.due||'';g('pay-note').value=py.note||'';const inv=paymentInvoice(pyid)||{};g('inv-number').value=inv.number||'';g('inv-type').value=inv.type||'';g('inv-date').value=inv.date||'';g('inv-amount').value=inv.amount||'';g('pay-ov').classList.add('open');}
-async function savePayment(){const name=v('pay-name');if(!name){alert('請輸入請款項目名稱');return;}const amt=v('pay-amount');if(!amt){alert('請輸入請款金額');return;}const pyData={name,amount:amt,status:g('pay-status').value,date:v('pay-date'),due:v('pay-due'),note:v('pay-note'),project_id:editPayPid||addPayPid,client_id:editPayCid||addPayCid};if(editPayId)pyData.id=editPayId;const invNum=v('inv-number');const invType=g('inv-type').value;try{const res=await api('savePayment',pyData);const newId=editPayId||res.id;if(!editPayId)D.payments.push({...pyData,id:newId});else{const i=D.payments.findIndex(p=>String(p.id)===String(editPayId));if(i>-1)D.payments[i]={...D.payments[i],...pyData};}if(invNum||invType){const invData={number:invNum,type:invType,date:v('inv-date'),amount:v('inv-amount'),payment_id:newId,project_id:pyData.project_id,client_id:pyData.client_id};const existInv=paymentInvoice(newId);if(existInv)invData.id=existInv.id;const invRes=await api('saveInvoice',invData);if(!existInv){D.invoices.push({...invData,id:invRes.id});}else{const i=D.invoices.findIndex(x=>String(x.id)===String(existInv.id));if(i>-1)D.invoices[i]={...D.invoices[i],...invData};}}toast(editPayId?'已更新':'已新增請款記錄');cm('pay-ov');renderCRM();}catch(e){toast('儲存失敗：'+e.message);}}
+async function savePayment(){const name=v('pay-name');if(!name){alert('請輸入請款項目名稱');return;}const amt=v('pay-amount');if(!amt){alert('請輸入請款金額');return;}const pyData={name,amount:amt,status:g('pay-status').value,date:v('pay-date'),due:v('pay-due'),note:v('pay-note'),project_id:editPayPid||addPayPid,client_id:editPayCid||addPayCid};if(editPayId)pyData.id=editPayId;const invNum=v('inv-number');const invType=g('inv-type').value;try{const res=await api('savePayment',pyData);const newId=editPayId||res.id;if(!editPayId)D.payments.push({...pyData,id:newId});else{const i=D.payments.findIndex(p=>String(p.id)===String(editPayId));if(i>-1)D.payments[i]={...D.payments[i],...pyData};}if(invNum||invType){const invData={number:invNum,type:invType,date:v('inv-date'),amount:v('inv-amount'),payment_id:newId,project_id:pyData.project_id,client_id:pyData.client_id};const existInv=paymentInvoice(newId);if(existInv)invData.id=existInv.id;const invRes=await api('saveInvoice',invData);if(!existInv)D.invoices.push({...invData,id:invRes.id});else{const i=D.invoices.findIndex(x=>String(x.id)===String(existInv.id));if(i>-1)D.invoices[i]={...D.invoices[i],...invData};}}toast(editPayId?'已更新':'已新增請款記錄');cm('pay-ov');renderCRM();}catch(e){toast('儲存失敗：'+e.message);}}
 async function delPay(cid,pid,pyid){if(!confirm('確定刪除此請款記錄？'))return;try{await api('delete',{sheet:'payments',id:pyid});D.payments=D.payments.filter(p=>String(p.id)!==String(pyid));toast('已刪除');renderCRM();}catch(e){toast('刪除失敗：'+e.message);}}
 
 function openMemberModal(){
+  if(!canEditMember()){toast('僅老闆及超級管理員可新增員工');return;}
   editMemberId=null;g('mm-title').textContent='新增員工';
-  ['mm-name_zh','mm-name_en','mm-id_number','mm-phone','mm-department','mm-title','mm-level','mm-email','mm-start_date','mm-base_salary','mm-allowances','mm-bank_code','mm-bank_account','mm-emergency_contact','mm-emergency_phone'].forEach(id=>g(id).value='');
+  ['mm-name_zh','mm-name_en','mm-id_number','mm-phone','mm-department','mm-title_field','mm-level','mm-email','mm-start_date','mm-base_salary','mm-allowances','mm-bank_code','mm-bank_account','mm-emergency_contact','mm-emergency_phone'].forEach(id=>g(id)&&(g(id).value=''));
   g('mm-role').value='employee';g('mm-work_mode').value='office';g('mm-employment_type').value='full_time';g('mm-salary_type').value='monthly';g('mm-ov').classList.add('open');
 }
 function openEditMember(id){
+  if(!canEditMember()){toast('僅老闆及超級管理員可編輯員工');return;}
   const m=D.members.find(x=>String(x.id)===String(id));if(!m)return;
   editMemberId=id;g('mm-title').textContent='編輯員工資料';
-  g('mm-name_zh').value=m.name_zh||'';g('mm-name_en').value=m.name_en||'';
-  g('mm-id_number').value=m.id_number||'';g('mm-phone').value=m.phone||'';
-  g('mm-department').value=m.department||'';g('mm-title').value=m.title||'';
-  g('mm-level').value=m.level||'';g('mm-role').value=m.role||'employee';
-  g('mm-work_mode').value=m.work_mode||'office';g('mm-email').value=m.email||'';
-  g('mm-start_date').value=m.start_date||'';g('mm-employment_type').value=m.employment_type||'full_time';
-  g('mm-salary_type').value=m.salary_type||'monthly';g('mm-base_salary').value=m.base_salary||'';
-  g('mm-allowances').value=m.allowances||'';g('mm-bank_code').value=m.bank_code||'';
-  g('mm-bank_account').value=m.bank_account||'';g('mm-emergency_contact').value=m.emergency_contact||'';
-  g('mm-emergency_phone').value=m.emergency_phone||'';g('mm-ov').classList.add('open');
+  g('mm-name_zh').value=m.name_zh||'';g('mm-name_en').value=m.name_en||'';g('mm-id_number').value=m.id_number||'';g('mm-phone').value=m.phone||'';
+  g('mm-department').value=m.department||'';g('mm-title_field').value=m.title||'';g('mm-role').value=m.role||'employee';
+  g('mm-work_mode').value=m.work_mode||'office';g('mm-email').value=m.email||'';g('mm-start_date').value=m.start_date||'';
+  g('mm-employment_type').value=m.employment_type||'full_time';g('mm-salary_type').value=m.salary_type||'monthly';
+  g('mm-base_salary').value=m.base_salary||'';g('mm-allowances').value=m.allowances||'';
+  g('mm-bank_code').value=m.bank_code||'';g('mm-bank_account').value=m.bank_account||'';
+  g('mm-emergency_contact').value=m.emergency_contact||'';g('mm-emergency_phone').value=m.emergency_phone||'';
+  g('mm-ov').classList.add('open');
 }
 async function saveMember(){
+  if(!canEditMember()){toast('無權限');return;}
   const name=v('mm-name_zh');if(!name){alert('請輸入中文姓名');return;}
-  const d={name_zh:name,name_en:v('mm-name_en'),id_number:v('mm-id_number'),phone:v('mm-phone'),
-    department:v('mm-department'),title:g('mm-title').value,level:v('mm-level'),role:g('mm-role').value,
-    email:v('mm-email'),start_date:v('mm-start_date'),employment_type:g('mm-employment_type').value,
-    work_mode:g('mm-work_mode').value,salary_type:g('mm-salary_type').value,base_salary:v('mm-base_salary'),
-    allowances:v('mm-allowances'),bank_code:v('mm-bank_code'),bank_account:v('mm-bank_account'),
+  const d={name_zh:name,name_en:v('mm-name_en'),id_number:v('mm-id_number'),phone:v('mm-phone'),department:v('mm-department'),
+    title:g('mm-title_field').value,role:g('mm-role').value,email:v('mm-email'),start_date:v('mm-start_date'),
+    employment_type:g('mm-employment_type').value,work_mode:g('mm-work_mode').value,salary_type:g('mm-salary_type').value,
+    base_salary:v('mm-base_salary'),allowances:v('mm-allowances'),bank_code:v('mm-bank_code'),bank_account:v('mm-bank_account'),
     emergency_contact:v('mm-emergency_contact'),emergency_phone:v('mm-emergency_phone'),active:true};
   if(editMemberId)d.id=editMemberId;
-  try{
-    const res=await api('saveMember',d);
-    if(!editMemberId)D.members.push({...d,id:res.id});
-    else{const i=D.members.findIndex(m=>String(m.id)===String(editMemberId));if(i>-1)D.members[i]={...D.members[i],...d};}
-    if(d.email===currentUser?.email)myMember=D.members.find(m=>m.email===currentUser.email)||null;
-    toast(editMemberId?'已更新':'已新增員工');cm('mm-ov');renderMembers();
-  }catch(e){toast('儲存失敗：'+e.message);}
+  try{const res=await api('saveMember',d);if(!editMemberId)D.members.push({...d,id:res.id});else{const i=D.members.findIndex(m=>String(m.id)===String(editMemberId));if(i>-1)D.members[i]={...D.members[i],...d};}if(d.email===currentUser?.email)myMember=D.members.find(m=>m.email===currentUser.email)||null;toast(editMemberId?'已更新':'已新增員工');cm('mm-ov');renderMembers();}catch(e){toast('儲存失敗：'+e.message);}
 }
-async function delMember(id){if(!confirm('確定刪除此員工資料？'))return;try{await api('delete',{sheet:'members',id});D.members=D.members.filter(m=>String(m.id)!==String(id));toast('已刪除');renderMembers();}catch(e){toast('刪除失敗：'+e.message);}}
+async function delMember(id){if(!canEditMember()){toast('無權限');return;}if(!confirm('確定刪除此員工資料？'))return;try{await api('delete',{sheet:'members',id});D.members=D.members.filter(m=>String(m.id)!==String(id));toast('已刪除');renderMembers();}catch(e){toast('刪除失敗：'+e.message);}}
 
 function openSalaryModal(){
   if(!canSeeSalary()){toast('無權限存取薪資資料');return;}
   editSalaryId=null;g('sm-title').textContent='新增薪資記錄';
   const now=new Date();g('sm-year').value=now.getFullYear();g('sm-month').value=now.getMonth()+1;
   ['sm-base_salary','sm-allowances','sm-bonus','sm-deductions','sm-labor_insurance','sm-health_insurance','sm-tax','sm-net_salary','sm-pay_date','sm-note'].forEach(id=>g(id).value='');
-  ['sm-labor_insurance','sm-health_insurance'].forEach(id=>{g(id).placeholder='輸入底薪後自動帶入';});
   const infoEl=g('sm-insurance-info');if(infoEl)infoEl.style.display='none';
-  const sel=g('sm-member_id');
-  sel.innerHTML=D.members.filter(m=>isActive(m)).map(m=>`<option value="${m.id}">${m.name_zh}${m.employment_type==='contractor'?'（外包）':''}</option>`).join('');
-  g('sm-ov').classList.add('open');
-  if(sel.value)setTimeout(()=>onMemberSelect(),100);
+  const sel=g('sm-member_id');sel.innerHTML=D.members.filter(m=>isActive(m)).map(m=>`<option value="${m.id}">${m.name_zh}${isContractor(m)?'（外包）':''}</option>`).join('');
+  g('sm-ov').classList.add('open');if(sel.value)setTimeout(()=>onMemberSelect(),100);
 }
 async function saveSalary(){
-  if(!canSeeSalary()){toast('無權限操作薪資資料');return;}
+  if(!canSeeSalary()){toast('無權限');return;}
   const mid=g('sm-member_id').value;if(!mid){alert('請選擇員工');return;}
   const d={member_id:mid,year:v('sm-year'),month:v('sm-month'),base_salary:v('sm-base_salary'),allowances:v('sm-allowances'),bonus:v('sm-bonus'),deductions:v('sm-deductions'),labor_insurance:v('sm-labor_insurance'),health_insurance:v('sm-health_insurance'),tax:v('sm-tax'),net_salary:g('sm-net_salary').value.replace(/,/g,''),pay_date:v('sm-pay_date'),note:v('sm-note')};
   if(editSalaryId)d.id=editSalaryId;
   try{const res=await api('saveSalaryRecord',d);if(!editSalaryId)D.salary_records.push({...d,id:res.id});toast(editSalaryId?'已更新':'已新增薪資記錄');cm('sm-ov');renderSalary();}catch(e){toast('儲存失敗：'+e.message);}
 }
-
-function v(id){return(g(id).value||'').trim()}
-function g(id){return document.getElementById(id)}
-function cm(id){g(id).classList.remove('open')}
-function oc(e,id){if(e.target===g(id))cm(id)}
-function toast(msg){const el=g('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500)}
 </script>
 </body>
 </html>
