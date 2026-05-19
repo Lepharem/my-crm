@@ -5049,144 +5049,187 @@ function renderReceivableOverview(){
   const yearSel   = document.getElementById('rov-filter-year');
   if(!clientSel) return;
 
-  // 建立客戶下拉（第一次進入時填充）
-  if(clientSel.options.length <= 1){
-    DB.clients.forEach(c=>{
-      const o = document.createElement('option');
-      o.value = c.id; o.textContent = c.name;
-      clientSel.appendChild(o);
-    });
-  }
+  const fmt = n => (n||n===0) ? 'NT$ '+Number(n).toLocaleString() : '—';
+  const today = new Date().toISOString().slice(0,10);
 
-  // 建立年份下拉
-  if(yearSel.options.length <= 1){
-    const years = [...new Set(
-      DB.receivables.flatMap(r=>r.payments||[])
-        .map(p=>p.dueDate?.slice(0,4))
-        .filter(Boolean)
-    )].sort().reverse();
-    years.forEach(y=>{
-      const o = document.createElement('option');
-      o.value = y; o.textContent = y+'年';
-      yearSel.appendChild(o);
+  // ── 從 DB.contracts + DB.receivables 建立完整資料 ──
+  // DB.receivables: [{contractId, clientId, contractNo, payments:[{period,dueDate,amount,paidDate,status,invoiceNumber,...}]}]
+  // DB.contracts:   [{id, clientId, name, contractNo, total, payMethod, note, ...}]
+
+  // 建立合約 map（以 contractId 為 key）
+  const ctMap = {};
+  (DB.contracts||[]).forEach(ct=>{ ctMap[ct.id] = ct; });
+  const clMap = {};
+  (DB.clients||[]).forEach(cl=>{ clMap[cl.id] = cl; });
+
+  // 攤平期次資料（用於篩選和統計）
+  const allRows = [];
+  (DB.receivables||[]).forEach(ra=>{
+    const ct = ctMap[ra.contractId] || {};
+    const cl = clMap[ra.clientId]   || {};
+    (ra.payments||[]).forEach(p=>{
+      allRows.push({
+        clientId: ra.clientId,     clientName: cl.name||'—',
+        contractId: ra.contractId, contractNo: ra.contractNo||ct.contractNo||'',
+        contractName: ct.name||'', contractTotal: Number(ct.total)||0,
+        payMethod: ct.payMethod||'', contractNote: ct.note||'',
+        period: p.period, dueDate: p.dueDate||'',
+        amount: Number(p.amount)||0, paidDate: p.paidDate||'',
+        status: p.status||'未入款',
+        invoiceNumber: p.invoiceNumber||'',
+        invoiceType:   p.invoiceType||'',
+        invoiceDate:   p.invoiceDate||'',
+      });
     });
+  });
+
+  // ── 初始化篩選器下拉 ──
+  if(clientSel.options.length <= 1){
+    [...new Map(allRows.map(r=>[r.clientId, r.clientName])).entries()]
+      .sort((a,b)=>a[1].localeCompare(b[1],'zh-TW'))
+      .forEach(([id, name])=>{
+        const o = document.createElement('option');
+        o.value = id; o.textContent = name;
+        clientSel.appendChild(o);
+      });
+  }
+  if(yearSel.options.length <= 1){
+    [...new Set(allRows.map(r=>r.dueDate.slice(0,4)).filter(Boolean))].sort().reverse()
+      .forEach(y=>{
+        const o = document.createElement('option');
+        o.value = y; o.textContent = y+'年';
+        yearSel.appendChild(o);
+      });
   }
 
   const fClient = clientSel.value;
   const fStatus = statusSel.value;
   const fYear   = yearSel.value;
 
-  // 攤平所有期次（含合約和客戶資訊）
-  const rows = [];
-  DB.receivables.forEach(ra=>{
-    const ct = DB.contracts.find(x=>x.id===ra.contractId) || {};
-    const cl = DB.clients.find(x=>x.id===ra.clientId) || {};
-    (ra.payments||[]).forEach(p=>{
-      rows.push({
-        clientId: ra.clientId, clientName: cl.name||'—',
-        contractId: ra.contractId, contractNo: ra.contractNo||ct.contractNo||'',
-        contractName: ct.name||'', contractTotal: ct.total||0,
-        payMethod: ct.payMethod||'', contractNote: ct.note||'',
-        period: p.period, dueDate: p.dueDate||'',
-        amount: p.amount||0, paidDate: p.paidDate||'',
-        status: p.status||'未入款',
-        invoiceNumber: p.invoiceNumber||'', invoiceType: p.invoiceType||'',
-        invoiceDate: p.invoiceDate||'',
-      });
-    });
-  });
-
-  // 套用篩選
-  const filtered = rows.filter(r=>{
+  // ── 篩選 ──
+  const filtered = allRows.filter(r=>{
     if(fClient && r.clientId !== fClient) return false;
-    if(fStatus && r.status !== fStatus) return false;
-    if(fYear && r.dueDate.slice(0,4) !== fYear) return false;
+    if(fStatus && r.status !== fStatus)   return false;
+    if(fYear   && r.dueDate.slice(0,4) !== fYear) return false;
     return true;
   });
 
-  // 統計卡
-  const totalAmt   = filtered.reduce((s,r)=>s+r.amount, 0);
-  const paidAmt    = filtered.filter(r=>r.status==='已入款').reduce((s,r)=>s+r.amount, 0);
-  const unpaidAmt  = filtered.filter(r=>r.status==='未入款').reduce((s,r)=>s+r.amount, 0);
-  const today = new Date().toISOString().slice(0,10);
-  const overdueAmt = filtered.filter(r=>r.status==='未入款' && r.dueDate && r.dueDate < today).reduce((s,r)=>s+r.amount, 0);
-  const paidRate   = totalAmt ? Math.round(paidAmt/totalAmt*100) : 0;
+  // ── 統計卡（以合約總額為基準，避免併單造成 >100%）──
+  // 篩選後有哪些合約，取對應合約總額加總
+  const filteredContractIds = [...new Set(filtered.map(r=>r.contractId))];
+  const contractTotalSum = filteredContractIds.reduce((s,cid)=>{
+    const ct = ctMap[cid]; return s + (Number(ct?.total)||0);
+  },0);
+  const paidAmt   = filtered.filter(r=>r.status==='已入款').reduce((s,r)=>s+r.amount, 0);
+  const unpaidAmt = filtered.filter(r=>r.status==='未入款').reduce((s,r)=>s+r.amount, 0);
+  const overdueAmt= filtered.filter(r=>r.status==='未入款'&&r.dueDate&&r.dueDate<today).reduce((s,r)=>s+r.amount,0);
+  const paidRate  = contractTotalSum ? Math.round(paidAmt/contractTotalSum*100) : 0;
 
-  const statsEl = document.getElementById('rov-stats');
-  statsEl.innerHTML = `
-    <div class="stat"><div class="stat-l">應收總額</div><div class="stat-n">NT$ ${totalAmt.toLocaleString()}</div></div>
+  document.getElementById('rov-stats').innerHTML = `
+    <div class="stat"><div class="stat-l">合約總額（篩選範圍）</div><div class="stat-n">NT$ ${contractTotalSum.toLocaleString()}</div></div>
     <div class="stat"><div class="stat-l">已入款</div><div class="stat-n good">NT$ ${paidAmt.toLocaleString()}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">收款率 ${paidRate}%</div></div>
     <div class="stat"><div class="stat-l">未入款</div><div class="stat-n warn">NT$ ${unpaidAmt.toLocaleString()}</div></div>
-    <div class="stat"><div class="stat-l">逾期未收</div><div class="stat-n danger">NT$ ${overdueAmt.toLocaleString()}</div></div>
-  `;
+    <div class="stat"><div class="stat-l">逾期未收</div><div class="stat-n danger">NT$ ${overdueAmt.toLocaleString()}</div></div>`;
 
-  // 主體：依客戶 → 合約分組
   const bodyEl = document.getElementById('rov-body');
   if(!filtered.length){ bodyEl.innerHTML='<div class="empty-state">無符合條件的資料</div>'; return; }
 
-  // 依客戶分組
+  // ── 分組：客戶 → 合約 → 期次 ──
   const byClient = {};
   filtered.forEach(r=>{
-    if(!byClient[r.clientId]) byClient[r.clientId]={name:r.clientName, contracts:{}};
-    const key = r.contractId;
-    if(!byClient[r.clientId].contracts[key])
-      byClient[r.clientId].contracts[key]={
+    if(!byClient[r.clientId]) byClient[r.clientId] = {name:r.clientName, cts:{}};
+    if(!byClient[r.clientId].cts[r.contractId])
+      byClient[r.clientId].cts[r.contractId] = {
         contractNo:r.contractNo, contractName:r.contractName,
         contractTotal:r.contractTotal, payMethod:r.payMethod,
         contractNote:r.contractNote, rows:[]
       };
-    byClient[r.clientId].contracts[key].rows.push(r);
+    byClient[r.clientId].cts[r.contractId].rows.push(r);
   });
 
-  const fmt = n => n ? 'NT$ '+Number(n).toLocaleString() : '—';
   const statusBadge = s => {
-    if(s==='已入款') return `<span class="badge b-active" style="font-size:11px">已入款</span>`;
-    if(s==='未入款') return `<span class="badge b-unpaid" style="font-size:11px">未入款</span>`;
+    if(s==='已入款') return `<span class="badge b-active"  style="font-size:11px">已入款</span>`;
+    if(s==='未入款') return `<span class="badge b-unpaid"  style="font-size:11px">未入款</span>`;
     return `<span class="badge" style="font-size:11px">${s}</span>`;
   };
 
+  // ── 渲染 ──
   let html = '';
-  Object.values(byClient).forEach(({name, contracts})=>{
-    const clientTotal   = Object.values(contracts).reduce((s,ct)=>s+ct.rows.reduce((a,r)=>a+r.amount,0),0);
-    const clientPaid    = Object.values(contracts).reduce((s,ct)=>s+ct.rows.filter(r=>r.status==='已入款').reduce((a,r)=>a+r.amount,0),0);
-    const clientUnpaid  = clientTotal - clientPaid;
+  Object.entries(byClient).forEach(([clientId, {name, cts}])=>{
+    // 客戶層統計：用合約總額，不用已收金額加總（避免併單問題）
+    const clientCtTotal = Object.values(cts).reduce((s,ct)=>s+ct.contractTotal, 0);
+    const clientPaid    = Object.values(cts).reduce((s,ct)=>s+ct.rows.filter(r=>r.status==='已入款').reduce((a,r)=>a+r.amount,0), 0);
+    const clientUnpaid  = Object.values(cts).reduce((s,ct)=>s+ct.rows.filter(r=>r.status==='未入款').reduce((a,r)=>a+r.amount,0), 0);
+    const ctCount = Object.keys(cts).length;
+    const clientRate = clientCtTotal ? Math.round(clientPaid/clientCtTotal*100) : 0;
+    const hasOverdue = Object.values(cts).some(ct=>ct.rows.some(r=>r.status==='未入款'&&r.dueDate&&r.dueDate<today));
 
-    html += `<div class="cc" style="margin-bottom:12px">
-      <div class="cc-header" onclick="this.parentElement.classList.toggle('open')">
-        <div class="av" style="background:var(--accent-bg,#e1f5ee);color:var(--accent-text,#085041);width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${name.slice(0,2)}</div>
-        <div class="ci"><div class="cn">${name}</div>
-          <div class="cm">應收 ${fmt(clientTotal)}・已收 <span style="color:#0f6e56">${fmt(clientPaid)}</span>・待收 <span style="color:#854f0b">${fmt(clientUnpaid)}</span></div>
+    // 唯一 ID 用於摺疊
+    const clientKey = clientId.replace(/[^a-z0-9]/gi,'_');
+
+    html += `
+    <div class="cc" id="rov-cl-${clientKey}" style="margin-bottom:10px">
+      <div class="cc-header" onclick="document.getElementById('rov-cl-${clientKey}').classList.toggle('open')">
+        <div class="av" style="background:var(--accent-bg,#e1f5ee);color:var(--accent-text,#085041);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${name.slice(0,2)}</div>
+        <div class="ci">
+          <div class="cn" style="display:flex;align-items:center;gap:8px">
+            ${name}
+            ${hasOverdue?'<span class="badge b-overdue" style="font-size:10px">有逾期</span>':''}
+          </div>
+          <div class="cm">${ctCount} 份合約・合約總額 ${fmt(clientCtTotal)}・已收 <span style="color:#0f6e56;font-weight:500">${fmt(clientPaid)}</span>（${clientRate}%）・待收 <span style="color:#854f0b">${fmt(clientUnpaid)}</span></div>
         </div>
         <svg class="chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <div class="cc-detail" style="padding:0">`;
 
-    Object.values(contracts).forEach(ct=>{
-      const ctPaid   = ct.rows.filter(r=>r.status==='已入款').reduce((s,r)=>s+r.amount,0);
-      const ctUnpaid = ct.rows.filter(r=>r.status==='未入款').reduce((s,r)=>s+r.amount,0);
-      const ctOverdue= ct.rows.filter(r=>r.status==='未入款'&&r.dueDate&&r.dueDate<today).length;
+    // 合約層
+    Object.entries(cts).forEach(([contractId, ct])=>{
+      const ctKey     = contractId.replace(/[^a-z0-9]/gi,'_');
+      const ctPaid    = ct.rows.filter(r=>r.status==='已入款').reduce((s,r)=>s+r.amount,0);
+      const ctUnpaid  = ct.rows.filter(r=>r.status==='未入款').reduce((s,r)=>s+r.amount,0);
+      const ctOverdue = ct.rows.filter(r=>r.status==='未入款'&&r.dueDate&&r.dueDate<today).length;
+      // 收款率以合約登記總額為分母
+      const ctRate    = ct.contractTotal ? Math.round(ctPaid/ct.contractTotal*100) : 0;
+      const isMerged  = ctRate > 100; // 超過 100% → 併單入帳
 
-      html += `<div style="padding:14px 16px;border-bottom:0.5px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-          <div style="font-size:13px;font-weight:600">${ct.contractName}</div>
-          <div style="font-size:12px;color:var(--text3)">${ct.contractNo}</div>
-          <div style="font-size:12px;color:var(--text2)">${ct.payMethod}</div>
-          ${ctOverdue?`<span class="badge b-overdue" style="font-size:11px">${ctOverdue} 期逾期</span>`:''}
-          <div style="margin-left:auto;font-size:12px;color:var(--text2)">合約總額 <b>${fmt(ct.contractTotal)}</b></div>
-        </div>
-        ${ct.contractNote?`<div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg2);border-radius:var(--r)">${ct.contractNote}</div>`:''}
-        <div class="table-wrap" style="margin-bottom:0">
-          <table class="ptable">
-            <thead><tr>
-              <th style="width:48px">期次</th><th>應收金額</th><th>到期日</th>
-              <th>入款日</th><th>狀態</th><th>發票號碼</th><th>發票類型</th><th>發票日期</th>
-            </tr></thead>
-            <tbody>`;
+      html += `
+        <div style="border-bottom:0.5px solid var(--border)">
+          <!-- 合約列（點擊展開期次） -->
+          <div onclick="document.getElementById('rov-ct-${ctKey}').style.display=document.getElementById('rov-ct-${ctKey}').style.display==='none'?'block':'none';this.querySelector('.chevron').style.transform=document.getElementById('rov-ct-${ctKey}').style.display==='none'?'':'rotate(180deg)'"
+               style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;background:var(--bg2)">
+            <svg class="chevron" style="width:14px;height:14px;opacity:.5;transition:transform .2s;flex-shrink:0" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:13px;font-weight:600">${ct.contractName}</span>
+                <span style="font-size:12px;color:var(--text3)">${ct.contractNo}</span>
+                <span style="font-size:12px;color:var(--text2)">${ct.payMethod||''}</span>
+                ${ctOverdue?`<span class="badge b-overdue" style="font-size:10px">${ctOverdue} 期逾期</span>`:''}
+                ${isMerged?`<span class="badge" style="font-size:10px;background:#fff3cd;color:#856404">⚠ 併單入帳</span>`:''}
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">
+                合約總額 <b>${fmt(ct.contractTotal)}</b>・
+                已收 <span style="color:#0f6e56">${fmt(ctPaid)}</span>（${isMerged?'<span style="color:#856404">'+ctRate+'%</span>':ctRate+'%'}）・
+                待收 <span style="color:#854f0b">${fmt(ctUnpaid)}</span>
+                ${ct.contractNote?`<span style="margin-left:8px;color:var(--text3)">｜ ${ct.contractNote}</span>`:''}
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--text3);white-space:nowrap">${ct.rows.length} 期</div>
+          </div>
+          <!-- 期次明細（預設隱藏） -->
+          <div id="rov-ct-${ctKey}" style="display:none">
+            ${isMerged?`<div style="padding:8px 16px;background:#fff8e1;font-size:12px;color:#856404">⚠ 此合約收款率 ${ctRate}%，超過 100%。原因：部分付款期次同時包含其他合約金額（併單入帳），實際合約金額無誤。</div>`:''}
+            <div class="table-wrap" style="margin:0;border-radius:0;border-left:none;border-right:none;border-bottom:none">
+              <table class="ptable">
+                <thead><tr>
+                  <th style="width:44px">期次</th><th>應收金額</th><th>到期日</th>
+                  <th>入款日</th><th>狀態</th><th>發票號碼</th><th>發票類型</th><th>發票日期</th>
+                </tr></thead>
+                <tbody>`;
 
       ct.rows.sort((a,b)=>a.period-b.period).forEach(r=>{
         const isOverdue = r.status==='未入款' && r.dueDate && r.dueDate < today;
-        const rowStyle  = isOverdue ? 'background:var(--red-bg,#fcebeb)' : (r.status==='已入款'?'background:#f0fdf4':'');
-        html += `<tr style="${rowStyle}">
+        const rowBg = isOverdue ? 'background:#fcebeb' : (r.status==='已入款'?'background:#f0fdf4':'');
+        html += `<tr style="${rowBg}">
           <td style="text-align:center;font-weight:500">${r.period}</td>
           <td style="font-weight:600">${fmt(r.amount)}</td>
           <td style="color:${isOverdue?'var(--red-text)':'var(--text2)'}">${r.dueDate||'—'}</td>
@@ -5198,26 +5241,15 @@ function renderReceivableOverview(){
         </tr>`;
       });
 
-      html += `</tbody>
-            <tfoot><tr style="background:var(--bg2)">
-              <td style="font-weight:600;text-align:right;padding-right:8px" colspan="1">小計</td>
-              <td style="font-weight:600">${fmt(ctPaid+ctUnpaid)}</td>
-              <td colspan="2"></td>
-              <td><span style="font-size:11px;color:#0f6e56">已收 ${fmt(ctPaid)}</span><br><span style="font-size:11px;color:#854f0b">待收 ${fmt(ctUnpaid)}</span></td>
-              <td colspan="3"></td>
-            </tr></tfoot>
-          </table>
-        </div>
-      </div>`;
+      html += `</tbody></table></div>
+          </div>
+        </div>`;
     });
 
     html += `</div></div>`;
   });
 
   bodyEl.innerHTML = html;
-
-  // 預設展開所有客戶卡
-  document.querySelectorAll('#rov-body .cc').forEach(el=>el.classList.add('open'));
 }
 
 
