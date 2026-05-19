@@ -1559,6 +1559,19 @@ window.loadAllData = async function(){
       });
     }
 
+    // ── 資料更新後重置所有篩選下拉，讓它們重新建立 ──
+    ['sm-client','sm-fy','sm-fm',
+     'ra-client','ra-fy','ra-fm',
+     'cl-fy','cl-fm',
+     'pf-fy','pf-fm',
+     'rov-filter-client','rov-filter-year'
+    ].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el) return;
+      // 保留第一個「全部」選項，移除其餘
+      while(el.options.length > 1) el.remove(1);
+    });
+
     renderHome();
     // 若使用者切換到其他頁面後資料才回來，重新 render 當前頁面
     setTimeout(()=>{
@@ -2079,10 +2092,8 @@ function renderClients(){
   const fm=document.getElementById('cl-fm')?.value||'';
 
   const yrSel=document.getElementById('cl-fy');
-  if(yrSel&&yrSel.options.length<=1){
-    const years=[...new Set(DB.contracts.map(c=>c.start?.slice(0,4)).filter(Boolean))].sort().reverse();
-    years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y+'年';yrSel.appendChild(o);});
-    if(fy) yrSel.value=fy;
+  if(yrSel&&DB.contracts.length){
+    if(yrSel.options.length<=1){const years=[...new Set(DB.contracts.map(c=>c.start?.slice(0,4)).filter(Boolean))].sort().reverse();years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y+'年';yrSel.appendChild(o);});if(fy) yrSel.value=fy;}
   }
 
   const clients=DB.clients.filter(c=>{
@@ -2803,13 +2814,13 @@ function renderReceivable(){
 
   // 初始化客戶選單
   const cSel=document.getElementById('ra-client');
-  if(cSel&&cSel.options.length<=1){
+  if(cSel&&cSel.options.length<=1&&DB.clients.length){
     DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;cSel.appendChild(o);});
     if(fc) cSel.value=fc;
   }
   // 初始化年份選單
   const yrSel=document.getElementById('ra-fy');
-  if(yrSel&&yrSel.options.length<=1){
+  if(yrSel&&yrSel.options.length<=1&&DB.receivables.length){
     const years=[...new Set(DB.receivables.flatMap(r=>r.payments.map(p=>p.dueDate?.slice(0,4))).filter(Boolean))].sort().reverse();
     years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y+'年';yrSel.appendChild(o);});
     if(fy) yrSel.value=fy;
@@ -3113,20 +3124,18 @@ function renderSummary(){
   const fy=document.getElementById('sm-fy')?.value||'';
   const fm=document.getElementById('sm-fm')?.value||'';
 
-  // 初始化客戶選單
+  // 初始化客戶選單（若 DB 有資料但選單還是空的，重新建立）
   const cSel=document.getElementById('sm-client');
-  if(cSel&&cSel.options.length<=1){
+  if(cSel&&(cSel.options.length<=1)&&DB.clients.length){
     DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;cSel.appendChild(o);});
     if(fc) cSel.value=fc;
   }
   // 初始化年份選單
   const yrSel=document.getElementById('sm-fy');
-  if(yrSel&&yrSel.options.length<=1){
+  if(yrSel&&(yrSel.options.length<=1)&&DB.contracts.length){
     const years=[...new Set(DB.contracts.map(c=>c.start?.slice(0,4)).filter(Boolean))].sort().reverse();
-    const curY=new Date().getFullYear().toString();
-    if(!years.includes(curY)) years.unshift(curY);
     years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y+'年';yrSel.appendChild(o);});
-    if(!fy&&years.length) yrSel.value=curY;
+    // 預設顯示全部，不強制選當年
   }
 
   // 依篩選條件過濾合約
