@@ -5584,6 +5584,14 @@ function hrApplyPermissions(){
 
 // ── navTo HR routes 已在 renders 物件中直接加入 ──
 
+function hrRenderPage(){
+  const ts = hrG('hr-tab-salary');
+  const tr = hrG('hr-tab-report');
+  if(ts) ts.style.display = hrCanSeeSalary()?'':'none';
+  if(tr) tr.style.display = hrIsOwner()?'':'none';
+  hrRenderMembers();
+}
+
 // ── HR tab 切換（v5 sch-tab 風格）──
 function setHRTab2(el){
   document.querySelectorAll('#hr-tab-group .sch-tab').forEach(t=>t.classList.remove('active'));
