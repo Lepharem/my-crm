@@ -1125,9 +1125,15 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
 
     <!-- ══ 打卡頁面 ══ -->
     <div id="page-clock" class="page">
-      <div class="page-header"><div class="page-title">打卡</div></div>
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="topbar-title">打卡</div>
+          <div class="topbar-sub">上下班出勤記錄</div>
+        </div>
+      </div>
+      <div class="content">
       <div class="clock-alert ca-warn" id="clock-alert-nomember" style="display:none">尚未建立員工資料，請先至「人資管理 > 員工資料」新增你的帳號</div>
-      <div class="clock-alert" id="clock-alert-holiday" style="display:none;background:#e6f1fb;color:#0c447c;padding:12px 14px;border-radius:var(--r);font-size:13px"></div>
+      <div class="clock-alert" id="clock-alert-holiday" style="display:none;background:var(--blue-bg,#dbeafe);color:var(--blue-text,#1d4ed8);padding:12px 14px;border-radius:var(--r);font-size:13px;margin-bottom:16px"></div>
       <div class="clock-wrap">
         <div class="clock-hero">
           <div class="clock-user">
@@ -1135,7 +1141,7 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
             <div class="clock-user-info">
               <div class="clock-user-name" id="clock-uname">—</div>
               <div class="clock-user-sub" id="clock-utitle">—</div>
-              <div style="font-size:11px;color:var(--accent-text,#085041);margin-top:3px" id="clock-leave-balance"></div>
+              <div style="font-size:11px;color:#16a34a;margin-top:3px" id="clock-leave-balance"></div>
             </div>
           </div>
           <div>
@@ -1154,129 +1160,149 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
             <div class="clock-loading-row" id="clock-loading"><div class="clock-spinner"></div>查詢打卡狀態…</div>
           </div>
         </div>
-        <div class="att-month-stat" id="clock-month-stat" style="display:none">
-          <div class="ams"><div class="ams-n good" id="cms-present">0</div><div class="ams-l">正常出勤</div></div>
-          <div class="ams"><div class="ams-n warn" id="cms-late">0</div><div class="ams-l">遲到</div></div>
-          <div class="ams"><div class="ams-n" style="color:#3c3489" id="cms-early">0</div><div class="ams-l">早退</div></div>
-          <div class="ams"><div class="ams-n" id="cms-hours">0h</div><div class="ams-l">本月工時</div></div>
+        <div class="content-grid" id="clock-month-stat" style="display:none;margin-bottom:16px">
+          <div class="stat-card" style="border-top:3px solid #16a34a"><div class="stat-label">正常出勤</div><div class="stat-value" id="cms-present">0</div></div>
+          <div class="stat-card" style="border-top:3px solid var(--amber)"><div class="stat-label">遲到</div><div class="stat-value" id="cms-late">0</div></div>
+          <div class="stat-card" style="border-top:3px solid var(--purple)"><div class="stat-label">早退</div><div class="stat-value" id="cms-early">0</div></div>
+          <div class="stat-card" style="border-top:3px solid var(--accent)"><div class="stat-label">本月工時</div><div class="stat-value" id="cms-hours">0h</div></div>
         </div>
-        <div class="sec-title" style="margin-bottom:10px">近期出勤記錄</div>
         <div class="table-wrap">
-          <table class="ptable">
-            <thead><tr><th>日期</th><th>星期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
-            <tbody id="my-attendance"></tbody>
-          </table>
+          <div class="table-header"><div class="table-title">近期出勤記錄</div></div>
+          <table><thead><tr><th>日期</th><th>星期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
+          <tbody id="my-attendance"></tbody></table>
         </div>
+      </div>
       </div>
     </div>
 
     <!-- ══ 人資管理頁面 ══ -->
     <div id="page-hr" class="page">
-      <div class="page-header"><div class="page-title">人資管理</div></div>
-      <div class="hr-tabs" style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap">
-        <button class="hr-tab on" data-ht="members" onclick="setHRTab(this)">員工資料</button>
-        <button class="hr-tab" data-ht="attendance" onclick="setHRTab(this)">出勤記錄</button>
-        <button class="hr-tab" data-ht="leave" onclick="setHRTab(this)">假勤申請</button>
-        <button class="hr-tab" id="hr-tab-salary" data-ht="salary" onclick="setHRTab(this)" style="display:none">薪資記錄</button>
-        <button class="hr-tab" id="hr-tab-report" data-ht="report" onclick="setHRTab(this)" style="display:none">差勤月結</button>
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="topbar-title">人資管理</div>
+          <div class="topbar-sub">員工資料、出勤、假勤、薪資</div>
+        </div>
+        <div class="topbar-actions">
+          <div class="schedule-tabs" id="hr-tab-group">
+            <div class="sch-tab active" data-ht="members" onclick="setHRTab2(this)">員工</div>
+            <div class="sch-tab" data-ht="attendance" onclick="setHRTab2(this)">出勤</div>
+            <div class="sch-tab" data-ht="leave" onclick="setHRTab2(this)">假勤</div>
+            <div class="sch-tab" id="hr-tab-salary" data-ht="salary" onclick="setHRTab2(this)" style="display:none">薪資</div>
+            <div class="sch-tab" id="hr-tab-report" data-ht="report" onclick="setHRTab2(this)" style="display:none">月結</div>
+          </div>
+        </div>
       </div>
+      <div class="content">
       <div class="hr-panel on" id="hr-members">
-        <div class="toolbar">
-          <div class="sw">
+        <div class="flex items-center gap-3" style="margin-bottom:16px;flex-wrap:wrap">
+          <div class="sw" style="flex:1;min-width:160px">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
             <input type="text" id="member-search" placeholder="搜尋員工姓名、職稱…" oninput="hrRenderMembers()">
           </div>
-          <div class="filters">
-            <button class="pill on" data-mf="all" onclick="setMemberFilter(this)">全部</button>
-            <button class="pill" data-mf="full_time" onclick="setMemberFilter(this)">正職</button>
-            <button class="pill" data-mf="contractor" onclick="setMemberFilter(this)">外包</button>
+          <div class="flex gap-2">
+            <button class="btn btn-sm ${''}" data-mf="all" onclick="setMemberFilter(this)" style="background:var(--navy);color:#fff;border-color:var(--navy)">全部</button>
+            <button class="btn btn-sm" data-mf="full_time" onclick="setMemberFilter(this)">正職</button>
+            <button class="btn btn-sm" data-mf="contractor" onclick="setMemberFilter(this)">外包</button>
           </div>
-          <button class="btn-add" id="btn-add-member" onclick="openMemberModal()">+ 新增員工</button>
+          <button class="btn btn-primary" id="btn-add-member" onclick="openMemberModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增員工
+          </button>
         </div>
         <div id="member-list"></div>
       </div>
       <div class="hr-panel" id="hr-attendance">
-        <div class="fin-bar">
-          <div class="month-nav-hr">
-            <button onclick="changeAttMonth(-1)">&#8249;</button>
-            <span class="month-label-hr" id="att-month-label"></span>
-            <button onclick="changeAttMonth(1)">&#8250;</button>
+        <div class="flex items-center gap-3" style="margin-bottom:16px;flex-wrap:wrap">
+          <div class="flex items-center gap-2">
+            <button class="btn btn-sm btn-ghost" onclick="changeAttMonth(-1)">‹</button>
+            <span style="font-size:14px;font-weight:500;min-width:80px;text-align:center" id="att-month-label"></span>
+            <button class="btn btn-sm btn-ghost" onclick="changeAttMonth(1)">›</button>
           </div>
-          <div class="filters" id="att-filter-wrap">
-            <button class="pill on" data-am="all" onclick="setAttFilter(this)">全員</button>
+          <div class="flex gap-2" id="att-filter-wrap">
+            <button class="btn btn-sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" data-am="all" onclick="setAttFilter(this)">全員</button>
           </div>
         </div>
         <div class="table-wrap">
-          <table class="ptable">
-            <thead><tr><th>員工</th><th>部門</th><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
-            <tbody id="att-tbody"></tbody>
-          </table>
+          <table><thead><tr><th>員工</th><th>部門</th><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
+          <tbody id="att-tbody"></tbody></table>
         </div>
       </div>
       <div class="hr-panel" id="hr-leave">
-        <div class="toolbar">
-          <div class="filters">
-            <button class="pill on" data-lf="all" onclick="setLeaveFilter(this)">全部</button>
-            <button class="pill" data-lf="pending" onclick="setLeaveFilter(this)">待審核</button>
-            <button class="pill" data-lf="approved" onclick="setLeaveFilter(this)">已核准</button>
-            <button class="pill" data-lf="rejected" onclick="setLeaveFilter(this)">已駁回</button>
+        <div class="flex items-center gap-3" style="margin-bottom:16px;flex-wrap:wrap">
+          <div class="flex gap-2">
+            <button class="btn btn-sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" data-lf="all" onclick="setLeaveFilter(this)">全部</button>
+            <button class="btn btn-sm" data-lf="pending" onclick="setLeaveFilter(this)">待審核</button>
+            <button class="btn btn-sm" data-lf="approved" onclick="setLeaveFilter(this)">已核准</button>
+            <button class="btn btn-sm" data-lf="rejected" onclick="setLeaveFilter(this)">已駁回</button>
           </div>
-          <button class="btn-add" id="btn-apply-leave" onclick="openLeaveModal()">+ 申請請假</button>
+          <button class="btn btn-primary" id="btn-apply-leave" onclick="openLeaveModal()" style="margin-left:auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>申請請假
+          </button>
         </div>
         <div id="leave-list"></div>
       </div>
       <div class="hr-panel" id="hr-salary">
-        <div class="fin-bar">
-          <div class="month-nav-hr">
-            <button onclick="changeSalMonth(-1)">&#8249;</button>
-            <span class="month-label-hr" id="sal-month-label"></span>
-            <button onclick="changeSalMonth(1)">&#8250;</button>
+        <div class="flex items-center gap-3" style="margin-bottom:16px;flex-wrap:wrap">
+          <div class="flex items-center gap-2">
+            <button class="btn btn-sm btn-ghost" onclick="changeSalMonth(-1)">‹</button>
+            <span style="font-size:14px;font-weight:500;min-width:80px;text-align:center" id="sal-month-label"></span>
+            <button class="btn btn-sm btn-ghost" onclick="changeSalMonth(1)">›</button>
           </div>
-          <button class="btn-add" onclick="openSalaryModal()">+ 新增薪資記錄</button>
+          <button class="btn btn-primary" onclick="openSalaryModal()" style="margin-left:auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增薪資記錄
+          </button>
         </div>
         <div class="table-wrap">
-          <table class="ptable">
-            <thead><tr><th>員工</th><th>底薪</th><th>津貼</th><th>獎金</th><th>勞保</th><th>健保</th><th>所得稅</th><th>實領</th><th>發薪日</th></tr></thead>
-            <tbody id="sal-tbody"></tbody>
-          </table>
+          <table><thead><tr><th>員工</th><th>底薪</th><th>津貼</th><th>獎金</th><th>勞保</th><th>健保</th><th>所得稅</th><th>實領</th><th>發薪日</th></tr></thead>
+          <tbody id="sal-tbody"></tbody></table>
         </div>
       </div>
       <div class="hr-panel" id="hr-report">
-        <div class="fin-bar">
-          <div class="month-nav-hr">
-            <button onclick="changeReportMonth(-1)">&#8249;</button>
-            <span class="month-label-hr" id="report-month-label"></span>
-            <button onclick="changeReportMonth(1)">&#8250;</button>
+        <div class="flex items-center gap-3" style="margin-bottom:16px;flex-wrap:wrap">
+          <div class="flex items-center gap-2">
+            <button class="btn btn-sm btn-ghost" onclick="changeReportMonth(-1)">‹</button>
+            <span style="font-size:14px;font-weight:500;min-width:80px;text-align:center" id="report-month-label"></span>
+            <button class="btn btn-sm btn-ghost" onclick="changeReportMonth(1)">›</button>
           </div>
-          <button class="btn-add" onclick="printAttReport()">列印 PDF</button>
+          <button class="btn btn-sm" onclick="printAttReport()" style="margin-left:auto">列印 PDF</button>
         </div>
         <div id="report-content"></div>
+      </div>
       </div>
     </div>
 
     <!-- ══ 登入紀錄頁面 ══ -->
     <div id="page-logs" class="page">
-      <div class="page-header">
-        <div class="page-title">登入紀錄</div>
-        <button class="btn-add" onclick="hrLoadLogs()">重新整理</button>
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="topbar-title">登入紀錄</div>
+          <div class="topbar-sub">系統使用者登入歷程</div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-sm" onclick="hrLoadLogs()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            重新整理
+          </button>
+        </div>
       </div>
-      <div id="logs-body">
-        <div class="stats" id="log-stats"></div>
+      <div class="content">
+        <div class="content-grid" id="log-stats" style="margin-bottom:16px"></div>
         <div id="log-loading" class="loading" style="display:none"><div class="spinner"></div>載入中…</div>
         <div class="table-wrap" id="log-table-wrap" style="display:none">
-          <table class="ptable">
-            <thead><tr><th>姓名</th><th>Email</th><th>登入時間</th><th>裝置</th><th>瀏覽器</th></tr></thead>
-            <tbody id="log-tbody"></tbody>
-          </table>
+          <div class="table-header"><div class="table-title">登入記錄</div></div>
+          <table><thead><tr><th>姓名</th><th>Email</th><th>登入時間</th><th>裝置</th><th>瀏覽器</th></tr></thead>
+          <tbody id="log-tbody"></tbody></table>
         </div>
       </div>
     </div>
 
     <!-- ══ 應收總覽頁面 ══ -->
     <div id="page-receivable-overview" class="page">
-      <div class="page-header">
-        <div class="page-title">應收總覽</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="topbar-title">應收總覽</div>
+          <div class="topbar-sub">客戶 × 合約 × 期次 × 發票</div>
+        </div>
+        <div class="topbar-actions">
           <select id="rov-filter-client" class="filter-input" onchange="renderReceivableOverview()" style="width:140px">
             <option value="">全部客戶</option>
           </select>
@@ -1290,10 +1316,10 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
           </select>
         </div>
       </div>
-      <!-- 統計卡 -->
-      <div id="rov-stats" class="stats" style="margin-bottom:20px"></div>
-      <!-- 主體 -->
-      <div id="rov-body"></div>
+      <div class="content">
+        <div id="rov-stats" class="content-grid" style="margin-bottom:16px"></div>
+        <div id="rov-body"></div>
+      </div>
     </div>
 
   </div><!-- /page-area -->
@@ -2097,7 +2123,7 @@ function openClientDrawer(clientId){
                 <button class="btn btn-xs edit-only" onclick="openEditContract('${ct.id}')">編輯</button>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
-                <div><span style="color:var(--text3)">走期：</span>${ct.start}～${ct.end}</div>
+                <div><span style="color:var(--text3)">走期：</span>${(ct.start||'').slice(0,10)}～${(ct.end||'').slice(0,10)}</div>
                 <div><span style="color:var(--text3)">金額：</span><strong>${fmt(ct.total)}</strong></div>
                 <div><span style="color:var(--text3)">付款：</span>${ct.payMethod||'—'}</div>
               </div>
@@ -2208,7 +2234,7 @@ function renderClientReceivable(clientId){
       return`<div class="card" style="margin-bottom:10px">
         <div class="card-body">
           <div class="flex items-center gap-2" style="margin-bottom:10px">
-            <div style="font-weight:600;font-size:13px;flex:1">${ra.contractNo||'（無委編）'} <span style="font-size:11px;font-weight:400;color:var(--text3)">簽約 ${ra.signDate||'—'}</span></div>
+            <div style="font-weight:600;font-size:13px;flex:1">${ra.contractNo||'（無委編）'} <span style="font-size:11px;font-weight:400;color:var(--text3)">簽約 ${(ra.signDate||'—').slice(0,10)}</span></div>
             <span style="font-weight:600">${fmt(ra.total)}</span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:6px">
@@ -2345,8 +2371,8 @@ function openEditContract(contractId){
   openModal('編輯合約',`
     <div class="form-group"><label class="form-label">合約名稱</label><input class="form-input" id="f-cname" value="${ct.name}"></div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">合約起日</label><input class="form-input" type="date" id="f-start" value="${ct.start||''}"></div>
-      <div class="form-group"><label class="form-label">合約迄日</label><input class="form-input" type="date" id="f-end" value="${ct.end||''}"></div>
+      <div class="form-group"><label class="form-label">合約起日</label><input class="form-input" type="date" id="f-start" value="${(ct.start||'').slice(0,10)}"></div>
+      <div class="form-group"><label class="form-label">合約迄日</label><input class="form-input" type="date" id="f-end" value="${(ct.end||'').slice(0,10)}"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">合約總金額（含稅）</label><input class="form-input" type="number" id="f-total" value="${ct.total||0}"></div>
@@ -2356,7 +2382,7 @@ function openEditContract(contractId){
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">合約編號</label><input class="form-input" id="f-cno" value="${ct.contractNo||''}"></div>
-      <div class="form-group"><label class="form-label">簽約日</label><input class="form-input" type="date" id="f-sign" value="${ct.signDate||''}"></div>
+      <div class="form-group"><label class="form-label">簽約日</label><input class="form-input" type="date" id="f-sign" value="${(ct.signDate||'').slice(0,10)}"></div>
     </div>
     <div class="form-group"><label class="form-label">狀態</label>
       <select class="form-input" id="f-status">${['進行中','完成','暫停','結束合約'].map(s=>`<option ${s===ct.status?'selected':''}>${s}</option>`).join('')}</select>
@@ -2741,30 +2767,66 @@ function renderReceivable(){
     return;
   }
 
-  const rows=filtered.flatMap(ra=>{
-    const c=DB.clients.find(x=>x.id===ra.clientId);
-    return ra.payments.map((p,pi)=>{
-      const isOverdue=p.status==='未入款'&&p.dueDate&&p.dueDate<today();
-      const bg=isOverdue?'background:var(--red-bg)':'';
-      const clientCell=pi===0
-        ?'<td style="font-weight:500" rowspan="'+ra.payments.length+'">'+(c?c.name:ra.clientId)+'</td>'
-         +'<td style="font-family:var(--font-mono);font-size:11px" rowspan="'+ra.payments.length+'">'+(ra.contractNo||'—')+'</td>'
-        :'';
-      return '<tr style="'+bg+'">'+clientCell
-        +'<td style="font-size:12px">第 '+p.period+' 期</td>'
-        +'<td style="font-size:12px">'+(p.dueDate||'—')+'</td>'
-        +'<td style="text-align:right;font-weight:500">'+fmt(p.amount)+'</td>'
-        +'<td><span class="tag '+(p.status==='已入款'?'tag-green':isOverdue?'tag-red':'tag-amber')+'">'+(isOverdue?'逾期':p.status)+'</span></td>'
-        +'<td><button class="btn btn-xs" onclick="openClientDrawer(\'' +ra.clientId+ '\')">查看</button></td>'
-        +'</tr>';
+  // 依客戶 → 合約分組，摺疊卡片
+  const byClient = {};
+  filtered.forEach(ra => {
+    if(!byClient[ra.clientId]) byClient[ra.clientId] = [];
+    byClient[ra.clientId].push(ra);
+  });
+  const todayStr = today();
+  let cardsHtml = '';
+  Object.entries(byClient).forEach(([clientId, ras]) => {
+    const c = DB.clients.find(x => x.id === clientId);
+    const cname = c ? c.name : clientId;
+    const clientKey = clientId.replace(/[^a-z0-9]/gi,'_');
+    const clientTotal = ras.reduce((a,r) => a + r.payments.reduce((b,p) => b+p.amount, 0), 0);
+    const clientPaid  = ras.reduce((a,r) => a + r.payments.filter(p=>p.status==='已入款').reduce((b,p) => b+p.amount, 0), 0);
+    const clientUnpaid= clientTotal - clientPaid;
+    const hasOverdue  = ras.some(r => r.payments.some(p => p.status==='未入款'&&p.dueDate&&p.dueDate<todayStr));
+
+    cardsHtml += `<div class="cc" id="ra-cl-${clientKey}" style="margin-bottom:10px">
+      <div class="cc-header" onclick="document.getElementById('ra-cl-${clientKey}').classList.toggle('open')">
+        <div class="av" style="background:var(--blue-bg,#dbeafe);color:var(--blue-text,#1d4ed8);width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${cname.slice(0,2)}</div>
+        <div class="ci">
+          <div class="cn" style="display:flex;align-items:center;gap:6px">${cname}${hasOverdue?'<span class="tag tag-red" style="font-size:10px">逾期</span>':''}</div>
+          <div class="cm">待收 <b style="color:var(--amber)">${fmt(clientUnpaid)}</b>　已收 <b style="color:#16a34a">${fmt(clientPaid)}</b>　合計 ${fmt(clientTotal)}</div>
+        </div>
+        <svg class="chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="cc-detail" style="padding:0">`;
+
+    ras.forEach(ra => {
+      const raPaid   = ra.payments.filter(p=>p.status==='已入款').reduce((a,p)=>a+p.amount,0);
+      const raTotal  = ra.payments.reduce((a,p)=>a+p.amount,0);
+      const raRate   = raTotal ? Math.round(raPaid/raTotal*100) : 0;
+      const raOverdue= ra.payments.filter(p=>p.status==='未入款'&&p.dueDate&&p.dueDate<todayStr).length;
+      cardsHtml += `<div style="padding:10px 16px;border-bottom:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:600">${ra.contractNo||'—'}</span>
+          ${raOverdue?`<span class="tag tag-red" style="font-size:10px">${raOverdue} 期逾期</span>`:''}
+          <div style="margin-left:auto;font-size:11px;color:var(--text3)">${raRate}% 已收</div>
+        </div>
+        <div class="table-wrap" style="margin:0;border-radius:6px">
+          <table><thead><tr>
+            <th style="width:48px">期次</th><th>截止日</th><th style="text-align:right">金額</th><th>狀態</th><th>入款日</th>
+          </tr></thead><tbody>`;
+      ra.payments.forEach(p => {
+        const isOverdue = p.status==='未入款'&&p.dueDate&&p.dueDate<todayStr;
+        const rowBg = isOverdue?'background:#fee2e2':(p.status==='已入款'?'background:#f0fdf4':'');
+        cardsHtml += `<tr style="${rowBg}">
+          <td style="text-align:center;font-weight:500">第${p.period}期</td>
+          <td style="font-size:12px;color:${isOverdue?'#dc2626':'var(--text2)'}">${p.dueDate?p.dueDate.slice(0,10):'—'}</td>
+          <td style="text-align:right;font-weight:500">${fmt(p.amount)}</td>
+          <td><span class="tag ${p.status==='已入款'?'tag-green':isOverdue?'tag-red':'tag-amber'}">${isOverdue?'逾期':p.status}</span></td>
+          <td style="font-size:12px;color:var(--text3)">${p.paidDate?p.paidDate.slice(0,10):'—'}</td>
+        </tr>`;
+      });
+      cardsHtml += `</tbody></table></div></div>`;
     });
+    cardsHtml += `</div></div>`;
   });
 
-  el.innerHTML=statsHtml
-    +'<div class="table-wrap"><table>'
-    +'<thead><tr><th>客戶</th><th>委編</th><th>期數</th><th>付款截止日</th><th style="text-align:right">金額</th><th>狀態</th><th>操作</th></tr></thead>'
-    +'<tbody>'+rows.join('')+'</tbody>'
-    +'</table></div>';
+  el.innerHTML = statsHtml + cardsHtml;
 }
 
 // ═══ SETTINGS ═══
@@ -3051,25 +3113,52 @@ function renderSummary(){
       }).join('')+'</tbody></table></div>'
     :'';
 
-  const ctRows=contracts.map(ct=>{
-    const c=DB.clients.find(x=>x.id===ct.clientId);
-    const ra=DB.receivables.filter(x=>x.clientId===ct.clientId);
-    const rec=ra.reduce((a,r)=>a+r.payments.filter(p=>p.status==='已入款').reduce((b,p)=>b+p.amount,0),0);
-    const p=ct.total>0?rec/ct.total:0;
-    const statusColor={'進行中':'tag-green','完成':'tag-blue','暫停':'tag-amber','結束合約':'tag-gray'};
-    return '<tr>'
-      +'<td style="font-weight:500">'+(c?c.name:ct.clientId)+'</td>'
-      +'<td style="font-size:12px;color:var(--text3)">'+ct.name+'</td>'
-      +'<td style="text-align:right">'+fmt(ct.total)+'</td>'
-      +'<td style="text-align:right;color:#16a34a">'+fmt(rec)+'</td>'
-      +'<td style="min-width:120px"><div class="flex items-center gap-2"><div class="progress-wrap" style="flex:1"><div class="progress-fill '+(p>=1?'green':'')+'" style="width:'+Math.round(p*100)+'%"></div></div><span style="font-size:11px">'+pct(p)+'</span></div></td>'
-      +'<td><span class="tag '+(statusColor[ct.status]||'tag-gray')+'">'+(ct.status||'—')+'</span></td>'
-      +'</tr>';
-  }).join('');
+  // 依客戶分組，同客戶合併顯示，點擊展開/收合
+  const byClient = {};
+  contracts.forEach(ct => {
+    if(!byClient[ct.clientId]) byClient[ct.clientId] = [];
+    byClient[ct.clientId].push(ct);
+  });
+  let ctRows = '';
+  Object.entries(byClient).forEach(([clientId, cts]) => {
+    const c = DB.clients.find(x => x.id === clientId);
+    const cname = c ? c.name : clientId;
+    const clientKey = clientId.replace(/[^a-z0-9]/gi,'_');
+    const activeCts = cts.filter(ct => ct.status === '進行中');
+    const clientTotal = cts.reduce((a,ct) => a+ct.total, 0);
+    ctRows += `<tr style="background:var(--surface2);cursor:pointer" onclick="var b=document.getElementById('sm-cts-${clientKey}');b.style.display=b.style.display==='none'?'':'none'">
+      <td colspan="6" style="font-weight:600;padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.4;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
+          <span>${cname}</span>
+          <span class="tag tag-gray" style="font-size:10px">${cts.length} 份合約 ${fmt(clientTotal)}</span>
+          ${activeCts.length ? `<span class="tag tag-green" style="font-size:10px">${activeCts.length} 進行中</span>` : ''}
+        </div>
+      </td>
+    </tr>`;
+    ctRows += `<tbody id="sm-cts-${clientKey}">`;
+    cts.forEach(ct => {
+      const ra = DB.receivables.filter(x => x.clientId === ct.clientId);
+      const rec = ra.reduce((a,r) => a + r.payments.filter(p => p.status === '已入款').reduce((b,p) => b+p.amount, 0), 0);
+      const p = ct.total > 0 ? rec / ct.total : 0;
+      const isCompleted = p >= 1;
+      const statusLabel = isCompleted ? '已結案' : (ct.status || '—');
+      const statusClass = isCompleted ? 'tag-gray' : ({'進行中':'tag-green','完成':'tag-blue','暫停':'tag-amber','結束合約':'tag-gray'}[ct.status] || 'tag-gray');
+      ctRows += `<tr>
+        <td style="font-size:12px;color:var(--text3);padding-left:28px">${ct.name}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${ct.contractNo || '—'}</td>
+        <td style="text-align:right">${fmt(ct.total)}</td>
+        <td style="text-align:right;color:#16a34a">${fmt(rec)}</td>
+        <td style="min-width:120px"><div class="flex items-center gap-2"><div class="progress-wrap" style="flex:1"><div class="progress-fill ${isCompleted?'green':''}" style="width:${Math.min(100,Math.round(p*100))}%"></div></div><span style="font-size:11px">${pct(p)}</span></div></td>
+        <td><span class="tag ${statusClass}">${statusLabel}</span></td>
+      </tr>`;
+    });
+    ctRows += `</tbody>`;
+  });
 
   el.innerHTML=statsHtml+catTable
     +'<div class="table-wrap"><div class="table-header"><div class="table-title">各客戶合約概況</div></div>'
-    +'<table><thead><tr><th>客戶</th><th>合約</th><th style="text-align:right">金額</th><th style="text-align:right">已入款</th><th style="text-align:right">收款進度</th><th>狀態</th></tr></thead>'
+    +'<table><thead><tr><th>合約名稱</th><th>報價單編號</th><th style="text-align:right">金額</th><th style="text-align:right">已入款</th><th style="text-align:right">收款進度</th><th>狀態</th></tr></thead>'
     +'<tbody>'+ctRows+'</tbody></table></div>';
 }
 
@@ -3258,7 +3347,7 @@ function renderProjects(){
           <div>
             <div class="card-title">${c.name}</div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px">
-              ${contracts.map(ct=>`${ct.start||''}～${ct.end||''}`).join('　')||'無合約走期'}
+              ${contracts.map(ct=>`${(ct.start||'').slice(0,10)}～${(ct.end||'').slice(0,10)}`).join('　')||'無合約走期'}
             </div>
           </div>
           <button class="btn btn-xs" onclick="openClientDrawer('${c.id}')">詳情</button>
@@ -5159,11 +5248,11 @@ function renderReceivableOverview(){
   const overdueAmt= filtered.filter(r=>r.status==='未入款'&&r.dueDate&&r.dueDate<today).reduce((s,r)=>s+r.amount,0);
   const paidRate  = contractTotalSum ? Math.round(paidAmt/contractTotalSum*100) : 0;
 
-  document.getElementById('rov-stats').innerHTML = `
-    <div class="stat"><div class="stat-l">合約總額（篩選範圍）</div><div class="stat-n">NT$ ${contractTotalSum.toLocaleString()}</div></div>
-    <div class="stat"><div class="stat-l">已入款</div><div class="stat-n good">NT$ ${paidAmt.toLocaleString()}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">收款率 ${paidRate}%</div></div>
-    <div class="stat"><div class="stat-l">未入款</div><div class="stat-n warn">NT$ ${unpaidAmt.toLocaleString()}</div></div>
-    <div class="stat"><div class="stat-l">逾期未收</div><div class="stat-n danger">NT$ ${overdueAmt.toLocaleString()}</div></div>`;
+  document.getElementById('rov-stats').innerHTML =
+    `<div class="stat-card" style="border-top:3px solid var(--accent)"><div class="stat-label">合約總額</div><div class="stat-value">NT$ ${contractTotalSum.toLocaleString()}</div></div>`
+   +`<div class="stat-card" style="border-top:3px solid #16a34a"><div class="stat-label">已入款</div><div class="stat-value" style="color:#16a34a">NT$ ${paidAmt.toLocaleString()}</div><div class="stat-change">收款率 ${paidRate}%</div></div>`
+   +`<div class="stat-card" style="border-top:3px solid var(--amber)"><div class="stat-label">未入款</div><div class="stat-value" style="color:var(--amber)">NT$ ${unpaidAmt.toLocaleString()}</div></div>`
+   +`<div class="stat-card" style="border-top:3px solid var(--red)"><div class="stat-label">逾期未收</div><div class="stat-value" style="color:var(--red)">NT$ ${overdueAmt.toLocaleString()}</div></div>`;
 
   const bodyEl = document.getElementById('rov-body');
   if(!filtered.length){ bodyEl.innerHTML='<div class="empty-state">無符合條件的資料</div>'; return; }
@@ -5313,9 +5402,9 @@ const HR_ROLE_L = {owner:'老闆',manager:'主管',employee:'組員'};
 const HR_WORK_L = {office:'辦公室',remote:'遠端',hybrid:'混合'};
 const HR_EMP_L  = {full_time:'全職',part_time:'兼職',contractor:'約聘外包'};
 const LEAVE_STATUS_L = {pending:'待審核',approved:'已核准',rejected:'已駁回'};
-const LEAVE_STATUS_C = {pending:'b-pending',approved:'b-approved',rejected:'b-rejected'};
+const LEAVE_STATUS_C = {pending:'tag tag-amber',approved:'tag tag-green',rejected:'tag tag-red'};
 const ATT_L = {present:'正常',late:'遲到',absent:'缺勤',early_leave:'早退',late_early:'遲到+早退'};
-const ATT_C = {present:'b-present',late:'b-late',absent:'b-absent',early_leave:'b-proposal',late_early:'b-overdue'};
+const ATT_C = {present:'tag tag-green',late:'tag tag-amber',absent:'tag tag-red',early_leave:'tag tag-amber',late_early:'tag tag-red'};
 
 const LEAVE_META = {
   '特別休假':{unit:'0.5天',pay:'照常給薪（勞基法§38）',rule:'依年資累計：滿0.5年3天、1年7天、2年10天、3年14天、5年15天，之後每年遞增1天，最多30天',proof:''},
@@ -5373,20 +5462,12 @@ function hrApplyPermissions(){
 
 // ── navTo HR routes 已在 renders 物件中直接加入 ──
 
-// ── HR 頁面切換 ──
-function hrRenderPage(){
-  const ts = hrG('hr-tab-salary');
-  const tr = hrG('hr-tab-report');
-  if(ts) ts.style.display = hrCanSeeSalary()?'':'none';
-  if(tr) tr.style.display = hrIsOwner()?'':'none';
-  hrRenderMembers();
-}
-
-function setHRTab(el){
-  document.querySelectorAll('.hr-tab').forEach(t=>t.classList.remove('on'));
+// ── HR tab 切換（v5 sch-tab 風格）──
+function setHRTab2(el){
+  document.querySelectorAll('#hr-tab-group .sch-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.hr-panel').forEach(p=>p.classList.remove('on'));
-  el.classList.add('on');
-  const panel = hrG('hr-'+el.dataset.ht);
+  el.classList.add('active');
+  const panel = document.getElementById('hr-'+el.dataset.ht);
   if(panel) panel.classList.add('on');
   const tab = el.dataset.ht;
   if(tab==='attendance') hrRenderAttendance();
@@ -5395,12 +5476,18 @@ function setHRTab(el){
   if(tab==='salary')     hrRenderSalary();
   if(tab==='report')     hrRenderReport();
 }
+// 相容舊版 setHRTab（保留）
+function setHRTab(el){
+  const ht = el.dataset.ht;
+  const newEl = document.querySelector(`#hr-tab-group [data-ht="${ht}"]`);
+  if(newEl) setHRTab2(newEl);
+}
 
 // ── 員工清單 ──
 function setMemberFilter(el){
   hrMemberFilter=el.dataset.mf;
-  document.querySelectorAll('[data-mf]').forEach(p=>p.classList.remove('on'));
-  el.classList.add('on');
+  document.querySelectorAll('[data-mf]').forEach(p=>{p.style.background='';p.style.color='';p.style.borderColor='';});
+  el.style.background='var(--navy)';el.style.color='#fff';el.style.borderColor='var(--navy)';
   hrRenderMembers();
 }
 function hrToggleMemberGroup(key){hrMemberGroupOpen[key]=!hrMemberGroupOpen[key];hrRenderMembers();}
@@ -5543,17 +5630,28 @@ function hrRenderAttendance(){
   const fw=hrG('att-filter-wrap');
   if(fw&&hrCanSeeAllAttendance()){
     const depts=[...new Set(D.members.filter(m=>!hrIsContractor(m)).map(m=>m.department).filter(Boolean))];
-    fw.innerHTML=`<button class="pill${hrAttDeptFilter==='all'?' on':''}" data-am="all" onclick="setAttFilter(this)">全員</button>`+depts.map(d=>`<button class="pill${hrAttDeptFilter===d?' on':''}" data-am="${d}" onclick="setAttFilter(this)">${d}</button>`).join('');
+    fw.innerHTML=`<button class="btn btn-sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" data-am="all" onclick="setAttFilter(this)">全員</button>`
+      +depts.map(d=>`<button class="btn btn-sm" data-am="${d}" onclick="setAttFilter(this)">${d}</button>`).join('');
   }
   if(hrAttDeptFilter!=='all'){const ids=D.members.filter(m=>m.department===hrAttDeptFilter).map(m=>String(m.id));recs=recs.filter(a=>ids.includes(String(a.member_id)));}
   const tbody=hrG('att-tbody');if(!tbody)return;
   if(!recs.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">本月無出勤記錄</td></tr>';return;}
   tbody.innerHTML=recs.map(a=>{const m=D.members.find(x=>String(x.id)===String(a.member_id));return`<tr><td style="font-weight:500">${m?m.name_zh:'—'}</td><td style="color:var(--text2)">${m?m.department||'—':'—'}</td><td>${hrFmtDate(a.date)}</td><td>${hrFmtTime(a.clock_in)}</td><td>${a.clock_out?hrFmtTime(a.clock_out):'—'}</td><td>${a.work_hours?Number(a.work_hours).toFixed(1)+'h':'—'}</td><td><span class="badge ${ATT_C[a.status]||'b-present'}">${ATT_L[a.status]||a.status}</span></td></tr>`;}).join('');
 }
-function setAttFilter(el){hrAttDeptFilter=el.dataset.am;document.querySelectorAll('[data-am]').forEach(p=>p.classList.remove('on'));el.classList.add('on');hrRenderAttendance();}
+function setAttFilter(el){
+  hrAttDeptFilter=el.dataset.am;
+  document.querySelectorAll('[data-am]').forEach(p=>{p.style.background='';p.style.color='';p.style.borderColor='';});
+  el.style.background='var(--navy)';el.style.color='#fff';el.style.borderColor='var(--navy)';
+  hrRenderAttendance();
+}
 
 // ── 假勤申請 ──
-function setLeaveFilter(el){hrLeaveFilter=el.dataset.lf;document.querySelectorAll('[data-lf]').forEach(p=>p.classList.remove('on'));el.classList.add('on');hrRenderLeave();}
+function setLeaveFilter(el){
+  hrLeaveFilter=el.dataset.lf;
+  document.querySelectorAll('[data-lf]').forEach(p=>{p.style.background='';p.style.color='';p.style.borderColor='';});
+  el.style.background='var(--navy)';el.style.color='#fff';el.style.borderColor='var(--navy)';
+  hrRenderLeave();
+}
 function hrRenderLeave(){
   if(myMember&&hrIsContractor(myMember)){const el=hrG('leave-list');if(el)el.innerHTML='<div class="empty-state">外包人員不適用假勤申請</div>';return;}
   const list=hrLeaveFilter==='all'?D.leave_requests:D.leave_requests.filter(l=>l.status===hrLeaveFilter);
@@ -5807,7 +5905,11 @@ async function hrLoadLogs(){
     const uniqueUsers=new Set(logs.map(l=>l.email)).size;
     const todayUsers=new Set(logs.filter(l=>l.login_at&&l.login_at.slice(0,10)===today).map(l=>l.email)).size;
     const monthCount=logs.filter(l=>l.login_at&&l.login_at.slice(0,7)===thisMonth).length;
-    const ls=hrG('log-stats');if(ls)ls.innerHTML=`<div class="stat"><div class="stat-l">總登入次數</div><div class="stat-n">${logs.length}</div></div><div class="stat"><div class="stat-l">今日登入人數</div><div class="stat-n good">${todayUsers}</div></div><div class="stat"><div class="stat-l">本月登入次數</div><div class="stat-n">${monthCount}</div></div><div class="stat"><div class="stat-l">使用帳號數</div><div class="stat-n">${uniqueUsers}</div></div>`;
+    const ls=hrG('log-stats');if(ls)ls.innerHTML=
+      `<div class="stat-card"><div class="stat-label">總登入次數</div><div class="stat-value">${logs.length}</div></div>`
+     +`<div class="stat-card" style="border-top:3px solid #16a34a"><div class="stat-label">今日登入人數</div><div class="stat-value" style="color:#16a34a">${todayUsers}</div></div>`
+     +`<div class="stat-card"><div class="stat-label">本月登入次數</div><div class="stat-value">${monthCount}</div></div>`
+     +`<div class="stat-card" style="border-top:3px solid var(--accent)"><div class="stat-label">使用帳號數</div><div class="stat-value">${uniqueUsers}</div></div>`;
     const ltb=hrG('log-tbody');if(ltb)ltb.innerHTML=logs.length?logs.map(l=>{const dt=l.login_at?new Date(l.login_at).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';return`<tr><td style="font-weight:500">${l.name||'—'}</td><td style="color:var(--text2)">${l.email||'—'}</td><td style="color:var(--text2)">${dt}</td><td>${l.device||'—'}</td><td>${l.browser||'—'}</td></tr>`;}).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">尚無登入記錄</td></tr>';
     if(ll)ll.style.display='none';if(tw)tw.style.display='block';
   }catch(e){if(ll)ll.innerHTML='<div style="color:var(--red-text);font-size:13px;text-align:center;padding:24px">載入失敗：'+e.message+'</div>';}
