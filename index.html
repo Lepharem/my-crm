@@ -1501,6 +1501,11 @@ window.loadAllData = async function(){
       });
     }
 
+    // tasks（若 GAS 有回傳則載入，否則保留現有資料）
+    if(data.tasks && Array.isArray(data.tasks)) {
+      DB.tasks = data.tasks.filter(r => r.id && r.id !== 'id');
+    }
+
     // spec_items
     const siRaw = data.spec_items || data.specItems || [];
     if(siRaw.length) DB.specItems = siRaw.filter(r => r.id && r.id !== 'id');
@@ -1555,12 +1560,35 @@ window.loadAllData = async function(){
     }
 
     renderHome();
+    // 若使用者切換到其他頁面後資料才回來，重新 render 當前頁面
     setTimeout(()=>{
       renderCatalogPage();
       renderFreelancerPage();
       renderVendorPricePage();
       renderThemePage();
       renderPermissionsPage();
+      // 重新 render 當前可見的頁面
+      const activePage = document.querySelector('.page.active');
+      if(activePage){
+        const pid = activePage.id.replace('page-','');
+        const rerenderMap = {
+          'clients': renderClients,
+          'receivable': renderReceivable,
+          'receivable-overview': renderReceivableOverview,
+          'summary': renderSummary,
+          'performance': renderPerformance,
+          'biz-schedule': renderSchedule,
+          'plan-schedule': renderSchedule2,
+          'projects': renderProjects,
+          'specs': renderSpecsPage,
+          'vendor-exec': renderVendorExec,
+          'freelancer-stats': renderFreelancerStats,
+          'exec-om': renderOmPage,
+          'exec-social': renderExecSocial,
+          'exec-ad': renderExecAd,
+        };
+        if(rerenderMap[pid]) rerenderMap[pid]();
+      }
     }, 0);
   } catch(err) {
     toast('載入失敗：' + err.message);
@@ -3366,7 +3394,16 @@ function _renderScheduleInto(contentId,deptId,statusId){
   const tasks=DB.tasks.filter(t=>(!dept||t.dept===dept)&&(!status||t.status===status));
   const groups={};
   tasks.forEach(t=>{if(!groups[t.dept])groups[t.dept]=[];groups[t.dept].push(t);});
-  if(!tasks.length){el.innerHTML=`<div class="empty-state"><p>目前無符合條件的排程</p></div>`;return;}
+  if(!tasks.length){
+    el.innerHTML=`<div class="empty-state">
+      <p style="margin-bottom:12px">目前無符合條件的排程任務</p>
+      <button class="btn btn-primary edit-only" onclick="openAddTask()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+        新增第一個任務
+      </button>
+    </div>`;
+    return;
+  }
   el.innerHTML=`
     <div style="display:flex;flex-direction:column;gap:16px">
       ${Object.entries(groups).map(([dept,dTasks])=>`
