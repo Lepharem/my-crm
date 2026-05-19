@@ -415,7 +415,7 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
 <div class="toast-wrap" id="toast-wrap"></div>
 
 <!-- SIDEBAR -->
-<div class="app" id="app">
+<div class="app" id="app" style="display:none">
 <nav class="sidebar" id="sidebar">
   <div class="sidebar-logo" onclick="goHome()">
     <div class="logo-mark">
@@ -442,6 +442,10 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
     <div class="nav-item" onclick="navTo('receivable',this)" id="nav-receivable">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
       應收帳款
+    </div>
+    <div class="nav-item" onclick="navTo('receivable-overview',this)" id="nav-receivable-overview">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      應收總覽
     </div>
   </div>
 
@@ -1234,6 +1238,30 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
       </div>
     </div>
 
+    <!-- ══ 應收總覽頁面 ══ -->
+    <div id="page-receivable-overview" class="page">
+      <div class="page-header">
+        <div class="page-title">應收總覽</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="rov-filter-client" class="filter-input" onchange="renderReceivableOverview()" style="width:140px">
+            <option value="">全部客戶</option>
+          </select>
+          <select id="rov-filter-status" class="filter-input" onchange="renderReceivableOverview()" style="width:100px">
+            <option value="">全部狀態</option>
+            <option value="未入款">未入款</option>
+            <option value="已入款">已入款</option>
+          </select>
+          <select id="rov-filter-year" class="filter-input" onchange="renderReceivableOverview()" style="width:90px">
+            <option value="">全年度</option>
+          </select>
+        </div>
+      </div>
+      <!-- 統計卡 -->
+      <div id="rov-stats" class="stats" style="margin-bottom:20px"></div>
+      <!-- 主體 -->
+      <div id="rov-body"></div>
+    </div>
+
   </div><!-- /page-area -->
 
   <!-- Mobile nav -->
@@ -1318,6 +1346,7 @@ function handleCredential(response){
   }
   _currentUser = { email, name: payload.name, picture: payload.picture };
   document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = '';
   // 更新 sidebar 顯示
   const uname = document.getElementById('sidebar-uname');
   const avatar = document.getElementById('sidebar-avatar');
@@ -1411,7 +1440,30 @@ window.loadAllData = async function(){
     }
 
     toast('資料載入完成');
-    if(typeof renderHome === 'function') renderHome();
+
+    // ── B3 修復：vendorRecords.clientId 自動補齊 ──
+    // 建立 clientName → id 的對照表（同時比 name 和 brandName）
+    if(DB.vendorRecords && DB.clients) {
+      const nameMap = {};
+      DB.clients.forEach(c => {
+        if(c.name)      nameMap[c.name.trim()]      = c.id;
+        if(c.brandName) nameMap[c.brandName.trim()]  = c.id;
+      });
+      DB.vendorRecords.forEach(vr => {
+        if(!vr.clientId && vr.clientName) {
+          vr.clientId = nameMap[vr.clientName.trim()] || '';
+        }
+      });
+    }
+
+    renderHome();
+    setTimeout(()=>{
+      renderCatalogPage();
+      renderFreelancerPage();
+      renderVendorPricePage();
+      renderThemePage();
+      renderPermissionsPage();
+    }, 0);
   } catch(err) {
     toast('載入失敗：' + err.message);
     console.error(err);
@@ -1656,7 +1708,7 @@ function navTo(id, btn){
   closeDrawer();
   closeSidebar();
   // render
-  const renders={home:renderHome,clients:renderClients,receivable:renderReceivable,'settings-catalog':renderCatalogPage,'settings-freelancer':renderFreelancerPage,'settings-vendor':renderVendorPricePage,'settings-theme':renderThemePage,'settings-permissions':renderPermissionsPage,summary:renderSummary,performance:renderPerformance,'biz-schedule':renderSchedule,'plan-schedule':renderSchedule2,projects:renderProjects,specs:renderSpecsPage,'vendor-exec':renderVendorExec,'freelancer-stats':renderFreelancerStats,'exec-om':renderOmPage,'exec-social':renderExecSocial,'exec-ad':renderExecAd,clock:function(){hrStartClock();hrLoadAttendanceStatus();},hr:hrRenderPage,logs:hrLoadLogs};
+  const renders={home:renderHome,clients:renderClients,receivable:renderReceivable,'receivable-overview':renderReceivableOverview,'settings-catalog':renderCatalogPage,'settings-freelancer':renderFreelancerPage,'settings-vendor':renderVendorPricePage,'settings-theme':renderThemePage,'settings-permissions':renderPermissionsPage,summary:renderSummary,performance:renderPerformance,'biz-schedule':renderSchedule,'plan-schedule':renderSchedule2,projects:renderProjects,specs:renderSpecsPage,'vendor-exec':renderVendorExec,'freelancer-stats':renderFreelancerStats,'exec-om':renderOmPage,'exec-social':renderExecSocial,'exec-ad':renderExecAd,clock:function(){hrStartClock();hrLoadAttendanceStatus();},hr:hrRenderPage,logs:hrLoadLogs};
   if(renders[id])renders[id]();
 }
 function goHome(){navTo('home',document.getElementById('nav-home'));}
@@ -4985,19 +5037,190 @@ function renderSettings(tab){ if(tab==='catalog')renderCatalogPage(); }
 
 
 // ─── INIT ─────────────────────────────────────────────────────────
-renderHome();
-// Pre-render all settings pages so data shows immediately on first visit
-setTimeout(()=>{
-  renderCatalogPage();
-  renderFreelancerPage();
-  renderVendorPricePage();
-  renderThemePage();
-  renderPermissionsPage();
-}, 0);
+// renders 在 loadAllData() 完成後執行，此處不提前渲染
 
 // ═══════════════════════════════════════════════════
-// ══  HR 模組（打卡 / 人資 / 假勤 / 薪資 / 登入紀錄）══
+// ══  應收總覽（客戶 × 合約 × 期次 × 發票）══
 // ═══════════════════════════════════════════════════
+
+function renderReceivableOverview(){
+  const clientSel = document.getElementById('rov-filter-client');
+  const statusSel = document.getElementById('rov-filter-status');
+  const yearSel   = document.getElementById('rov-filter-year');
+  if(!clientSel) return;
+
+  // 建立客戶下拉（第一次進入時填充）
+  if(clientSel.options.length <= 1){
+    DB.clients.forEach(c=>{
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      clientSel.appendChild(o);
+    });
+  }
+
+  // 建立年份下拉
+  if(yearSel.options.length <= 1){
+    const years = [...new Set(
+      DB.receivables.flatMap(r=>r.payments||[])
+        .map(p=>p.dueDate?.slice(0,4))
+        .filter(Boolean)
+    )].sort().reverse();
+    years.forEach(y=>{
+      const o = document.createElement('option');
+      o.value = y; o.textContent = y+'年';
+      yearSel.appendChild(o);
+    });
+  }
+
+  const fClient = clientSel.value;
+  const fStatus = statusSel.value;
+  const fYear   = yearSel.value;
+
+  // 攤平所有期次（含合約和客戶資訊）
+  const rows = [];
+  DB.receivables.forEach(ra=>{
+    const ct = DB.contracts.find(x=>x.id===ra.contractId) || {};
+    const cl = DB.clients.find(x=>x.id===ra.clientId) || {};
+    (ra.payments||[]).forEach(p=>{
+      rows.push({
+        clientId: ra.clientId, clientName: cl.name||'—',
+        contractId: ra.contractId, contractNo: ra.contractNo||ct.contractNo||'',
+        contractName: ct.name||'', contractTotal: ct.total||0,
+        payMethod: ct.payMethod||'', contractNote: ct.note||'',
+        period: p.period, dueDate: p.dueDate||'',
+        amount: p.amount||0, paidDate: p.paidDate||'',
+        status: p.status||'未入款',
+        invoiceNumber: p.invoiceNumber||'', invoiceType: p.invoiceType||'',
+        invoiceDate: p.invoiceDate||'',
+      });
+    });
+  });
+
+  // 套用篩選
+  const filtered = rows.filter(r=>{
+    if(fClient && r.clientId !== fClient) return false;
+    if(fStatus && r.status !== fStatus) return false;
+    if(fYear && r.dueDate.slice(0,4) !== fYear) return false;
+    return true;
+  });
+
+  // 統計卡
+  const totalAmt   = filtered.reduce((s,r)=>s+r.amount, 0);
+  const paidAmt    = filtered.filter(r=>r.status==='已入款').reduce((s,r)=>s+r.amount, 0);
+  const unpaidAmt  = filtered.filter(r=>r.status==='未入款').reduce((s,r)=>s+r.amount, 0);
+  const today = new Date().toISOString().slice(0,10);
+  const overdueAmt = filtered.filter(r=>r.status==='未入款' && r.dueDate && r.dueDate < today).reduce((s,r)=>s+r.amount, 0);
+  const paidRate   = totalAmt ? Math.round(paidAmt/totalAmt*100) : 0;
+
+  const statsEl = document.getElementById('rov-stats');
+  statsEl.innerHTML = `
+    <div class="stat"><div class="stat-l">應收總額</div><div class="stat-n">NT$ ${totalAmt.toLocaleString()}</div></div>
+    <div class="stat"><div class="stat-l">已入款</div><div class="stat-n good">NT$ ${paidAmt.toLocaleString()}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">收款率 ${paidRate}%</div></div>
+    <div class="stat"><div class="stat-l">未入款</div><div class="stat-n warn">NT$ ${unpaidAmt.toLocaleString()}</div></div>
+    <div class="stat"><div class="stat-l">逾期未收</div><div class="stat-n danger">NT$ ${overdueAmt.toLocaleString()}</div></div>
+  `;
+
+  // 主體：依客戶 → 合約分組
+  const bodyEl = document.getElementById('rov-body');
+  if(!filtered.length){ bodyEl.innerHTML='<div class="empty-state">無符合條件的資料</div>'; return; }
+
+  // 依客戶分組
+  const byClient = {};
+  filtered.forEach(r=>{
+    if(!byClient[r.clientId]) byClient[r.clientId]={name:r.clientName, contracts:{}};
+    const key = r.contractId;
+    if(!byClient[r.clientId].contracts[key])
+      byClient[r.clientId].contracts[key]={
+        contractNo:r.contractNo, contractName:r.contractName,
+        contractTotal:r.contractTotal, payMethod:r.payMethod,
+        contractNote:r.contractNote, rows:[]
+      };
+    byClient[r.clientId].contracts[key].rows.push(r);
+  });
+
+  const fmt = n => n ? 'NT$ '+Number(n).toLocaleString() : '—';
+  const statusBadge = s => {
+    if(s==='已入款') return `<span class="badge b-active" style="font-size:11px">已入款</span>`;
+    if(s==='未入款') return `<span class="badge b-unpaid" style="font-size:11px">未入款</span>`;
+    return `<span class="badge" style="font-size:11px">${s}</span>`;
+  };
+
+  let html = '';
+  Object.values(byClient).forEach(({name, contracts})=>{
+    const clientTotal   = Object.values(contracts).reduce((s,ct)=>s+ct.rows.reduce((a,r)=>a+r.amount,0),0);
+    const clientPaid    = Object.values(contracts).reduce((s,ct)=>s+ct.rows.filter(r=>r.status==='已入款').reduce((a,r)=>a+r.amount,0),0);
+    const clientUnpaid  = clientTotal - clientPaid;
+
+    html += `<div class="cc" style="margin-bottom:12px">
+      <div class="cc-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="av" style="background:var(--accent-bg,#e1f5ee);color:var(--accent-text,#085041);width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${name.slice(0,2)}</div>
+        <div class="ci"><div class="cn">${name}</div>
+          <div class="cm">應收 ${fmt(clientTotal)}・已收 <span style="color:#0f6e56">${fmt(clientPaid)}</span>・待收 <span style="color:#854f0b">${fmt(clientUnpaid)}</span></div>
+        </div>
+        <svg class="chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="cc-detail" style="padding:0">`;
+
+    Object.values(contracts).forEach(ct=>{
+      const ctPaid   = ct.rows.filter(r=>r.status==='已入款').reduce((s,r)=>s+r.amount,0);
+      const ctUnpaid = ct.rows.filter(r=>r.status==='未入款').reduce((s,r)=>s+r.amount,0);
+      const ctOverdue= ct.rows.filter(r=>r.status==='未入款'&&r.dueDate&&r.dueDate<today).length;
+
+      html += `<div style="padding:14px 16px;border-bottom:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <div style="font-size:13px;font-weight:600">${ct.contractName}</div>
+          <div style="font-size:12px;color:var(--text3)">${ct.contractNo}</div>
+          <div style="font-size:12px;color:var(--text2)">${ct.payMethod}</div>
+          ${ctOverdue?`<span class="badge b-overdue" style="font-size:11px">${ctOverdue} 期逾期</span>`:''}
+          <div style="margin-left:auto;font-size:12px;color:var(--text2)">合約總額 <b>${fmt(ct.contractTotal)}</b></div>
+        </div>
+        ${ct.contractNote?`<div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg2);border-radius:var(--r)">${ct.contractNote}</div>`:''}
+        <div class="table-wrap" style="margin-bottom:0">
+          <table class="ptable">
+            <thead><tr>
+              <th style="width:48px">期次</th><th>應收金額</th><th>到期日</th>
+              <th>入款日</th><th>狀態</th><th>發票號碼</th><th>發票類型</th><th>發票日期</th>
+            </tr></thead>
+            <tbody>`;
+
+      ct.rows.sort((a,b)=>a.period-b.period).forEach(r=>{
+        const isOverdue = r.status==='未入款' && r.dueDate && r.dueDate < today;
+        const rowStyle  = isOverdue ? 'background:var(--red-bg,#fcebeb)' : (r.status==='已入款'?'background:#f0fdf4':'');
+        html += `<tr style="${rowStyle}">
+          <td style="text-align:center;font-weight:500">${r.period}</td>
+          <td style="font-weight:600">${fmt(r.amount)}</td>
+          <td style="color:${isOverdue?'var(--red-text)':'var(--text2)'}">${r.dueDate||'—'}</td>
+          <td style="color:var(--text2)">${r.paidDate||'—'}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td style="font-size:12px">${r.invoiceNumber||'—'}</td>
+          <td style="font-size:12px;color:var(--text2)">${r.invoiceType||'—'}</td>
+          <td style="font-size:12px;color:var(--text2)">${r.invoiceDate||'—'}</td>
+        </tr>`;
+      });
+
+      html += `</tbody>
+            <tfoot><tr style="background:var(--bg2)">
+              <td style="font-weight:600;text-align:right;padding-right:8px" colspan="1">小計</td>
+              <td style="font-weight:600">${fmt(ctPaid+ctUnpaid)}</td>
+              <td colspan="2"></td>
+              <td><span style="font-size:11px;color:#0f6e56">已收 ${fmt(ctPaid)}</span><br><span style="font-size:11px;color:#854f0b">待收 ${fmt(ctUnpaid)}</span></td>
+              <td colspan="3"></td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  bodyEl.innerHTML = html;
+
+  // 預設展開所有客戶卡
+  document.querySelectorAll('#rov-body .cc').forEach(el=>el.classList.add('open'));
+}
+
+
 
 // ── HR 全域資料（D 物件，與 CRM 的 DB 並存）──
 let D = {
