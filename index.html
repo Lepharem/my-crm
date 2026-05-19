@@ -373,8 +373,42 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
 .leave-info-card{background:var(--accent-bg,#e1f5ee);border:0.5px solid var(--accent,#0f6e56);border-radius:var(--r);padding:12px 14px;margin-bottom:12px;font-size:13px;color:var(--accent-text,#085041);display:none}
 .leave-info-card.show{display:block}
 .fin-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
-.month-nav-hr button{padding:6px 10px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:13px;cursor:pointer}
+.month-nav-hr button{padding:4px 8px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:13px;line-height:1;cursor:pointer;font-family:inherit}
 .month-nav-hr{display:flex;align-items:center;gap:6px}
+/* ── 應收總覽：cc card 系列 ── */
+.cc{background:var(--surface);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.cc-header{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none}
+.cc-header:hover{background:var(--surface2,var(--bg2))}
+.cc.open>.cc-header{border-bottom:1px solid var(--border2)}
+.cc-detail{display:none}
+.cc.open>.cc-detail{display:block}
+.cc .chevron{width:16px;height:16px;opacity:.4;transition:transform .2s;flex-shrink:0}
+.cc.open .chevron{transform:rotate(180deg)}
+.ci{flex:1;min-width:0}
+.cn{font-size:14px;font-weight:600;color:var(--text)}
+.cm{font-size:12px;color:var(--text3);margin-top:2px}
+/* ── 共用 stat / badge / table 補定義（應收總覽使用）── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:14px 16px}
+.stat-l{font-size:11px;color:var(--text3);margin-bottom:4px}
+.stat-n{font-size:22px;font-weight:600;color:var(--text)}
+.good{color:#16a34a}.warn{color:#b45309}.danger{color:#dc2626}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;white-space:nowrap}
+.b-active{background:#dcfce7;color:#15803d}
+.b-unpaid{background:#dbeafe;color:#1d4ed8}
+.b-overdue{background:#fee2e2;color:#dc2626}
+.b-pending{background:#fef9c3;color:#a16207}
+.b-approved{background:#dcfce7;color:#15803d}
+.b-rejected{background:#fee2e2;color:#dc2626}
+.b-present{background:#dcfce7;color:#15803d}
+.b-late{background:#fef9c3;color:#a16207}
+.b-proposal{background:#ede9fe;color:#6d28d9}
+.ptable{width:100%;border-collapse:collapse;font-size:13px}
+.ptable th{text-align:left;padding:9px 12px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border2);white-space:nowrap}
+.ptable td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ptable tr:last-child td{border-bottom:none}
+.ptable tr:hover td{background:var(--surface2,var(--bg2))}
+.sec-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:10px}
 .month-label-hr{font-size:15px;font-weight:500;min-width:80px;text-align:center}
 .report-table-wrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:16px}
 .report-header{padding:16px 20px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
