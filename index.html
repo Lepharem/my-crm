@@ -1463,17 +1463,55 @@ window.loadAllData = async function(){
       DB.contracts = valid;
     }
 
-    // receivables (v5 格式 - 含 payments 子陣列)
-    if(data.receivables) DB.receivables = data.receivables.filter(r => r.contractId && r.contractId !== 'client_id');
+    // receivables：GAS 回傳 contract_payments（平面列表），需轉換成帶 payments[] 子陣列的格式
+    const cpRaw = data.contract_payments || data.receivables || [];
+    if(cpRaw.length) {
+      // 依 (contractId, clientId, contractNo) 分組
+      const raMap = {};
+      cpRaw.forEach(row => {
+        if(!row.id || row.id === 'id') return;
+        const key = row.contractId || row.contract_id || '';
+        if(!key) return;
+        if(!raMap[key]) raMap[key] = {
+          id: key,
+          contractId: key,
+          clientId:   row.clientId   || row.client_id   || '',
+          contractNo: row.contractNo || row.contract_no  || '',
+          signDate:   row.signDate   || row.sign_date    || '',
+          amount: 0, tax: 0, total: 0, note: '',
+          payments: []
+        };
+        const amt = Number(row.amount) || 0;
+        raMap[key].payments.push({
+          period:        Number(row.period)  || raMap[key].payments.length + 1,
+          dueDate:       (row.dueDate   || row.due_date   || '').slice(0,10),
+          amount:        amt,
+          paidDate:      (row.paidDate  || row.paid_date  || '').slice(0,10),
+          status:        row.status     || '未入款',
+          invoiceNumber: row.invoiceNumber || row.invoice_number || '',
+          invoiceType:   row.invoiceType   || row.invoice_type   || '',
+          invoiceDate:   (row.invoiceDate  || row.invoice_date   || '').slice(0,10),
+        });
+        raMap[key].total += amt;
+      });
+      // 每組 payments 依 period 排序
+      DB.receivables = Object.values(raMap).map(ra => {
+        ra.payments.sort((a,b) => a.period - b.period);
+        return ra;
+      });
+    }
 
     // spec_items
-    if(data.spec_items) DB.specItems = data.spec_items.filter(r => r.id && r.id !== 'id');
+    const siRaw = data.spec_items || data.specItems || [];
+    if(siRaw.length) DB.specItems = siRaw.filter(r => r.id && r.id !== 'id');
 
     // vendor_records
-    if(data.vendor_records) DB.vendorRecords = data.vendor_records.filter(r => r.id);
+    const vrRaw = data.vendor_records || data.vendorRecords || [];
+    if(vrRaw.length) DB.vendorRecords = vrRaw.filter(r => r.id);
 
     // freelancer_records
-    if(data.freelancer_records) DB.freelancerRecords = data.freelancer_records.filter(r => r.id);
+    const frRaw = data.freelancer_records || data.freelancerRecords || [];
+    if(frRaw.length) DB.freelancerRecords = frRaw.filter(r => r.id);
 
     // om / social / ad
     if(data.om_records) DB.omRecords = data.om_records.filter(r => r.id);
@@ -2118,8 +2156,17 @@ function openClientDrawer(clientId){
           <div class="card" style="margin-bottom:10px">
             <div class="card-body">
               <div class="flex items-center gap-2" style="margin-bottom:8px">
-                <div style="font-size:14px;font-weight:600;flex:1">${ct.name}</div>
+                <div style="flex:1">
+                  <div style="font-size:14px;font-weight:600">${ct.name}</div>
+                  ${ct.contractNo?`<div style="font-size:11px;color:var(--accent);font-weight:500;margin-top:2px;font-family:var(--font-mono)">${ct.contractNo}</div>`:''}
+                </div>
                 <span class="tag ${ct.status==='進行中'?'tag-green':'tag-gray'}">${ct.status}</span>
+                ${ct.driveLink?`<a href="${ct.driveLink}" target="_blank" class="btn btn-xs" style="background:var(--blue-bg);color:var(--blue-text);border-color:transparent;text-decoration:none">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
+                  </svg>查看合約</a>`
+                :`<button class="btn btn-xs edit-only" style="color:var(--text3)" onclick="openEditContract('${ct.id}',true)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>補上連結</button>`}
                 <button class="btn btn-xs edit-only" onclick="openEditContract('${ct.id}')">編輯</button>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
@@ -2127,6 +2174,7 @@ function openClientDrawer(clientId){
                 <div><span style="color:var(--text3)">金額：</span><strong>${fmt(ct.total)}</strong></div>
                 <div><span style="color:var(--text3)">付款：</span>${ct.payMethod||'—'}</div>
               </div>
+              ${ct.note?`<div style="margin-top:6px;font-size:11px;color:var(--text3)">${ct.note}</div>`:''}
             </div>
           </div>`).join('')||'<div class="empty-state"><p>尚無合約資料</p></div>'}
       </div>
@@ -2388,6 +2436,10 @@ function openEditContract(contractId){
       <select class="form-input" id="f-status">${['進行中','完成','暫停','結束合約'].map(s=>`<option ${s===ct.status?'selected':''}>${s}</option>`).join('')}</select>
     </div>
     <div class="form-group"><label class="form-label">備註</label><textarea class="form-input" id="f-note">${ct.note||''}</textarea></div>
+    <div class="form-group"><label class="form-label">Google Drive 合約連結</label>
+      <input class="form-input" id="f-drive" placeholder="貼上 Google Drive 分享連結" value="${ct.driveLink||''}">
+      ${ct.driveLink?`<a href="${ct.driveLink}" target="_blank" style="font-size:11px;color:var(--accent);margin-top:4px;display:inline-block">↗ 預覽目前連結</a>`:''}
+    </div>
   `,async ()=>{
     ct.name=document.getElementById('f-cname').value.trim()||ct.name;
     ct.start=document.getElementById('f-start').value;ct.end=document.getElementById('f-end').value;
@@ -2397,6 +2449,7 @@ function openEditContract(contractId){
     ct.signDate=document.getElementById('f-sign').value;
     ct.status=document.getElementById('f-status').value;
     ct.note=document.getElementById('f-note').value;
+    ct.driveLink=document.getElementById('f-drive').value.trim();
     
     closeModal();openClientDrawer(ct.clientId);toast('合約已更新','success');
   });
@@ -3146,7 +3199,7 @@ function renderSummary(){
       const statusClass = isCompleted ? 'tag-gray' : ({'進行中':'tag-green','完成':'tag-blue','暫停':'tag-amber','結束合約':'tag-gray'}[ct.status] || 'tag-gray');
       ctRows += `<tr>
         <td style="font-size:12px;color:var(--text3);padding-left:28px">${ct.name}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${ct.contractNo || '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${ct.driveLink?`<a href="${ct.driveLink}" target="_blank" style="color:var(--accent);text-decoration:none;display:flex;align-items:center;gap:3px">${ct.contractNo||'—'}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;opacity:.6"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:ct.contractNo||'—'}</td>
         <td style="text-align:right">${fmt(ct.total)}</td>
         <td style="text-align:right;color:#16a34a">${fmt(rec)}</td>
         <td style="min-width:120px"><div class="flex items-center gap-2"><div class="progress-wrap" style="flex:1"><div class="progress-fill ${isCompleted?'green':''}" style="width:${Math.min(100,Math.round(p*100))}%"></div></div><span style="font-size:11px">${pct(p)}</span></div></td>
