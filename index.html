@@ -1453,6 +1453,8 @@ window.loadAllData = async function(){
   try {
     toast('資料載入中...');
     const data = await gasApi('getAll');
+    console.log('GAS getAll keys:', Object.keys(data));
+    console.log('clients:', (data.clients||[]).length, 'contracts:', (data.contracts||[]).length, 'contract_payments:', (data.contract_payments||[]).length);
 
     // clients - 過濾掉 header 列
     if(data.clients) DB.clients = data.clients.filter(r => r.id && r.id !== 'id');
@@ -3120,7 +3122,28 @@ DB.vendorCompanies.push({
 // ═══ SUMMARY ═══
 function renderSummary(){
   const el=document.getElementById('summary-content');if(!el)return;
-  const fc=document.getElementById('sm-client')?.value||'';
+
+  // ── 診斷：顯示目前 DB 狀態 ──
+  if(!DB.clients.length || !DB.contracts.length){
+    el.innerHTML=`<div style="padding:24px;background:#fef9c3;border-radius:10px;margin-bottom:16px;font-size:13px">
+      <div style="font-weight:600;margin-bottom:8px;color:#854d0e">⚠️ 資料尚未載入</div>
+      <div>clients: <b>${DB.clients.length}</b> 筆 &nbsp;|&nbsp; contracts: <b>${DB.contracts.length}</b> 筆 &nbsp;|&nbsp; receivables: <b>${DB.receivables.length}</b> 筆</div>
+      <div style="margin-top:8px">
+        <button onclick="loadAllData()" style="padding:6px 14px;background:#0f6e56;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">重新載入資料</button>
+      </div>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;color:#854d0e">查看 DB 原始內容（診斷用）</summary>
+        <pre style="font-size:10px;margin-top:6px;overflow:auto;max-height:200px">${JSON.stringify({
+          clientsCount: DB.clients.length,
+          contractsCount: DB.contracts.length,
+          receivablesCount: DB.receivables.length,
+          firstClient: DB.clients[0]||null,
+          firstContract: DB.contracts[0]||null,
+        }, null, 2)}</pre>
+      </details>
+    </div>`;
+    return;
+  }
   const fy=document.getElementById('sm-fy')?.value||'';
   const fm=document.getElementById('sm-fm')?.value||'';
 
