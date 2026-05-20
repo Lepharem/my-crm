@@ -2302,6 +2302,7 @@ function openClientDrawer(clientId){
           <span style="font-size:13px;font-weight:600">${specs.length} 項規格</span>
           <span style="font-size:12px;color:var(--text3)">合計 ${fmt(totalSpec)}</span>
           <div class="ml-auto flex gap-2">
+            ${specs.filter(s=>!s.contractId).length?`<button class="btn btn-sm edit-only" style="color:var(--amber);border-color:var(--amber)" onclick="openAssignContract('${clientId}')">⚠ ${specs.filter(s=>!s.contractId).length}筆未串合約</button>`:''}
             <button class="btn btn-sm edit-only" onclick="openPickCatalog('${clientId}')">從報價總表選取</button>
             <button class="btn btn-sm btn-primary edit-only" onclick="openAddSpec('${clientId}')">＋ 新增</button>
           </div>
@@ -2747,42 +2748,152 @@ function saveSpec(specId,clientId){
   closeModal();openClientDrawer(clientId);toast(specId?'規格已更新':'規格已新增','success');
 }
 
-function openPickCatalog(clientId){
-  const catHtml=['口碑','社群','廣告','其他'].map(cat=>{
-    const items=DB.serviceCatalog.filter(x=>x.category===cat);
-    if(!items.length)return'';
-    const itemHtml=items.map(item=>{
-      return'<label style="display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--r);padding:5px 10px;cursor:pointer;font-size:12px;background:var(--surface2)">'
-        +'<input type="checkbox" id="cp-'+item.id+'" value="'+item.id+'">'
-        +'<span style="font-weight:500">'+item.name+'</span>'
-        +'<span style="color:var(--text3)">'+item.unit+'</span>'
-        +'<span style="color:var(--amber)">'+(item.price?fmt(item.price):'議價')+'</span>'
-        +'</label>';
-    }).join('');
-    return'<div style="margin-bottom:14px">'
-      +'<div style="font-size:12px;font-weight:600;margin-bottom:6px">'+cat+'</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'+itemHtml+'</div></div>';
-  }).join('');
-  const formHtml='<div style="font-size:12px;color:var(--text3);margin-bottom:12px">勾選後可再調整數量與成本</div>'
-    +catHtml
-    +'<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">'
-    +'<div class="form-row">'
-    +'<div class="form-group"><label class="form-label">預設數量</label><input class="form-input" type="number" id="cp-qty" value="1"></div>'
-    +'<div class="form-group"><label class="form-label">外部成本（選填）</label><input class="form-input" type="number" id="cp-ext" placeholder="0"></div>'
-    +'</div></div>';
-  openModal('從報價總表選取',formHtml,()=>{
-    const qty=Number(document.getElementById('cp-qty')?.value)||1;
-    const ext=Number(document.getElementById('cp-ext')?.value)||0;
-    let added=0;
-    DB.serviceCatalog.forEach(item=>{
-      if(document.getElementById('cp-'+item.id)?.checked){
-        DB.specItems.push({id:nextId('S'),clientId,contractId:'',category:item.category,name:item.name,spec:item.spec||'',qty,unit:item.unit||'篇',price:item.price||0,extCost:ext,intCost:0,cost:ext,costDetail:{},totalPrice:qty*(item.price||0),totalCost:qty*ext});
-        added++;
-      }
+// ── 批次補串合約（針對 contractId 為空的規格）──
+function openAssignContract(clientId){
+  const unlinked = DB.specItems.filter(s => s.clientId === clientId && !s.contractId);
+  if(!unlinked.length){ toast('此客戶所有規格已串合約'); return; }
+  const contracts = DB.contracts.filter(c => c.clientId === clientId);
+  if(!contracts.length){ toast('此客戶尚無合約，請先新增合約'); return; }
+
+  const contractOpts = contracts.map(c =>
+    `<option value="${c.id}">${c.contractNo||c.name}（${(c.start||'').slice(0,7)}～${(c.end||'').slice(0,7)}）</option>`
+  ).join('');
+
+  const specRows = unlinked.map(s =>
+    `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <input type="checkbox" id="asc-${s.id}" checked>
+      <span class="tag ${ {'口碑':'tag-blue','社群':'tag-green','廣告':'tag-amber'}[s.category]||'tag-gray'}" style="font-size:10px">${s.category}</span>
+      <span style="flex:1;font-size:12px;font-weight:500">${s.name}</span>
+      <span style="font-size:11px;color:var(--text3)">${s.qty} ${s.unit}</span>
+    </div>`
+  ).join('');
+
+  openModal('批次串連合約',`
+    <div style="background:var(--amber-bg);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--amber);margin-bottom:14px">
+      以下 ${unlinked.length} 筆規格尚未串連合約，請選擇要對應的合約後確認。
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">對應合約</label>
+      <select class="form-input" id="asc-contract"><option value="">— 請選擇 —</option>${contractOpts}</select>
+    </div>
+    <div style="max-height:45vh;overflow-y:auto">${specRows}</div>
+  `, async () => {
+    const contractId = document.getElementById('asc-contract')?.value;
+    if(!contractId){ alert('請選擇合約'); return; }
+    let updated = 0;
+    const toUpdate = [];
+    unlinked.forEach(s => {
+      if(!document.getElementById('asc-'+s.id)?.checked) return;
+      s.contractId = contractId;
+      s.totalPrice = s.qty * (s.price || 0);
+      s.totalCost  = s.qty * ((s.extCost||0) + (s.intCost||0));
+      toUpdate.push(s);
+      updated++;
     });
-    if(!added)return alert('請至少選取一個項目');
-    closeModal();openClientDrawer(clientId);toast('已匯入 '+added+' 項規格','success');
-  },true);
+    if(!updated){ alert('請至少勾選一筆'); return; }
+    try {
+      await Promise.all(toUpdate.map(d => gasApi('saveSpecItem', d)));
+      toast(`已將 ${updated} 筆規格串連合約並同步`, 'success');
+    } catch(e) {
+      toast(`已更新 ${updated} 筆（同步失敗：${e.message}）`, 'warning');
+    }
+    closeModal(); openClientDrawer(clientId);
+  });
+}
+
+function openPickCatalog(clientId, preContractId){
+  // 取得客戶的合約清單
+  const clientContracts = DB.contracts.filter(c => c.clientId === clientId);
+  const contractOpts = clientContracts.map(c =>
+    `<option value="${c.id}"${preContractId===c.id?' selected':''}>${c.contractNo||c.name}</option>`
+  ).join('');
+
+  const catHtml = ['口碑','社群','廣告','其他'].map(cat => {
+    const items = DB.serviceCatalog.filter(x => x.category === cat);
+    if(!items.length) return '';
+    // 每個項目：checkbox + 名稱 + 數量輸入 + 成本（預帶 freelancerCost）
+    const itemHtml = items.map(item => {
+      const defaultCost = (item.freelancerCost||0) + (item.vendorCost||0);
+      return `<div style="display:grid;grid-template-columns:1fr 80px 90px;align-items:center;gap:8px;border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;background:var(--surface2);margin-bottom:4px">
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;min-width:0">
+          <input type="checkbox" id="cp-${item.id}" value="${item.id}" onchange="cpToggleRow('${item.id}')">
+          <div style="min-width:0">
+            <div style="font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
+            <div style="font-size:10px;color:var(--text3)">${item.unit} · ${item.price?fmt(item.price):'議價'}</div>
+          </div>
+        </label>
+        <input type="number" id="cpq-${item.id}" class="form-input" style="opacity:.4;pointer-events:none;font-size:12px;padding:4px 6px;text-align:center" placeholder="數量" min="1" value="1">
+        <input type="number" id="cpc-${item.id}" class="form-input" style="opacity:.4;pointer-events:none;font-size:12px;padding:4px 6px;text-align:right" placeholder="外包成本" value="${defaultCost||''}">
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:8px">
+        ${cat}
+        <button type="button" onclick="cpSelectCat('${cat}',true)" style="font-size:10px;padding:1px 7px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer">全選</button>
+        <button type="button" onclick="cpSelectCat('${cat}',false)" style="font-size:10px;padding:1px 7px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer">取消</button>
+      </div>
+      ${itemHtml}
+    </div>`;
+  }).join('');
+
+  const formHtml = `
+    <div style="background:var(--blue-bg);border-radius:var(--r);padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--blue-text)">
+      勾選項目後，數量和外包成本欄位會啟用。外包成本已預帶服務報價的預設成本，可手動調整。
+    </div>
+    ${clientContracts.length ? `<div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">關聯合約（必選）</label>
+      <select class="form-input" id="cp-contract"><option value="">— 請選擇合約 —</option>${contractOpts}</select>
+    </div>` : '<div style="padding:8px 12px;background:var(--amber-bg);border-radius:var(--r);font-size:12px;color:var(--amber);margin-bottom:14px">此客戶尚無合約，規格將不關聯合約</div>'}
+    <div style="max-height:55vh;overflow-y:auto;padding-right:4px">${catHtml}</div>`;
+
+  openModal('批次新增規格項目', formHtml, async () => {
+    const contractId = document.getElementById('cp-contract')?.value || '';
+    let added = 0;
+    const toSave = [];
+    DB.serviceCatalog.forEach(item => {
+      if(!document.getElementById('cp-'+item.id)?.checked) return;
+      const qty = Number(document.getElementById('cpq-'+item.id)?.value) || 1;
+      const extCost = Number(document.getElementById('cpc-'+item.id)?.value) || 0;
+      const newItem = {
+        id: nextId('S'), clientId, contractId,
+        category: item.category, name: item.name,
+        spec: item.spec || '', qty, unit: item.unit || '篇',
+        price: item.price || 0, extCost, intCost: 0, cost: extCost,
+        costDetail: {}, totalPrice: qty * (item.price || 0), totalCost: qty * extCost
+      };
+      DB.specItems.push(newItem);
+      toSave.push(newItem);
+      added++;
+    });
+    if(!added){ alert('請至少勾選一個項目'); return; }
+    // 批次存入 GAS
+    if(toSave.length){
+      try{
+        await Promise.all(toSave.map(d => gasApi('saveSpecItem', d)));
+        toast(`已新增 ${added} 項規格並同步至資料庫`, 'success');
+      } catch(e){
+        toast(`已新增 ${added} 項規格（同步失敗：${e.message}）`, 'warning');
+      }
+    }
+    closeModal(); openClientDrawer(clientId);
+  }, true);
+}
+
+// 勾選/取消時啟用/停用該列輸入
+function cpToggleRow(itemId){
+  const checked = document.getElementById('cp-'+itemId)?.checked;
+  const qEl = document.getElementById('cpq-'+itemId);
+  const cEl = document.getElementById('cpc-'+itemId);
+  if(qEl){ qEl.style.opacity = checked?'1':'0.4'; qEl.style.pointerEvents = checked?'auto':'none'; }
+  if(cEl){ cEl.style.opacity = checked?'1':'0.4'; cEl.style.pointerEvents = checked?'auto':'none'; }
+}
+
+// 類別全選/取消
+function cpSelectCat(cat, select){
+  DB.serviceCatalog.filter(x=>x.category===cat).forEach(item=>{
+    const cb = document.getElementById('cp-'+item.id);
+    if(cb){ cb.checked = select; cpToggleRow(item.id); }
+  });
 }
 
 // ═══ RECEIVABLE ═══
