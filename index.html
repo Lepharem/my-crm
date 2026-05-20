@@ -3685,6 +3685,128 @@ function clearSpFilters(){['sp-client','sp-month-start','sp-month-end','specs-ca
 
 function renderSpecsPage(){
   const el=document.getElementById('specs-content');if(!el)return;
+  const spClient=document.getElementById('sp-client');
+  if(spClient&&spClient.options.length===1){DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;spClient.appendChild(o);});}
+  const cat=document.getElementById('specs-category')?.value||'';
+  const clientId=document.getElementById('sp-client')?.value||'';
+  const msStart=document.getElementById('sp-month-start')?.value||'';
+  const msEnd=document.getElementById('sp-month-end')?.value||'';
+  const curMonth=new Date().toISOString().slice(0,7);
+
+  // 進行中合約
+  const activeContracts=DB.contracts.filter(ct=>
+    ct.status==='進行中'&&(!clientId||ct.clientId===clientId)
+  );
+  if(!activeContracts.length){
+    el.innerHTML=`<div style="padding:24px"><div class="empty-state"><p>目前無進行中的合約</p></div></div>`;return;
+  }
+
+  // 計算合約月數（用於每月量推算）
+  function contractMonths(ct){
+    if(!ct.start||!ct.end)return 1;
+    const s=new Date(ct.start),e=new Date(ct.end);
+    return Math.max(1,Math.round((e-s)/(1000*60*60*24*30)));
+  }
+
+  // 從執行記錄算實際已執行量（依 specId 精確比對，fallback 用 clientId+name 模糊）
+  function getActual(spec,filterMonth){
+    const matchRec=(recs)=>recs.filter(r=>{
+      if(r.specId&&r.specId===spec.id)return true;
+      if(r.contractId===spec.contractId&&(r.specType===spec.name||r.item===spec.name||r.specType?.includes(spec.name)))return true;
+      return false;
+    });
+    const omFiltered=matchRec(DB.omRecords||[]).filter(r=>!filterMonth||(r.publishDate||'').slice(0,7)===filterMonth);
+    const scFiltered=matchRec(DB.socialRecords||[]).filter(r=>!filterMonth||(r.postDate||'').slice(0,7)===filterMonth);
+    const adFiltered=matchRec(DB.adRecords||[]).filter(r=>!filterMonth||(r.date||'').slice(0,7)===filterMonth);
+    return omFiltered.length+scFiltered.length+adFiltered.length;
+  }
+
+  const catColors={'口碑':'tag-blue','社群':'tag-green','廣告':'tag-amber','其他':'tag-gray'};
+  let html='<div style="padding:20px 24px 32px">';
+
+  // 頂部月份篩選說明
+  html+=`<div style="font-size:12px;color:var(--text3);margin-bottom:16px;display:flex;align-items:center;gap:12px">
+    <span>篩選月份可查看單月執行進度；空白則顯示全約累計</span>
+    <span style="font-family:var(--font-mono);background:var(--surface2);padding:2px 8px;border-radius:4px;border:1px solid var(--border)">當前月份：${curMonth}</span>
+  </div>`;
+
+  activeContracts.forEach(ct=>{
+    if(cat&&!DB.specItems.some(s=>s.contractId===ct.id&&s.category===cat))return;
+    const c=DB.clients.find(x=>x.id===ct.clientId);
+    const cname=c?c.name:'—';
+    const mos=contractMonths(ct);
+    const specs=DB.specItems.filter(s=>s.contractId===ct.id&&(!cat||s.category===cat));
+
+    html+=`<div style="margin-bottom:28px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <div style="padding:14px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-weight:600;font-size:13px">${cname}</span>
+        <span style="font-size:12px;color:var(--text3)">·</span>
+        <span style="font-size:12px;color:var(--text2)">${ct.name}</span>
+        ${ct.contractNo?`<span style="font-size:11px;font-family:var(--font-mono);color:var(--accent)">${ct.contractNo}</span>`:''}
+        <span class="tag tag-green" style="font-size:10px">進行中</span>
+        <span style="margin-left:auto;font-size:12px;color:var(--text3)">${(ct.start||'').slice(0,7)} ～ ${(ct.end||'').slice(0,7)}（共 ${mos} 個月）</span>
+      </div>`;
+
+    if(!specs.length){
+      html+=`<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">此合約尚未設定規格項目 <button class="btn btn-xs" onclick="openPickCatalog('${ct.clientId}')">＋ 從服務報價新增</button></div>`;
+    } else {
+      const filterMonth=msStart||'';
+      html+=`<table style="width:100%;font-size:12px">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 14px;text-align:left;font-weight:600;color:var(--text3)">類型</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:600;color:var(--text3)">規格名稱</th>
+          <th style="padding:8px 14px;text-align:center;font-weight:600;color:var(--text3)">全約計畫量</th>
+          <th style="padding:8px 14px;text-align:center;font-weight:600;color:var(--text3)">每月計畫量</th>
+          <th style="padding:8px 14px;text-align:center;font-weight:600;color:var(--text3)">${filterMonth?filterMonth+'月實際':'累計實際'}</th>
+          <th style="padding:8px 14px;text-align:center;font-weight:600;color:var(--text3)">進度</th>
+          <th style="padding:8px 14px;text-align:right;font-weight:600;color:var(--text3)">小計</th>
+        </tr></thead>
+        <tbody>${specs.map((s,i)=>{
+          const monthlyPlan=Math.round(s.qty/mos);
+          const actual=getActual(s,filterMonth);
+          const planBase=filterMonth?monthlyPlan:s.qty;
+          const progress=planBase>0?Math.min(actual/planBase,1):0;
+          const pct100=Math.round(progress*100);
+          const barColor=pct100>=100?'#16a34a':pct100>=60?'var(--accent)':pct100>=30?'var(--amber)':'var(--red-text)';
+          const isOk=pct100>=100;
+          const unitPrice=s.qty>0?Math.round((s.totalPrice||0)/s.qty):s.price||0;
+          return`<tr style="${i%2===1?'background:var(--surface2)':''}">
+            <td style="padding:8px 14px"><span class="tag ${catColors[s.category]||'tag-gray'}" style="font-size:10px">${s.category||'—'}</span></td>
+            <td style="padding:8px 14px;font-weight:500">${s.name||'—'}</td>
+            <td style="padding:8px 14px;text-align:center;font-family:var(--font-mono)">${s.qty} ${s.unit||''}</td>
+            <td style="padding:8px 14px;text-align:center;font-family:var(--font-mono);color:var(--text2)">${monthlyPlan} ${s.unit||''}</td>
+            <td style="padding:8px 14px;text-align:center;font-family:var(--font-mono);font-weight:600;color:${actual>0?'#16a34a':'var(--text3)'}">${actual} ${s.unit||''}</td>
+            <td style="padding:8px 14px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <div style="flex:1;height:6px;background:var(--border);border-radius:3px;min-width:60px">
+                  <div style="height:6px;border-radius:3px;background:${barColor};width:${pct100}%;transition:width .3s"></div>
+                </div>
+                <span style="font-size:11px;font-weight:600;color:${barColor};white-space:nowrap">${pct100}%${isOk?' ✓':''}</span>
+              </div>
+            </td>
+            <td style="padding:8px 14px;text-align:right;font-family:var(--font-mono)">${unitPrice?'$'+unitPrice.toLocaleString()+'×'+s.qty:'—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+        <tfoot><tr style="background:var(--surface2);border-top:1.5px solid var(--border2)">
+          <td colspan="2" style="padding:8px 14px;font-weight:600;color:var(--text2)">合計</td>
+          <td style="padding:8px 14px;text-align:center;font-family:var(--font-mono);font-weight:600">${specs.reduce((a,s)=>a+s.qty,0)} 件</td>
+          <td></td>
+          <td style="padding:8px 14px;text-align:center;font-family:var(--font-mono);font-weight:600;color:#16a34a">${specs.reduce((a,s)=>a+getActual(s,filterMonth),0)} 件</td>
+          <td></td>
+          <td style="padding:8px 14px;text-align:right;font-weight:700">${'$'+specs.reduce((a,s)=>a+(s.totalPrice||0),0).toLocaleString()}</td>
+        </tr></tfoot>
+      </table>`;
+    }
+    html+='</div>';
+  });
+
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+// 舊的 renderSpecsPage（已被上方取代，保留空函式避免呼叫錯誤）
+function _OLD_renderSpecsPage(){
+  const el=document.getElementById('specs-content');if(!el)return;
   // populate client filter
   const spClient=document.getElementById('sp-client');
   if(spClient&&spClient.options.length===1){DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;spClient.appendChild(o);});}
@@ -4033,11 +4155,22 @@ function openOmDrawer(id){
       </div>
       <div class="form-row">
         <label class="form-label">合約</label>
-        <select class="form-input" id="om-f-contract">${contracts}</select>
+        <select class="form-input" id="om-f-contract" onchange="omUpdateSpecItems()">${contracts}</select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">規格項目</label>
+        <select class="form-input" id="om-f-specid" onchange="omApplySpec()">
+          <option value="">— 選擇規格 —</option>
+          ${(rec&&rec.contractId?DB.specItems.filter(s=>s.contractId===rec.contractId):DB.specItems.filter(s=>s.contractId===contracts.split('value="')[1]?.split('"')[0])).map(s=>`<option value="${s.id}"${rec&&rec.specId===s.id?' selected':''}>${s.name}（${s.qty}${s.unit}）</option>`).join('')}
+        </select>
       </div>
       <div class="form-row">
         <label class="form-label">規格類型 *</label>
-        <select class="form-input" id="om-f-spec">${specTypes.map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}</select>
+        <select class="form-input" id="om-f-spec">
+          <optgroup label="文案類型">${['長圖文','特規長圖文','短圖文','特規短圖文','短議題文','特規短議題文'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}</optgroup>
+          <optgroup label="回覆類型">${['即時回文','綁定回文','推樓回文','代發回文','Google星評(1-6等)','Google星評(7等)','社群按讚(機器人)','社群按讚(真人)'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}</optgroup>
+          <optgroup label="輿情監控">${['週監控','進階週監控','雙日監控','進階雙日監控'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}</optgroup>
+        </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-row">
@@ -4109,7 +4242,66 @@ function omUpdateContracts(){
   const sel=document.getElementById('om-f-contract');
   if(!sel)return;
   const contracts=DB.contracts.filter(c=>c.clientId===clientId);
-  sel.innerHTML=contracts.map(c=>`<option value="${c.id}">${c.contractNo}</option>`).join('');
+  sel.innerHTML='<option value="">—</option>'+contracts.map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join('');
+  omUpdateSpecItems();
+}
+function omUpdateSpecItems(){
+  const contractId=document.getElementById('om-f-contract')?.value;
+  const sel=document.getElementById('om-f-specid');
+  if(!sel)return;
+  const specs=contractId?DB.specItems.filter(s=>s.contractId===contractId&&s.category==='口碑'):[];
+  sel.innerHTML='<option value="">— 選擇規格 —</option>'+specs.map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit}）</option>`).join('');
+}
+function omApplySpec(){
+  const specId=document.getElementById('om-f-specid')?.value;
+  if(!specId)return;
+  const spec=DB.specItems.find(s=>s.id===specId);
+  if(!spec)return;
+  const specSel=document.getElementById('om-f-spec');
+  if(specSel&&spec.name){
+    // 嘗試比對規格類型選項
+    const opts=Array.from(specSel.options);
+    const match=opts.find(o=>o.value===spec.name||spec.name.includes(o.value));
+    if(match)specSel.value=match.value;
+  }
+}
+// 社群連動
+function scUpdateContracts(){
+  const clientId=document.getElementById('sc-f-client')?.value;
+  const sel=document.getElementById('sc-f-contract');
+  if(!sel)return;
+  sel.innerHTML='<option value="">—</option>'+DB.contracts.filter(c=>c.clientId===clientId).map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join('');
+  scUpdateSpecItems();
+}
+function scUpdateSpecItems(){
+  const contractId=document.getElementById('sc-f-contract')?.value;
+  const sel=document.getElementById('sc-f-specid');
+  if(!sel)return;
+  const specs=contractId?DB.specItems.filter(s=>s.contractId===contractId&&s.category==='社群'):[];
+  sel.innerHTML='<option value="">— 選擇規格 —</option>'+specs.map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit}）</option>`).join('');
+}
+function scApplySpec(){
+  const specId=document.getElementById('sc-f-specid')?.value;
+  if(!specId)return;
+  const spec=DB.specItems.find(s=>s.id===specId);
+  if(!spec)return;
+  const specSel=document.getElementById('sc-f-spec');
+  if(specSel){const match=Array.from(specSel.options).find(o=>o.value===spec.name||spec.name.includes(o.value));if(match)specSel.value=match.value;}
+}
+// 廣告連動
+function adUpdateContracts(){
+  const clientId=document.getElementById('ad-f-client')?.value;
+  const sel=document.getElementById('ad-f-contract');
+  if(!sel)return;
+  sel.innerHTML='<option value="">—</option>'+DB.contracts.filter(c=>c.clientId===clientId).map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join('');
+  adUpdateSpecItems();
+}
+function adUpdateSpecItems(){
+  const contractId=document.getElementById('ad-f-contract')?.value;
+  const sel=document.getElementById('ad-f-specid');
+  if(!sel)return;
+  const specs=contractId?DB.specItems.filter(s=>s.contractId===contractId&&s.category==='廣告'):[];
+  sel.innerHTML='<option value="">— 選擇規格 —</option>'+specs.map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit}）</option>`).join('');
 }
 
 function omUpdateWriterFee(){
@@ -4118,7 +4310,7 @@ function omUpdateWriterFee(){
   if(!writerId||!specType)return;
   const writer=DB.freelancers.find(f=>f.id===writerId);
   if(!writer)return;
-  const item=writer.items.find(i=>i.name&&specType.includes(i.name.replace('-常規','').replace('-簡易','')));
+  const item=writer.items.find(i=>(i.item||i.name)&&specType.includes((i.item||i.name).replace('-常規','').replace('-簡易','')));
   if(item){const feeEl=document.getElementById('om-f-writer-fee');if(feeEl&&!feeEl.value)feeEl.value=item.price;}
 }
 
@@ -4145,9 +4337,10 @@ function saveOmRecord(existingId){
   const writer=DB.freelancers.find(f=>f.id===writerId);
   const newId=existingId||genOmId(vendorName);
 
+  const specId=document.getElementById('om-f-specid')?.value||'';
   const rec={
     id:newId,
-    clientId, contractId:contractId||'',
+    clientId, contractId:contractId||'', specId,
     clientName:DB.clients.find(c=>c.id===clientId)?.name||'',
     specType, platform,
     section:document.getElementById('om-f-section')?.value||'',
@@ -4229,9 +4422,13 @@ function openSocialDrawer(id){
   const freelancers=DB.freelancers.filter(f=>f.type==='社群').map(f=>`<option value="${f.id}"${rec&&rec.executorId===f.id?' selected':''}>${f.name}</option>`).join('');
   const specTypes=['單圖文','多圖文','Reels','限時動態','直播','其他'];
   const statuses=['待執行','已排程','已發佈','已封存'];
+  const scContracts=rec?DB.contracts.filter(c=>c.clientId===rec.clientId).map(c=>`<option value="${c.id}"${rec.contractId===c.id?' selected':''}>${c.contractNo||c.name}</option>`).join(''):'';
+  const scSpecs=rec&&rec.contractId?DB.specItems.filter(s=>s.contractId===rec.contractId&&s.category==='社群').map(s=>`<option value="${s.id}"${rec.specId===s.id?' selected':''}>${s.name}（${s.qty}${s.unit}）</option>`).join(''):'';
   showDrawer(id?'編輯社群執行記錄':'新增社群執行記錄',
     `<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">
-      <div class="form-row"><label class="form-label">客戶 *</label><select class="form-input" id="sc-f-client">${clients}</select></div>
+      <div class="form-row"><label class="form-label">客戶 *</label><select class="form-input" id="sc-f-client" onchange="scUpdateContracts()">${clients}</select></div>
+      <div class="form-row"><label class="form-label">合約</label><select class="form-input" id="sc-f-contract" onchange="scUpdateSpecItems()"><option value="">—</option>${scContracts}</select></div>
+      <div class="form-row"><label class="form-label">規格項目</label><select class="form-input" id="sc-f-specid" onchange="scApplySpec()"><option value="">— 選擇規格 —</option>${scSpecs}</select></div>
       <div class="form-row"><label class="form-label">規格類型</label><select class="form-input" id="sc-f-spec">${specTypes.map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}</select></div>
       <div class="form-row"><label class="form-label">發布日期</label><input type="date" class="form-input" id="sc-f-date" value="${rec?rec.postDate||'':''}"></div>
       <div class="form-row"><label class="form-label">標題／主題</label><input class="form-input" id="sc-f-title" value="${rec?(rec.title||'').replace(/"/g,'&quot;'):''}"></div>
@@ -4257,7 +4454,9 @@ function saveSocialRecord(existingId){
   const executor=isInternal?null:DB.freelancers.find(f=>f.id===executorVal);
   const now=new Date();
   const newId=existingId||('SC-'+(now.getFullYear()+'').slice(2)+String(now.getMonth()+1).padStart(2,'0')+'-'+String((DB.socialRecords.length+1)).padStart(3,'0'));
-  const rec={id:newId,clientId,clientName:DB.clients.find(c=>c.id===clientId)?.name||'',specType:document.getElementById('sc-f-spec')?.value||'',postDate:document.getElementById('sc-f-date')?.value||'',title:document.getElementById('sc-f-title')?.value||'',assetLink:document.getElementById('sc-f-asset')?.value||'',content:document.getElementById('sc-f-content')?.value||'',executorId:isInternal?'':executorVal,executorName:isInternal?'內部':(executor?executor.name:executorVal),executorFee:parseFloat(document.getElementById('sc-f-fee')?.value)||0,status:document.getElementById('sc-f-status')?.value||'待執行',note:document.getElementById('sc-f-note')?.value||''};
+  const scContractId=document.getElementById('sc-f-contract')?.value||'';
+  const scSpecId=document.getElementById('sc-f-specid')?.value||'';
+  const rec={id:newId,clientId,contractId:scContractId,specId:scSpecId,clientName:DB.clients.find(c=>c.id===clientId)?.name||'',specType:document.getElementById('sc-f-spec')?.value||'',postDate:document.getElementById('sc-f-date')?.value||'',title:document.getElementById('sc-f-title')?.value||'',assetLink:document.getElementById('sc-f-asset')?.value||'',content:document.getElementById('sc-f-content')?.value||'',executorId:isInternal?'':executorVal,executorName:isInternal?'內部':(executor?executor.name:executorVal),executorFee:parseFloat(document.getElementById('sc-f-fee')?.value)||0,status:document.getElementById('sc-f-status')?.value||'待執行',note:document.getElementById('sc-f-note')?.value||''};
   if(existingId){const idx=DB.socialRecords.findIndex(r=>r.id===existingId);if(idx>=0)DB.socialRecords[idx]=rec;}
   else DB.socialRecords.push(rec);
   closeDrawer();renderExecSocial();toast('儲存成功');
@@ -4348,7 +4547,9 @@ function openAdDrawer(id){
   const clients=DB.clients.map(c=>`<option value="${c.id}"${rec&&rec.clientId===c.id?' selected':''}>${c.name}</option>`).join('');
   showDrawer(id?'編輯廣告投遞記錄':'新增廣告投遞記錄',
     `<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">
-      <div class="form-row"><label class="form-label">客戶 *</label><select class="form-input" id="ad-f-client">${clients}</select></div>
+      <div class="form-row"><label class="form-label">客戶 *</label><select class="form-input" id="ad-f-client" onchange="adUpdateContracts()">${clients}</select></div>
+      <div class="form-row"><label class="form-label">合約</label><select class="form-input" id="ad-f-contract" onchange="adUpdateSpecItems()"><option value="">—</option>${(rec?DB.contracts.filter(c=>c.clientId===rec.clientId).map(c=>`<option value="${c.id}"${rec.contractId===c.id?' selected':''}>${c.contractNo||c.name}</option>`).join(''):'')}</select></div>
+      <div class="form-row"><label class="form-label">規格項目</label><select class="form-input" id="ad-f-specid"><option value="">— 選擇規格 —</option>${(rec&&rec.contractId?DB.specItems.filter(s=>s.contractId===rec.contractId&&s.category==='廣告').map(s=>`<option value="${s.id}"${rec.specId===s.id?' selected':''}>${s.name}（${s.qty}${s.unit}）</option>`).join(''):'')}</select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-row"><label class="form-label">廣告類型 *</label><select class="form-input" id="ad-f-type" onchange="updateAdFeePreview()"><option${rec&&rec.adType==='Google'?' selected':''}>Google</option><option${rec&&rec.adType==='Meta'?' selected':''}>Meta</option></select></div>
         <div class="form-row"><label class="form-label">投遞日期</label><input type="date" class="form-input" id="ad-f-date" value="${rec?rec.date||'':''}"></div>
@@ -4407,7 +4608,9 @@ function saveAdRecord(existingId){
   const fees=calcAdFees(budget,adType);
   const now=new Date();
   const newId=existingId||('AD-'+(now.getFullYear()+'').slice(2)+String(now.getMonth()+1).padStart(2,'0')+'-'+String((DB.adRecords.length+1)).padStart(3,'0'));
-  const rec={id:newId,clientId,clientName:DB.clients.find(c=>c.id===clientId)?.name||'',adType,date:document.getElementById('ad-f-date')?.value||'',adGroup:document.getElementById('ad-f-group')?.value||'',material:document.getElementById('ad-f-material')?.value||'',impression:parseFloat(document.getElementById('ad-f-imp')?.value)||0,reach:parseFloat(document.getElementById('ad-f-reach')?.value)||0,clicks:parseFloat(document.getElementById('ad-f-clicks')?.value)||0,ctr:parseFloat(document.getElementById('ad-f-ctr')?.value)||0,cpm:parseFloat(document.getElementById('ad-f-cpm')?.value)||0,cpc:parseFloat(document.getElementById('ad-f-cpc')?.value)||0,messages:parseFloat(document.getElementById('ad-f-msg')?.value)||0,costPerResult:parseFloat(document.getElementById('ad-f-cpr')?.value)||0,budget,contractBudget:parseFloat(document.getElementById('ad-f-contract-budget')?.value)||0,svcFee:fees.svc,vatFee:fees.vat||0,foreignTax:fees.foreign||0,txFee:fees.tx||0,totalCost:fees.total,cta:document.getElementById('ad-f-cta')?.value||'',note:document.getElementById('ad-f-note')?.value||''};
+  const adContractId=document.getElementById('ad-f-contract')?.value||'';
+  const adSpecId=document.getElementById('ad-f-specid')?.value||'';
+  const rec={id:newId,clientId,contractId:adContractId,specId:adSpecId,clientName:DB.clients.find(c=>c.id===clientId)?.name||'',adType,date:document.getElementById('ad-f-date')?.value||'',adGroup:document.getElementById('ad-f-group')?.value||'',material:document.getElementById('ad-f-material')?.value||'',impression:parseFloat(document.getElementById('ad-f-imp')?.value)||0,reach:parseFloat(document.getElementById('ad-f-reach')?.value)||0,clicks:parseFloat(document.getElementById('ad-f-clicks')?.value)||0,ctr:parseFloat(document.getElementById('ad-f-ctr')?.value)||0,cpm:parseFloat(document.getElementById('ad-f-cpm')?.value)||0,cpc:parseFloat(document.getElementById('ad-f-cpc')?.value)||0,messages:parseFloat(document.getElementById('ad-f-msg')?.value)||0,costPerResult:parseFloat(document.getElementById('ad-f-cpr')?.value)||0,budget,contractBudget:parseFloat(document.getElementById('ad-f-contract-budget')?.value)||0,svcFee:fees.svc,vatFee:fees.vat||0,foreignTax:fees.foreign||0,txFee:fees.tx||0,totalCost:fees.total,cta:document.getElementById('ad-f-cta')?.value||'',note:document.getElementById('ad-f-note')?.value||''};
   if(existingId){const idx=DB.adRecords.findIndex(r=>r.id===existingId);if(idx>=0)DB.adRecords[idx]=rec;}
   else DB.adRecords.push(rec);
   closeDrawer();renderExecAd();toast('儲存成功');
