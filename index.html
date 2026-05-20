@@ -2025,13 +2025,29 @@ function renderHome(){
   const pendingTasks=DB.tasks.filter(t=>t.status!=='已完成').length;
   const overdueTasks=DB.tasks.filter(t=>t.status!=='已完成'&&t.dueDate&&t.dueDate<today()).length;
 
+  // 本月執行摘要
+  const thisMonth=today().slice(0,7);
+  const omThisMonth=(DB.omRecords||[]).filter(r=>(r.publishDate||r.date||'').slice(0,7)===thisMonth);
+  const socialThisMonth=(DB.socialRecords||[]).filter(r=>(r.postDate||'').slice(0,7)===thisMonth);
+  const adThisMonth=(DB.adRecords||[]).filter(r=>(r.date||'').slice(0,7)===thisMonth);
+  const omDone=omThisMonth.filter(r=>r.status==='已上刊'||r.status==='觀察中'||r.status==='完成').length;
+  const socialDone=socialThisMonth.filter(r=>r.status==='已發佈').length;
+  const adBudget=adThisMonth.reduce((a,r)=>a+(r.budget||0),0);
+
+  // 逾期應收款
   const todayStr=today();
+  const overduePayments=DB.receivables.flatMap(ra=>
+    ra.payments.filter(p=>p.status!=='已入款'&&p.dueDate&&p.dueDate<todayStr)
+      .map(p=>({...p,contractId:ra.contractId,clientId:ra.clientId,contractNo:ra.contractNo}))
+  );
+
+  const todayDate=today();
   const depts=['營運','業務','企劃'];
   const deptTasks={};
   depts.forEach(d=>{deptTasks[d]=DB.tasks.filter(t=>{
     if(_schView==='day') return t.dept===d;
     if(_schView==='week'){const dd=new Date(t.dueDate);const now=new Date();const wstart=new Date(now);wstart.setDate(now.getDate()-now.getDay()+1);const wend=new Date(wstart);wend.setDate(wstart.getDate()+6);return t.dept===d&&dd>=wstart&&dd<=wend;}
-    if(_schView==='month'){return t.dept===d&&t.dueDate&&t.dueDate.slice(0,7)===todayStr.slice(0,7);}
+    if(_schView==='month'){return t.dept===d&&t.dueDate&&t.dueDate.slice(0,7)===todayDate.slice(0,7);}
     return t.dept===d;
   });});
 
@@ -2056,6 +2072,40 @@ function renderHome(){
         <div class="stat-label">進行中合約</div>
         <div class="stat-value">${DB.contracts.filter(c=>c.status==='進行中').length}</div>
         <div class="stat-change">共 ${DB.contracts.length} 份合約</div>
+      </div>
+    </div>
+
+    ${overduePayments.length?`
+    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--r2);padding:14px 18px;display:flex;align-items:flex-start;gap:12px">
+      <span style="font-size:18px;flex-shrink:0">⚠️</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:#991b1b;margin-bottom:6px">逾期應收款 ${overduePayments.length} 筆</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${overduePayments.slice(0,6).map(p=>{
+            const client=DB.clients.find(c=>c.id===p.clientId);
+            return`<span style="background:#fff;border:1px solid #fca5a5;border-radius:4px;padding:3px 8px;font-size:11px;color:#991b1b">${client?client.name:'—'} · ${p.dueDate} · ${fmt(p.amount)}</span>`;
+          }).join('')}
+          ${overduePayments.length>6?`<span style="font-size:11px;color:#991b1b;padding:3px 8px">…等 ${overduePayments.length-6} 筆</span>`:''}
+        </div>
+      </div>
+      <button class="btn btn-xs" style="background:#991b1b;color:#fff;border-color:#991b1b;flex-shrink:0" onclick="navTo('receivable')">查看應收</button>
+    </div>`:''}
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">本月執行摘要 · ${thisMonth}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r)">
+          <div style="font-size:20px;font-weight:700;color:var(--blue-text)">${omDone}<span style="font-size:12px;color:var(--text3);font-weight:400"> / ${omThisMonth.length}</span></div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">口碑已上刊</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r)">
+          <div style="font-size:20px;font-weight:700;color:#166534">${socialDone}<span style="font-size:12px;color:var(--text3);font-weight:400"> / ${socialThisMonth.length}</span></div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">社群已發佈</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r)">
+          <div style="font-size:20px;font-weight:700;color:var(--amber)">${adThisMonth.length>0?fmt(adBudget):'—'}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">廣告費用（本月）</div>
+        </div>
       </div>
     </div>
 
@@ -4900,7 +4950,7 @@ function renderExecSocial(){
         <td style="text-align:right;font-size:12px">${r.executorFee?fmt(r.executorFee):'—'}</td>
         <td><span class="tag ${statusColors[r.status]||'tag-gray'}" style="font-size:11px">${r.status||'待執行'}</span></td>
         <td style="font-size:12px;color:var(--text3)">${r.note||'—'}</td>
-        <td><button class="btn btn-xs edit-only" onclick="openSocialDrawer('${r.id}')" title="編輯">✏️</button></td>
+        <td class="edit-only"><div style="display:flex;gap:4px"><button class="btn btn-xs" onclick="openSocialDrawer('${r.id}')" title="編輯">✏️</button><button class="btn btn-xs" style="color:var(--red)" onclick="deleteSocialRecord('${r.id}')" title="刪除">✕</button></div></td>
       </tr>`;
     }).join('')}</tbody></table></div></div>`;
   el.innerHTML=html;
@@ -4951,7 +5001,15 @@ function saveSocialRecord(existingId){
   const rec={id:newId,clientId,contractId:scContractId,specId:scSpecId,clientName:DB.clients.find(c=>c.id===clientId)?.name||'',specType:document.getElementById('sc-f-spec')?.value||'',postDate:document.getElementById('sc-f-date')?.value||'',title:document.getElementById('sc-f-title')?.value||'',assetLink:document.getElementById('sc-f-asset')?.value||'',content:document.getElementById('sc-f-content')?.value||'',executorId:isInternal?'':executorVal,executorName:isInternal?'內部':(executor?executor.name:executorVal),executorFee:parseFloat(document.getElementById('sc-f-fee')?.value)||0,status:document.getElementById('sc-f-status')?.value||'待執行',note:document.getElementById('sc-f-note')?.value||''};
   if(existingId){const idx=DB.socialRecords.findIndex(r=>r.id===existingId);if(idx>=0)DB.socialRecords[idx]=rec;}
   else DB.socialRecords.push(rec);
+  syncToGAS('socialRecords', rec).catch(e=>console.error('sync social failed',e));
   closeDrawer();renderExecSocial();toast('儲存成功');
+}
+
+function deleteSocialRecord(id){
+  if(!confirm('確定刪除此社群記錄？'))return;
+  DB.socialRecords=DB.socialRecords.filter(x=>x.id!==id);
+  syncDeleteGAS('socialRecords',id).catch(()=>{});
+  renderExecSocial();
 }
 
 // ═══ 廣告執行記錄 ═══
@@ -5026,7 +5084,7 @@ function renderExecAd(){
         <td style="text-align:right;font-size:12px;color:var(--amber)">${fmt(fees.svc)}</td>
         <td style="font-size:12px">${r.cta||'—'}</td>
         <td style="font-size:12px;color:var(--text3)">${r.note||'—'}</td>
-        <td><button class="btn btn-xs edit-only" onclick="openAdDrawer('${r.id}')" title="編輯">✏️</button></td>
+        <td class="edit-only"><div style="display:flex;gap:4px"><button class="btn btn-xs" onclick="openAdDrawer('${r.id}')" title="編輯">✏️</button><button class="btn btn-xs" style="color:var(--red)" onclick="deleteAdRecord('${r.id}')" title="刪除">✕</button></div></td>
       </tr>`;
     }).join('')}</tbody></table></div></div>`;
   el.innerHTML=html;
@@ -5105,7 +5163,15 @@ function saveAdRecord(existingId){
   const rec={id:newId,clientId,contractId:adContractId,specId:adSpecId,clientName:DB.clients.find(c=>c.id===clientId)?.name||'',adType,date:document.getElementById('ad-f-date')?.value||'',adGroup:document.getElementById('ad-f-group')?.value||'',material:document.getElementById('ad-f-material')?.value||'',impression:parseFloat(document.getElementById('ad-f-imp')?.value)||0,reach:parseFloat(document.getElementById('ad-f-reach')?.value)||0,clicks:parseFloat(document.getElementById('ad-f-clicks')?.value)||0,ctr:parseFloat(document.getElementById('ad-f-ctr')?.value)||0,cpm:parseFloat(document.getElementById('ad-f-cpm')?.value)||0,cpc:parseFloat(document.getElementById('ad-f-cpc')?.value)||0,messages:parseFloat(document.getElementById('ad-f-msg')?.value)||0,costPerResult:parseFloat(document.getElementById('ad-f-cpr')?.value)||0,budget,contractBudget:parseFloat(document.getElementById('ad-f-contract-budget')?.value)||0,svcFee:fees.svc,vatFee:fees.vat||0,foreignTax:fees.foreign||0,txFee:fees.tx||0,totalCost:fees.total,cta:document.getElementById('ad-f-cta')?.value||'',note:document.getElementById('ad-f-note')?.value||''};
   if(existingId){const idx=DB.adRecords.findIndex(r=>r.id===existingId);if(idx>=0)DB.adRecords[idx]=rec;}
   else DB.adRecords.push(rec);
+  syncToGAS('adRecords', rec).catch(e=>console.error('sync ad failed',e));
   closeDrawer();renderExecAd();toast('儲存成功');
+}
+
+function deleteAdRecord(id){
+  if(!confirm('確定刪除此廣告記錄？'))return;
+  DB.adRecords=DB.adRecords.filter(x=>x.id!==id);
+  syncDeleteGAS('adRecords',id).catch(()=>{});
+  renderExecAd();
 }
 
 function renderVendorExec(){
@@ -5274,10 +5340,18 @@ function openAddVendorRecord(){
   openModal('新增廠商執行記錄',`
     <div class="form-row">
       <div class="form-group"><label class="form-label">客戶 *</label>
-        <select class="form-input" id="f-client">
+        <select class="form-input" id="f-client" onchange="vrUpdateContracts()">
           <option value="">選擇客戶</option>
           ${DB.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
         </select>
+      </div>
+      <div class="form-group"><label class="form-label">合約</label>
+        <select class="form-input" id="f-vr-contract" onchange="vrUpdateSpecItems()"><option value="">—</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">規格項目</label>
+        <select class="form-input" id="f-vr-specid"><option value="">— 選擇規格（選填）—</option></select>
       </div>
       <div class="form-group"><label class="form-label">月份</label><input class="form-input" type="month" id="f-month"></div>
     </div>
@@ -5306,8 +5380,10 @@ function openAddVendorRecord(){
   `,()=>{
     const clientId=document.getElementById('f-client').value;
     if(!clientId)return alert('請選擇客戶');
-    DB.vendorRecords.push({
+    const rec={
       id:nextId('VR'),clientId,
+      contractId:document.getElementById('f-vr-contract')?.value||'',
+      specId:document.getElementById('f-vr-specid')?.value||'',
       month:document.getElementById('f-month').value,
       platform:document.getElementById('f-platform').value,
       board:document.getElementById('f-board').value,
@@ -5318,27 +5394,43 @@ function openAddVendorRecord(){
       link:document.getElementById('f-link').value,
       done:document.getElementById('f-done').value==='1',
       note:''
-    });
+    };
+    DB.vendorRecords.push(rec);
+    syncToGAS('vendorRecords', rec).catch(e=>console.error('sync vendor failed',e));
     closeModal();renderVendorExec();toast('記錄已新增','success');
   });
 }
 
 function openEditVendorRecord(id){
   const r=DB.vendorRecords.find(x=>x.id===id);if(!r)return;
+  const contractOpts=r.clientId?DB.contracts.filter(c=>c.clientId===r.clientId).map(c=>`<option value="${c.id}"${r.contractId===c.id?' selected':''}>${c.contractNo||c.name}</option>`).join(''):'';
+  const specOpts=r.contractId?DB.specItems.filter(s=>s.contractId===r.contractId&&(s.category==='口碑'||!s.category)).map(s=>`<option value="${s.id}"${r.specId===s.id?' selected':''}>${s.name}（${s.qty}${s.unit||''}）</option>`).join(''):'';
   openModal('編輯廠商執行記錄',`
     <div class="form-row">
       <div class="form-group"><label class="form-label">客戶</label>
-        <select class="form-input" id="f-client">
+        <select class="form-input" id="f-client" onchange="vrUpdateContracts()">
           ${DB.clients.map(c=>`<option value="${c.id}" ${c.id===r.clientId?'selected':''}>${c.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">合約</label>
+        <select class="form-input" id="f-vr-contract" onchange="vrUpdateSpecItems()">
+          <option value="">—</option>${contractOpts}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">規格項目</label>
+        <select class="form-input" id="f-vr-specid">
+          <option value="">— 選擇規格（選填）—</option>${specOpts}
         </select>
       </div>
       <div class="form-group"><label class="form-label">月份</label><input class="form-input" type="month" id="f-month" value="${r.month||''}"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">平台</label><input class="form-input" id="f-platform" value="${r.platform||''}"></div>
-      <div class="form-group"><label class="form-label">版位</label><input class="form-input" id="f-board" value="${r.board||''}"></div>
+      <div class="form-group"><label class="form-label">版位</label><input class="form-input" id="f-board" value="${r.board||r.section||''}"></div>
     </div>
-    <div class="form-group"><label class="form-label">標題</label><input class="form-input" id="f-title" value="${r.title||''}"></div>
+    <div class="form-group"><label class="form-label">標題</label><input class="form-input" id="f-title" value="${(r.title||'').replace(/"/g,'&quot;')}"></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">金額</label><input class="form-input" type="number" id="f-amount" value="${r.amount||0}"></div>
       <div class="form-group"><label class="form-label">狀態</label>
@@ -5347,12 +5439,15 @@ function openEditVendorRecord(id){
     </div>
   `,()=>{
     r.clientId=document.getElementById('f-client').value;
+    r.contractId=document.getElementById('f-vr-contract')?.value||r.contractId||'';
+    r.specId=document.getElementById('f-vr-specid')?.value||r.specId||'';
     r.month=document.getElementById('f-month').value;
     r.platform=document.getElementById('f-platform').value;
     r.board=document.getElementById('f-board').value;
     r.title=document.getElementById('f-title').value;
     r.amount=Number(document.getElementById('f-amount').value)||0;
     r.done=document.getElementById('f-done').value==='1';
+    syncToGAS('vendorRecords', r).catch(e=>console.error('sync vendor failed',e));
     closeModal();renderVendorExec();toast('記錄已更新','success');
   });
 }
@@ -5360,7 +5455,21 @@ function openEditVendorRecord(id){
 function deleteVendorRecord(id){
   if(!confirm('確定刪除？'))return;
   DB.vendorRecords=DB.vendorRecords.filter(x=>x.id!==id);
+  syncDeleteGAS('vendorRecords',id).catch(()=>{});
   renderVendorExec();
+}
+
+// ── vendorRecord 合約/規格連動 ──
+function vrUpdateContracts(){
+  const clientId=document.getElementById('f-client')?.value||'';
+  const sel=document.getElementById('f-vr-contract');if(!sel)return;
+  sel.innerHTML='<option value="">—</option>'+(clientId?DB.contracts.filter(c=>c.clientId===clientId).map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join(''):'');
+  vrUpdateSpecItems();
+}
+function vrUpdateSpecItems(){
+  const contractId=document.getElementById('f-vr-contract')?.value||'';
+  const sel=document.getElementById('f-vr-specid');if(!sel)return;
+  sel.innerHTML='<option value="">— 選擇規格（選填）—</option>'+(contractId?DB.specItems.filter(s=>s.contractId===contractId&&(s.category==='口碑'||!s.category)).map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit||''}）</option>`).join(''):'');
 }
 
 // ═══ EXTENDED DB ═══
