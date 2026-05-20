@@ -2222,10 +2222,14 @@ function renderClients(){
         p.dueDate<todayStr
       )
     );
+    const pendingCutAngle=(DB.omRecords||[]).filter(r=>
+      clientCtIds.includes(r.contractId) && r.status==='切角審核'
+    ).length;
     const pctVal=totalAmt>0?received/totalAmt:0;
     const initials=c.name.slice(0,2);
     const statusTag='<span class="tag '+(c.status==='結束合作'?'tag-gray':'tag-green')+'" style="font-size:10px">'+(c.status||'進行中')+'</span>';
-    const overdueTag=overdue?'<span class="tag tag-red">逾期</span>':'';
+    const overdueTag=overdue?'<span class="tag tag-red">逾期</span>':''
+    const cutAngleTag=pendingCutAngle?`<span class="tag tag-purple">${pendingCutAngle}件待切角審核</span>`:'';
     const progressBar=totalAmt?'<div><div class="flex items-center gap-2" style="margin-bottom:4px"><div style="font-size:11px;color:var(--text3)">收款進度</div><div style="font-size:11px;font-weight:500;margin-left:auto">'+pct(pctVal)+'</div></div><div class="progress-wrap"><div class="progress-fill '+(pctVal>=1?'green':pctVal>=.5?'':'amber')+'" style="width:'+Math.round(pctVal*100)+'%"></div></div></div>':'';
     return '<div class="card" style="cursor:pointer;transition:.15s" onmouseover="this.style.boxShadow=\'var(--shadow-md)\'" onmouseout="this.style.boxShadow=\'var(--shadow)\'" onclick="openClientDrawer(\''+c.id+'\')">'
       +'<div class="card-body">'
@@ -2234,7 +2238,7 @@ function renderClients(){
       +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.name+'</div>'
       +(c.brandName?'<div style="font-size:11px;color:var(--blue-text);font-weight:500;margin-top:1px">'+c.brandName+'</div>':'')
       +'<div style="font-size:11px;color:var(--text3);margin-top:2px">PM：'+(c.pm||'—')+'　聯絡：'+(c.contact||'—')+'</div></div>'
-      +'<div style="display:flex;gap:4px;flex-shrink:0">'+overdueTag+statusTag+'</div>'
+      +'<div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap">'+cutAngleTag+overdueTag+statusTag+'</div>'
       +'</div>'
       +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
       +'<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:var(--r)"><div style="font-size:10px;color:var(--text3);margin-bottom:2px">合約數</div><div style="font-size:16px;font-weight:600">'+cts.length+'</div></div>'
@@ -2310,6 +2314,7 @@ function openClientDrawer(clientId){
                 <div><span style="color:var(--text3)">付款：</span>${ct.payMethod||'—'}</div>
               </div>
               ${ct.note?`<div style="margin-top:6px;font-size:11px;color:var(--text3)">${ct.note}</div>`:''}
+              ${ct.clientToken?`<div style="margin-top:8px;display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:20px">✓ 客戶連結已啟用</span><button class="btn btn-xs" onclick="copyClientDashLink('${ct.id}')">複製連結</button></div>`:''}
             </div>
           </div>`).join('')||'<div class="empty-state"><p>尚無合約資料</p></div>'}
       </div>
@@ -2592,6 +2597,16 @@ function openEditContract(contractId){
       <input class="form-input" id="f-drive" placeholder="貼上 Google Drive 分享連結" value="${ct.driveLink||''}">
       ${ct.driveLink?`<a href="${ct.driveLink}" target="_blank" style="font-size:11px;color:var(--accent);margin-top:4px;display:inline-block">↗ 預覽目前連結</a>`:''}
     </div>
+    <div class="form-group" style="background:var(--blue-bg);border:1px solid #c7d7f9;border-radius:var(--r);padding:12px">
+      <label class="form-label" style="color:var(--blue-text)">客戶專案儀表板連結</label>
+      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <input class="form-input" id="f-client-token" style="flex:1;min-width:160px;font-size:11px;font-family:var(--font-mono)" readonly placeholder="尚未產生" value="${ct.clientToken||''}">
+        <button class="btn btn-sm" onclick="genClientDashToken('${ct.id}')">產生連結</button>
+        <button class="btn btn-sm" onclick="copyClientDashLink('${ct.id}')" ${ct.clientToken?'':'disabled'}>複製連結</button>
+        ${ct.clientToken?`<button class="btn btn-sm" style="color:var(--red)" onclick="revokeClientDashToken('${ct.id}')">撤銷</button>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--blue-text);margin-top:6px;opacity:.8">客戶可用此連結查看執行進度、審核切角，永久有效直到撤銷</div>
+    </div>
   `,async ()=>{
     ct.name=document.getElementById('f-cname').value.trim()||ct.name;
     ct.start=document.getElementById('f-start').value;ct.end=document.getElementById('f-end').value;
@@ -2613,6 +2628,47 @@ function deleteContract(contractId, clientId){
   DB.contracts=DB.contracts.filter(x=>x.id!==contractId);
   syncDeleteGAS('contracts', contractId).catch(()=>{});
   openClientDrawer(clientId);toast('合約已刪除');
+}
+// ── 客戶儀表板 Token 管理 ──
+async function genClientDashToken(contractId){
+  try{
+    const res=await gasApi('genClientToken',{contractId});
+    if(res.token){
+      const ct=DB.contracts.find(x=>x.id===contractId);
+      if(ct) ct.clientToken=res.token;
+      const el=document.getElementById('f-client-token');
+      if(el) el.value=res.token;
+      toast('客戶連結已產生','success');
+    }
+  }catch(e){toast('產生失敗','error');}
+}
+
+async function revokeClientDashToken(contractId){
+  if(!confirm('撤銷後客戶連結將立即失效，確定嗎？'))return;
+  try{
+    const res=await gasApi('revokeClientToken',{contractId});
+    if(res.ok){
+      const ct=DB.contracts.find(x=>x.id===contractId);
+      if(ct) ct.clientToken='';
+      const el=document.getElementById('f-client-token');
+      if(el) el.value='';
+      toast('連結已撤銷');
+    }
+  }catch(e){toast('撤銷失敗','error');}
+}
+
+function copyClientDashLink(contractId){
+  const ct=DB.contracts.find(x=>x.id===contractId);
+  if(!ct?.clientToken){toast('請先產生連結');return;}
+  const gasUrl=document.getElementById('gas-url-input')?.value||'';
+  if(!gasUrl){toast('請先在設定中填入 GAS URL');return;}
+  const link=gasUrl+'?view=client&token='+ct.clientToken;
+  navigator.clipboard.writeText(link).then(()=>toast('已複製客戶連結！','success'))
+    .catch(()=>{
+      const ta=document.createElement('textarea');ta.value=link;
+      document.body.appendChild(ta);ta.select();document.execCommand('copy');
+      document.body.removeChild(ta);toast('已複製客戶連結！','success');
+    });
 }
 
 function openAddSpec(clientId){
