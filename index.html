@@ -1526,9 +1526,26 @@ window.loadAllData = async function(){
     if(adRaw.length) DB.adRecords = adRaw.filter(r => r.id);
     else if(!DB.adRecords) DB.adRecords = [];
 
-    // vendor_companies（新）
+    // vendor_companies（廠商定價，新）
     const vcRaw = data.vendor_companies || data.fin_vendor_companies || [];
     if(vcRaw.length) DB.vendorCompanies = vcRaw.filter(r => r.id);
+
+    // ref_service_catalog（樂法服務報價，有資料才覆蓋靜態）
+    const scRaw = data.service_catalog || data.ref_service_catalog || [];
+    if(scRaw.length) DB.serviceCatalog = scRaw.filter(r => r.id && r.id !== 'id');
+
+    // hr_freelancer_records（外包人員報價，有資料才覆蓋靜態）
+    const flRaw = data.freelancer_records || data.hr_freelancer_records || [];
+    if(flRaw.length) {
+      // GAS 格式：{id, name, type, payMethod, items(JSON string or array)}
+      DB.freelancers = flRaw.filter(r => r.id && r.id !== 'id').map(r => {
+        if(typeof r.items === 'string') {
+          try { r.items = JSON.parse(r.items); } catch(e) { r.items = []; }
+        }
+        if(!Array.isArray(r.items)) r.items = [];
+        return r;
+      });
+    }
 
     // contacts / activities（新）
     const ctRaw = data.contacts || data.crm_contacts || [];
@@ -2217,15 +2234,9 @@ function openClientDrawer(clientId){
               <div class="flex items-center gap-2" style="margin-bottom:8px">
                 <div style="flex:1">
                   <div style="font-size:14px;font-weight:600">${ct.name}</div>
-                  ${ct.contractNo?`<div style="font-size:11px;color:var(--accent);font-weight:500;margin-top:2px;font-family:var(--font-mono)">${ct.contractNo}</div>`:''}
+                  ${ct.contractNo?`<div style="font-size:11px;font-weight:500;margin-top:2px;font-family:var(--font-mono)">${ct.driveLink?`<a href="${ct.driveLink}" target="_blank" style="color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:3px">${ct.contractNo}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:9px;height:9px;opacity:.6"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:`<span style="color:var(--accent)">${ct.contractNo}</span>`}</div>`:''}
                 </div>
                 <span class="tag ${ct.status==='進行中'?'tag-green':'tag-gray'}">${ct.status}</span>
-                ${ct.driveLink?`<a href="${ct.driveLink}" target="_blank" class="btn btn-xs" style="background:var(--blue-bg);color:var(--blue-text);border-color:transparent;text-decoration:none">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
-                  </svg>查看合約</a>`
-                :`<button class="btn btn-xs edit-only" style="color:var(--text3)" onclick="openEditContract('${ct.id}',true)">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>補上連結</button>`}
                 <button class="btn btn-xs edit-only" onclick="openEditContract('${ct.id}')">編輯</button>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
