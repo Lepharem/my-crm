@@ -1454,38 +1454,34 @@ window.loadAllData = async function(){
     toast('資料載入中...');
     const data = await gasApi('getAll');
     console.log('GAS getAll keys:', Object.keys(data));
-    console.log('clients:', (data.clients||[]).length, 'contracts:', (data.contracts||[]).length, 'contract_payments:', (data.contract_payments||[]).length);
+    console.log('clients:', (data.clients||data.crm_clients||[]).length, 'contracts:', (data.contracts||data.crm_contracts||[]).length, 'contract_payments:', (data.contract_payments||data.fin_payments||[]).length);
 
-    // clients - 過濾掉 header 列
-    if(data.clients) DB.clients = data.clients.filter(r => r.id && r.id !== 'id');
+    // clients（支援新舊 key 名稱）
+    const clientsRaw = data.clients || data.crm_clients || [];
+    if(clientsRaw.length) DB.clients = clientsRaw.filter(r => r.id && r.id !== 'id');
 
-    // contracts - 過濾 header
-    if(data.contracts) {
-      const valid = data.contracts.filter(r => r.id && r.id !== 'id');
-      DB.contracts = valid;
-    }
+    // contracts（支援新舊 key）
+    const contractsRaw = data.contracts || data.crm_contracts || [];
+    if(contractsRaw.length) DB.contracts = contractsRaw.filter(r => r.id && r.id !== 'id');
 
-    // receivables：GAS 回傳 contract_payments（平面列表），需轉換成帶 payments[] 子陣列的格式
-    const cpRaw = data.contract_payments || data.receivables || [];
+    // receivables：GAS 回傳 contract_payments / fin_payments（平面列表），轉換成帶 payments[] 子陣列的格式
+    const cpRaw = data.contract_payments || data.fin_payments || data.receivables || [];
     if(cpRaw.length) {
-      // 依 (contractId, clientId, contractNo) 分組
       const raMap = {};
       cpRaw.forEach(row => {
         if(!row.id || row.id === 'id') return;
         const key = row.contractId || row.contract_id || '';
         if(!key) return;
         if(!raMap[key]) raMap[key] = {
-          id: key,
-          contractId: key,
+          id: key, contractId: key,
           clientId:   row.clientId   || row.client_id   || '',
           contractNo: row.contractNo || row.contract_no  || '',
           signDate:   row.signDate   || row.sign_date    || '',
-          amount: 0, tax: 0, total: 0, note: '',
-          payments: []
+          amount: 0, tax: 0, total: 0, note: '', payments: []
         };
         const amt = Number(row.amount) || 0;
         raMap[key].payments.push({
-          period:        Number(row.period)  || raMap[key].payments.length + 1,
+          period:        Number(row.period || row.periodNo)  || raMap[key].payments.length + 1,
           dueDate:       (row.dueDate   || row.due_date   || '').slice(0,10),
           amount:        amt,
           paidDate:      (row.paidDate  || row.paid_date  || '').slice(0,10),
@@ -1493,50 +1489,63 @@ window.loadAllData = async function(){
           invoiceNumber: row.invoiceNumber || row.invoice_number || '',
           invoiceType:   row.invoiceType   || row.invoice_type   || '',
           invoiceDate:   (row.invoiceDate  || row.invoice_date   || '').slice(0,10),
+          invoiceMemo:   row.invoiceMemo   || '',
+          invoiceItems:  row.invoiceItems  || '',
         });
         raMap[key].total += amt;
       });
-      // 每組 payments 依 period 排序
       DB.receivables = Object.values(raMap).map(ra => {
         ra.payments.sort((a,b) => a.period - b.period);
         return ra;
       });
     }
 
-    // tasks（若 GAS 有回傳則載入，否則保留現有資料）
-    if(data.tasks && Array.isArray(data.tasks)) {
-      DB.tasks = data.tasks.filter(r => r.id && r.id !== 'id');
-    }
+    // tasks（支援新舊 key）
+    const tasksRaw = data.tasks || data.ops_tasks || [];
+    if(tasksRaw.length) DB.tasks = tasksRaw.filter(r => r.id && r.id !== 'id');
 
-    // spec_items
-    const siRaw = data.spec_items || data.specItems || [];
+    // spec_items（支援新舊 key）
+    const siRaw = data.spec_items || data.fin_spec_items || data.specItems || [];
     if(siRaw.length) DB.specItems = siRaw.filter(r => r.id && r.id !== 'id');
 
-    // vendor_records
-    const vrRaw = data.vendor_records || data.vendorRecords || [];
+    // vendor_records（支援新舊 key）
+    const vrRaw = data.vendor_records || data.fin_vendor_records || data.vendorRecords || [];
     if(vrRaw.length) DB.vendorRecords = vrRaw.filter(r => r.id);
 
-    // freelancer_records
-    const frRaw = data.freelancer_records || data.freelancerRecords || [];
+    // freelancer_records（支援新舊 key）
+    const frRaw = data.freelancer_records || data.fin_freelancer_records || data.freelancerRecords || [];
     if(frRaw.length) DB.freelancerRecords = frRaw.filter(r => r.id);
 
-    // om / social / ad
-    if(data.om_records) DB.omRecords = data.om_records.filter(r => r.id);
-    if(data.social_records) { DB.socialRecords = data.social_records.filter(r => r.id); }
-    else if(!DB.socialRecords) { DB.socialRecords = []; }
-    if(data.ad_records) { DB.adRecords = data.ad_records.filter(r => r.id); }
-    else if(!DB.adRecords) { DB.adRecords = []; }
+    // om / social / ad（支援新舊 key）
+    const omRaw = data.om_records || data.ops_om_records || [];
+    if(omRaw.length) DB.omRecords = omRaw.filter(r => r.id);
+    const soRaw = data.social_records || data.ops_social_records || [];
+    if(soRaw.length) DB.socialRecords = soRaw.filter(r => r.id);
+    else if(!DB.socialRecords) DB.socialRecords = [];
+    const adRaw = data.ad_records || data.ops_ad_records || [];
+    if(adRaw.length) DB.adRecords = adRaw.filter(r => r.id);
+    else if(!DB.adRecords) DB.adRecords = [];
 
-    // ── HR 資料填入 D 物件 ──
+    // vendor_companies（新）
+    const vcRaw = data.vendor_companies || data.fin_vendor_companies || [];
+    if(vcRaw.length) DB.vendorCompanies = vcRaw.filter(r => r.id);
+
+    // contacts / activities（新）
+    const ctRaw = data.contacts || data.crm_contacts || [];
+    if(ctRaw.length) DB.contacts = ctRaw.filter(r => r.id);
+    const actRaw = data.activities || data.crm_activities || [];
+    if(actRaw.length) DB.activities = actRaw.filter(r => r.id);
+
+    // ── HR 資料填入 D 物件（支援新舊 key）──
     if(typeof D !== 'undefined') {
-      D.members        = data.members        || [];
-      D.leave_types    = data.leave_types    || [];
-      D.leave_requests = data.leave_requests || [];
-      D.attendance     = data.attendance     || [];
-      D.salary_records = data.salary_records || [];
-      D.login_logs     = data.login_logs     || [];
-      D.annual_leave   = data.annual_leave   || [];
-      D.holidays       = data.holidays       || [];
+      D.members        = data.members        || data.hr_members        || [];
+      D.leave_types    = data.leave_types    || data.hr_leave_types    || [];
+      D.leave_requests = data.leave_requests || data.hr_leave_requests || [];
+      D.attendance     = data.attendance     || data.hr_attendance     || [];
+      D.salary_records = data.salary_records || data.hr_salary_records || [];
+      D.login_logs     = data.login_logs     || data.sys_login_logs    || [];
+      D.annual_leave   = data.annual_leave   || data.hr_annual_leave   || [];
+      D.holidays       = data.holidays       || data.hr_holidays       || [];
       if(typeof _currentUser !== 'undefined' && _currentUser) {
         myMember = D.members.find(m => m.email === _currentUser.email) || null;
         if(typeof hrApplyPermissions === 'function') hrApplyPermissions();
@@ -1659,9 +1668,18 @@ window.syncUpdateGAS = window.syncToGAS;
 
 window.syncDeleteGAS = async function(collection, id){
   const sheetMap = {
-    clients: 'clients', contracts: 'contracts',
-    specItems: 'spec_items', vendorRecords: 'vendor_records',
-    freelancerRecords: 'freelancer_records',
+    clients:            'crm_clients',
+    contracts:          'crm_contracts',
+    contacts:           'crm_contacts',
+    activities:         'crm_activities',
+    specItems:          'fin_spec_items',
+    vendorRecords:      'fin_vendor_records',
+    vendorCompanies:    'fin_vendor_companies',
+    freelancerRecords:  'fin_freelancer_records',
+    tasks:              'ops_tasks',
+    omRecords:          'ops_om_records',
+    socialRecords:      'ops_social_records',
+    adRecords:          'ops_ad_records',
   };
   const sheet = sheetMap[collection] || collection;
   try { await gasApi('delete', { sheet, id }); } catch(err){ console.error('syncDeleteGAS failed', err); }
@@ -5808,7 +5826,7 @@ async function hrReviewLeave(id,status){
 async function hrDelLeave(id){
   if(!confirm('確定刪除此請假記錄？'))return;
   try{
-    await gasApi('delete',{sheet:'leave_requests',id});
+    await gasApi('delete',{sheet:'hr_leave_requests',id});
     D.leave_requests=D.leave_requests.filter(x=>String(x.id)!==String(id));
     hrRenderLeave();toast('已刪除','success');
   }catch(e){toast('刪除失敗：'+e.message,'error');}
@@ -6091,7 +6109,7 @@ async function hrDelMember(id){
   if(!hrCanEditMember()){toast('無權限','error');return;}
   if(!confirm('確定刪除此員工資料？'))return;
   try{
-    await gasApi('delete',{sheet:'members',id});
+    await gasApi('delete',{sheet:'hr_members',id});
     D.members=D.members.filter(m=>String(m.id)!==String(id));
     toast('已刪除','success');hrRenderMembers();
   }catch(e){toast('刪除失敗：'+e.message,'error');}
