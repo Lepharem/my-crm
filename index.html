@@ -3149,6 +3149,29 @@ DB.vendorCompanies.push({
 });
 
 // ═══ SUMMARY ═══
+// ═══ SUMMARY 展開/收合工具函式 ═══
+function smToggleClient(key){
+  const body=document.getElementById('sm-cts-'+key);
+  if(!body)return;
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'';
+  const arr=document.getElementById('sm-arr-'+key);
+  if(arr)arr.style.transform=open?'':'rotate(180deg)';
+}
+function smTogglePays(ctKey){
+  const row=document.getElementById('sm-pays-'+ctKey);
+  if(!row)return;
+  row.style.display=row.style.display==='none'?'':'none';
+}
+function smExpandAll(expand){
+  document.querySelectorAll('[id^="sm-cts-"]').forEach(el=>{
+    el.style.display=expand?'':'none';
+  });
+  document.querySelectorAll('[id^="sm-arr-"]').forEach(el=>{
+    el.style.transform=expand?'rotate(180deg)':'';
+  });
+}
+
 function renderSummary(){
   const el=document.getElementById('summary-content');if(!el)return;
 
@@ -3256,53 +3279,141 @@ function renderSummary(){
       }).join('')+'</tbody></table></div>'
     :'';
 
-  // 依客戶分組，同客戶合併顯示，點擊展開/收合
+  // 依客戶分組，進行中排前，結案/完收排後（灰階）
+  const todayStr2 = new Date().toISOString().slice(0,10);
   const byClient = {};
   contracts.forEach(ct => {
     if(!byClient[ct.clientId]) byClient[ct.clientId] = [];
     byClient[ct.clientId].push(ct);
   });
-  let ctRows = '';
+
+  // 每個合約計算自己的收款（只抓 contractId 對應的 receivable）
+  function getCtRec(ct) {
+    const ra = DB.receivables.find(x => x.contractId === ct.id);
+    if(ra) return ra.payments.filter(p=>p.status==='已入款').reduce((a,p)=>a+p.amount,0);
+    // fallback: 從 DB.receivables 用 contractNo 比對
+    const ra2 = DB.receivables.find(x => x.contractNo && ct.contractNo && x.contractNo === ct.contractNo);
+    if(ra2) return ra2.payments.filter(p=>p.status==='已入款').reduce((a,p)=>a+p.amount,0);
+    return 0;
+  }
+  function getCtPayments(ct) {
+    const ra = DB.receivables.find(x => x.contractId === ct.id)
+             || DB.receivables.find(x => x.contractNo && ct.contractNo && x.contractNo === ct.contractNo);
+    return ra ? ra.payments.slice().sort((a,b)=>a.period-b.period) : [];
+  }
+  function isCtDone(ct) {
+    const rec = getCtRec(ct);
+    return ct.status === '結案' || ct.status === '結束合約' || (ct.total > 0 && rec >= ct.total);
+  }
+
+  let activeRows = '';
+  let doneRows = '';
+
   Object.entries(byClient).forEach(([clientId, cts]) => {
     const c = DB.clients.find(x => x.id === clientId);
     const cname = c ? c.name : clientId;
     const clientKey = clientId.replace(/[^a-z0-9]/gi,'_');
-    const activeCts = cts.filter(ct => ct.status === '進行中');
+    const activeCts = cts.filter(ct => !isCtDone(ct));
+    const doneCts = cts.filter(ct => isCtDone(ct));
     const clientTotal = cts.reduce((a,ct) => a+ct.total, 0);
-    ctRows += `<tr style="background:var(--surface2);cursor:pointer" onclick="var b=document.getElementById('sm-cts-${clientKey}');b.style.display=b.style.display==='none'?'':'none'">
-      <td colspan="6" style="font-weight:600;padding:10px 12px">
+    const isDoneClient = activeCts.length === 0;
+    const clientRec = cts.reduce((a,ct)=>a+getCtRec(ct),0);
+    const hasOverdue = cts.some(ct => getCtPayments(ct).some(p => p.status==='未入款' && p.dueDate && p.dueDate < todayStr2));
+
+    const headerStyle = isDoneClient
+      ? 'background:var(--surface2);cursor:pointer;opacity:.65;filter:grayscale(.6)'
+      : 'background:var(--surface2);cursor:pointer';
+
+    let groupHtml = `<tr class="sm-client-row" data-key="${clientKey}" style="${headerStyle}" onclick="smToggleClient('${clientKey}')">
+      <td colspan="7" style="font-weight:600;padding:10px 12px">
         <div style="display:flex;align-items:center;gap:8px">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.4;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
+          <svg id="sm-arr-${clientKey}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.4;flex-shrink:0;transition:transform .15s"><path d="M6 9l6 6 6-6"/></svg>
           <span>${cname}</span>
           <span class="tag tag-gray" style="font-size:10px">${cts.length} 份合約 ${fmt(clientTotal)}</span>
           ${activeCts.length ? `<span class="tag tag-green" style="font-size:10px">${activeCts.length} 進行中</span>` : ''}
+          ${hasOverdue ? `<span class="tag tag-red" style="font-size:10px">逾期</span>` : ''}
+          <span style="margin-left:auto;font-size:11px;color:var(--text3)">已收 ${fmt(clientRec)}</span>
         </div>
       </td>
-    </tr>`;
-    ctRows += `<tbody id="sm-cts-${clientKey}">`;
+    </tr>
+    <tbody id="sm-cts-${clientKey}" style="display:none">`;
+
     cts.forEach(ct => {
-      const ra = DB.receivables.filter(x => x.clientId === ct.clientId);
-      const rec = ra.reduce((a,r) => a + r.payments.filter(p => p.status === '已入款').reduce((b,p) => b+p.amount, 0), 0);
-      const p = ct.total > 0 ? rec / ct.total : 0;
-      const isCompleted = p >= 1;
-      const statusLabel = isCompleted ? '已結案' : (ct.status || '—');
-      const statusClass = isCompleted ? 'tag-gray' : ({'進行中':'tag-green','完成':'tag-blue','暫停':'tag-amber','結束合約':'tag-gray'}[ct.status] || 'tag-gray');
-      ctRows += `<tr>
-        <td style="font-size:12px;color:var(--text3);padding-left:28px">${ct.name}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${ct.driveLink?`<a href="${ct.driveLink}" target="_blank" style="color:var(--accent);text-decoration:none;display:flex;align-items:center;gap:3px">${ct.contractNo||'—'}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;opacity:.6"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:ct.contractNo||'—'}</td>
+      const rec = getCtRec(ct);
+      const pays = getCtPayments(ct);
+      const p = ct.total > 0 ? Math.min(rec / ct.total, 1) : 0;
+      const done = isCtDone(ct);
+      const statusLabel = (ct.status === '結案' || ct.status === '結束合約') ? '結案'
+        : (ct.total > 0 && rec >= ct.total) ? '完收'
+        : (ct.status || '—');
+      const statusClass = done ? 'tag-gray' : ({'進行中':'tag-green','完成':'tag-blue','暫停':'tag-amber'}[ct.status] || 'tag-gray');
+      const ctKey = ct.id.replace(/[^a-z0-9]/gi,'_');
+      const rowStyle = done ? 'opacity:.55;filter:grayscale(.5)' : '';
+      const hasOverduePay = pays.some(pay => pay.status==='未入款' && pay.dueDate && pay.dueDate < todayStr2);
+
+      groupHtml += `<tr style="${rowStyle}">
+        <td style="font-size:12px;padding-left:28px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="cursor:pointer;color:var(--text2);font-weight:500" onclick="event.stopPropagation();smTogglePays('${ctKey}')">${ct.name}</span>
+            ${hasOverduePay ? '<span class="tag tag-red" style="font-size:10px">逾期</span>' : ''}
+          </div>
+        </td>
+        <td style="font-family:var(--font-mono);font-size:11px">${ct.driveLink?`<a href="${ct.driveLink}" target="_blank" style="color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:3px">${ct.contractNo||'—'}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:9px;height:9px;opacity:.6"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:`<span style="color:var(--text3)">${ct.contractNo||'—'}</span>`}</td>
         <td style="text-align:right">${fmt(ct.total)}</td>
         <td style="text-align:right;color:#16a34a">${fmt(rec)}</td>
-        <td style="min-width:120px"><div class="flex items-center gap-2"><div class="progress-wrap" style="flex:1"><div class="progress-fill ${isCompleted?'green':''}" style="width:${Math.min(100,Math.round(p*100))}%"></div></div><span style="font-size:11px">${pct(p)}</span></div></td>
+        <td style="min-width:110px"><div style="display:flex;align-items:center;gap:6px"><div class="progress-wrap" style="flex:1"><div class="progress-fill ${done?'green':''}" style="width:${Math.round(p*100)}%"></div></div><span style="font-size:11px;white-space:nowrap">${Math.round(p*100)}%</span></div></td>
         <td><span class="tag ${statusClass}">${statusLabel}</span></td>
+        <td style="text-align:center;padding:4px 8px">
+          <button class="btn btn-xs" onclick="event.stopPropagation();smTogglePays('${ctKey}')" style="font-size:10px;padding:2px 8px">期次 ▾</button>
+        </td>
       </tr>`;
+
+      // 期次明細（預設隱藏）
+      if(pays.length) {
+        groupHtml += `<tr id="sm-pays-${ctKey}" style="display:none"><td colspan="7" style="padding:0 0 4px 0;background:var(--surface2)">
+          <div style="margin:0 28px 8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
+          <table style="font-size:11px;width:100%">
+            <thead><tr style="background:var(--bg)">
+              <th style="padding:6px 10px;font-weight:600;color:var(--text3);text-align:left">期次</th>
+              <th style="padding:6px 10px;font-weight:600;color:var(--text3)">到期日</th>
+              <th style="padding:6px 10px;font-weight:600;color:var(--text3);text-align:right">金額</th>
+              <th style="padding:6px 10px;font-weight:600;color:var(--text3)">狀態</th>
+              <th style="padding:6px 10px;font-weight:600;color:var(--text3)">入款日</th>
+            </tr></thead>
+            <tbody>${pays.map(pay=>{
+              const ov = pay.status==='未入款' && pay.dueDate && pay.dueDate < todayStr2;
+              const bg = ov?'background:#fff0f0':pay.status==='已入款'?'background:#f0fdf4':'';
+              return `<tr style="${bg}">
+                <td style="padding:5px 10px">第 ${pay.period} 期</td>
+                <td style="padding:5px 10px;color:${ov?'var(--red-text)':'var(--text2)'}">${pay.dueDate||'—'}</td>
+                <td style="padding:5px 10px;text-align:right;font-weight:500">${fmt(pay.amount)}</td>
+                <td style="padding:5px 10px"><span class="tag ${pay.status==='已入款'?'tag-green':ov?'tag-red':'tag-amber'}" style="font-size:10px">${ov?'逾期':pay.status}</span></td>
+                <td style="padding:5px 10px;color:var(--text3)">${pay.paidDate||'—'}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table></div>
+        </td></tr>`;
+      }
     });
-    ctRows += `</tbody>`;
+
+    groupHtml += `</tbody>`;
+    if(isDoneClient) doneRows += groupHtml;
+    else activeRows += groupHtml;
   });
 
+  // 結案客戶加灰階分隔標題
+  const doneSection = doneRows ? `
+    <tr><td colspan="7" style="padding:8px 12px;background:var(--bg);border-top:2px dashed var(--border2)">
+      <span style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">── 已結案 / 完收 ──</span>
+    </td></tr>
+    ${doneRows}` : '';
+
   el.innerHTML=statsHtml+catTable
-    +'<div class="table-wrap"><div class="table-header"><div class="table-title">各客戶合約概況</div></div>'
-    +'<table><thead><tr><th>合約名稱</th><th>報價單編號</th><th style="text-align:right">金額</th><th style="text-align:right">已入款</th><th style="text-align:right">收款進度</th><th>狀態</th></tr></thead>'
-    +'<tbody>'+ctRows+'</tbody></table></div>';
+    +'<div class="table-wrap"><div class="table-header">'
+    +'<div class="table-title">各客戶合約概況</div>'
+    +'</div>'
+    +'<table><thead><tr><th>合約名稱</th><th>報價單編號</th><th style="text-align:right">金額</th><th style="text-align:right">已入款</th><th style="text-align:right">收款進度</th><th>狀態</th><th style="width:60px"></th></tr></thead>'
+    +'<tbody>'+activeRows+doneSection+'</tbody></table></div>';
 }
 
 // ═══ PERFORMANCE ═══
@@ -3531,73 +3642,77 @@ function renderSpecsPage(){
   if(spClient&&spClient.options.length===1){DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;spClient.appendChild(o);});}
   const cat=document.getElementById('specs-category')?.value||'';
   const clientId=document.getElementById('sp-client')?.value||'';
-  const specs=DB.specItems.filter(s=>(!cat||s.category===cat)&&(!clientId||s.clientId===clientId));
 
-  // category summary cards
-  const cats=['口碑','社群','廣告','其他'];
-  const catColors={'口碑':['#4C1D95','#EDE9FE'],'社群':['#1B4FD8','#EEF2FF'],'廣告':['#92400E','#FEF3C7'],'其他':['#374151','#F3F4F6']};
-  const catSummary=cats.map(c=>{
-    const items=specs.filter(s=>s.category===c);
-    const rev=items.reduce((a,s)=>a+s.totalPrice,0);
-    const vendor=items.reduce((a,s)=>a+s.qty*(s.extCost||0),0);
-    const ext=items.reduce((a,s)=>a+s.qty*(s.intCost||0),0);
-    return{cat:c,rev,vendor,ext};
-  });
+  // 只抓進行中的合約
+  const activeContracts=DB.contracts.filter(ct=>ct.status==='進行中'&&(!clientId||ct.clientId===clientId));
 
-  let html=`<div style="padding:20px 24px 0">
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-      ${catSummary.map(g=>`<div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid ${catColors[g.cat][0]};border-radius:var(--r2);padding:16px 18px;box-shadow:var(--shadow)">
-        <div style="font-size:12px;font-weight:600;color:${catColors[g.cat][0]};margin-bottom:6px">${g.cat}</div>
-        <div style="font-size:22px;font-weight:600;color:var(--text);margin-bottom:6px">${fmt(g.rev)}</div>
-        <div style="font-size:11px;color:var(--text3)">廠商 ${fmt(g.vendor)}　外包 ${fmt(g.ext)}</div>
-      </div>`).join('')}
-    </div>`;
-
-  if(!specs.length){
-    html+=`<div class="empty-state"><p>目前無執行記錄，請新增廠商或外包記錄後查看</p></div></div>`;
-    el.innerHTML=html;return;
+  if(!activeContracts.length){
+    el.innerHTML=`<div style="padding:24px"><div class="empty-state"><p>目前無進行中的合約</p></div></div>`;return;
   }
 
-  // group by name
-  const groups={};
-  specs.forEach(s=>{
-    const key=`${s.category}|||${s.name}`;
-    if(!groups[key])groups[key]={category:s.category,name:s.name,unit:s.unit,items:[]};
-    groups[key].items.push(s);
-  });
-  const rows=Object.values(groups).map(g=>{
-    const totalQty=g.items.reduce((a,s)=>a+s.qty,0);
-    const totalRev=g.items.reduce((a,s)=>a+s.totalPrice,0);
-    const totalExt=g.items.reduce((a,s)=>a+s.qty*(s.extCost||0),0);
-    const totalInt=g.items.reduce((a,s)=>a+s.qty*(s.intCost||0),0);
-    const profit=totalRev-totalExt-totalInt;
-    const margin=totalRev>0?profit/totalRev:null;
-    return{...g,totalQty,totalRev,totalExt,totalInt,profit,margin};
-  }).sort((a,b)=>b.totalRev-a.totalRev);
+  const catColors={'口碑':'tag-blue','社群':'tag-green','廣告':'tag-amber','其他':'tag-gray'};
+  let html='<div style="padding:20px 24px 32px">';
 
-  const catTagColors={'口碑':'tag-purple','社群':'tag-blue','廣告':'tag-amber','其他':'tag-gray'};
-  html+=`<div class="table-wrap"><table>
-    <thead><tr><th>類型</th><th>規格名稱</th><th style="text-align:right">總執行量</th><th style="text-align:right">總報價</th><th style="text-align:right">廠商成本</th><th style="text-align:right">外包成本</th><th style="text-align:right">利潤</th><th style="text-align:right">利潤率</th></tr></thead>
-    <tbody>${rows.map(r=>`<tr>
-      <td><span class="tag ${catTagColors[r.category]||'tag-gray'}">${r.category}</span></td>
-      <td style="font-weight:500">${r.name}</td>
-      <td style="text-align:right;font-family:var(--font-mono)">${r.totalQty.toLocaleString()} ${r.unit||''}</td>
-      <td style="text-align:right;font-weight:500">${fmt(r.totalRev)}</td>
-      <td style="text-align:right;color:var(--amber)">${fmt(r.totalExt)}</td>
-      <td style="text-align:right;color:var(--blue-text)">${fmt(r.totalInt)}</td>
-      <td style="text-align:right;color:${r.profit>=0?'#16a34a':'var(--red)'}"><strong>${fmt(r.profit)}</strong></td>
-      <td style="text-align:right">${r.margin!==null?`<span class="tag ${r.margin>=.5?'tag-green':r.margin>=.2?'tag-amber':'tag-red'}">${pct(r.margin)}</span>`:'—'}</td>
-    </tr>`).join('')}</tbody>
-    <tfoot><tr>
-      <td colspan="2" style="padding:10px 14px;color:var(--text3);font-size:12px">合計</td>
-      <td style="padding:10px 14px;text-align:right">${specs.reduce((a,s)=>a+s.qty,0).toLocaleString()}</td>
-      <td style="padding:10px 14px;text-align:right;font-weight:600">${fmt(specs.reduce((a,s)=>a+s.totalPrice,0))}</td>
-      <td style="padding:10px 14px;text-align:right;color:var(--amber)">${fmt(specs.reduce((a,s)=>a+s.qty*(s.extCost||0),0))}</td>
-      <td style="padding:10px 14px;text-align:right;color:var(--blue-text)">${fmt(specs.reduce((a,s)=>a+s.qty*(s.intCost||0),0))}</td>
-      <td style="padding:10px 14px;text-align:right;font-weight:600;color:#16a34a">${fmt(rows.reduce((a,r)=>a+r.profit,0))}</td>
-      <td></td>
-    </tr></tfoot>
-  </table></div></div>`;
+  activeContracts.forEach(ct=>{
+    const c=DB.clients.find(x=>x.id===ct.clientId);
+    const cname=c?c.name:'—';
+    // 此合約的規格項目
+    const specs=DB.specItems.filter(s=>s.contractId===ct.id&&(!cat||s.category===cat));
+    if(!specs.length&&cat)return; // 有類型篩選但無符合項目就略過
+
+    html+=`<div style="margin-bottom:28px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <div style="padding:14px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-weight:600;font-size:13px">${cname}</span>
+        <span style="font-size:12px;color:var(--text3)">·</span>
+        <span style="font-size:12px;color:var(--text2)">${ct.name}</span>
+        ${ct.contractNo?`<span style="font-size:11px;font-family:var(--font-mono);color:var(--accent)">${ct.contractNo}</span>`:''}
+        <span class="tag tag-green" style="font-size:10px">進行中</span>
+        <span style="margin-left:auto;font-size:12px;color:var(--text3)">走期 ${(ct.start||'').slice(0,10)} ～ ${(ct.end||'').slice(0,10)}</span>
+      </div>`;
+
+    if(!specs.length){
+      html+=`<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">此合約尚未設定規格項目</div>`;
+    } else {
+      const totalAmt=specs.reduce((a,s)=>a+(s.totalPrice||0),0);
+      html+=`<table style="width:100%;font-size:12px">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 14px;text-align:left;font-weight:600;color:var(--text3)">類型</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:600;color:var(--text3)">規格名稱</th>
+          <th style="padding:8px 14px;text-align:center;font-weight:600;color:var(--text3)">單位</th>
+          <th style="padding:8px 14px;text-align:right;font-weight:600;color:var(--text3)">數量</th>
+          <th style="padding:8px 14px;text-align:right;font-weight:600;color:var(--text3)">單價</th>
+          <th style="padding:8px 14px;text-align:right;font-weight:600;color:var(--text3)">小計</th>
+          <th style="padding:8px 14px;text-align:right;font-weight:600;color:var(--text3)">廠商成本</th>
+          <th style="padding:8px 14px;text-align:right;font-weight:600;color:var(--text3)">外包成本</th>
+          <th style="padding:8px 14px;text-align:left;font-weight:600;color:var(--text3)">備註</th>
+        </tr></thead>
+        <tbody>${specs.map((s,i)=>{
+          const unitPrice=s.qty>0?(s.totalPrice||0)/s.qty:s.price||0;
+          return`<tr style="${i%2===1?'background:var(--surface2)':''}">
+            <td style="padding:8px 14px"><span class="tag ${catColors[s.category]||'tag-gray'}" style="font-size:10px">${s.category||'—'}</span></td>
+            <td style="padding:8px 14px;font-weight:500">${s.name||'—'}</td>
+            <td style="padding:8px 14px;text-align:center;color:var(--text2)">${s.unit||'—'}</td>
+            <td style="padding:8px 14px;text-align:right;font-family:var(--font-mono)">${s.qty||0}</td>
+            <td style="padding:8px 14px;text-align:right;font-family:var(--font-mono);color:var(--text2)">${unitPrice?fmt(unitPrice):'—'}</td>
+            <td style="padding:8px 14px;text-align:right;font-weight:600">${fmt(s.totalPrice||0)}</td>
+            <td style="padding:8px 14px;text-align:right;color:var(--amber-text)">${s.extCost&&s.qty?(fmt(s.extCost*s.qty)):'—'}</td>
+            <td style="padding:8px 14px;text-align:right;color:var(--blue-text)">${s.intCost&&s.qty?(fmt(s.intCost*s.qty)):'—'}</td>
+            <td style="padding:8px 14px;color:var(--text3);font-size:11px">${s.spec||''}</td>
+          </tr>`;
+        }).join('')}</tbody>
+        <tfoot><tr style="background:var(--surface2);border-top:1.5px solid var(--border2)">
+          <td colspan="5" style="padding:8px 14px;font-weight:600;color:var(--text2)">合計</td>
+          <td style="padding:8px 14px;text-align:right;font-weight:700;color:var(--text)">${fmt(totalAmt)}</td>
+          <td style="padding:8px 14px;text-align:right;font-weight:600;color:var(--amber-text)">${fmt(specs.reduce((a,s)=>a+(s.extCost||0)*(s.qty||0),0))}</td>
+          <td style="padding:8px 14px;text-align:right;font-weight:600;color:var(--blue-text)">${fmt(specs.reduce((a,s)=>a+(s.intCost||0)*(s.qty||0),0))}</td>
+          <td></td>
+        </tr></tfoot>
+      </table>`;
+    }
+    html+='</div>';
+  });
+
+  html+='</div>';
   el.innerHTML=html;
 }
 
