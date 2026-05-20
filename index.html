@@ -902,6 +902,9 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
       <div class="topbar">
         <div class="topbar-left"><div class="topbar-title">口碑執行記錄</div><div class="topbar-sub">口碑文章、回文、監控執行紀錄管理</div></div>
         <div class="topbar-actions">
+          <button class="btn btn-sm btn-ghost edit-only" onclick="openVendorTokenModal()" style="gap:6px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>廠商連結
+          </button>
           <button class="btn btn-primary edit-only" onclick="openOmDrawer(null)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增記錄
           </button>
@@ -915,22 +918,22 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
         <select class="filter-input" id="om-client" onchange="renderOmPage()" style="width:130px"><option value="">全部客戶</option></select>
         <span class="filter-label">月份</span>
         <input type="month" class="filter-input" id="om-month" onchange="renderOmPage()" style="width:130px">
-        <span class="filter-label">執行人員</span>
-        <select class="filter-input" id="om-executor" onchange="renderOmPage()" style="width:110px"><option value="">全部</option><option value="內部">內部</option></select>
+        <span class="filter-label">寫手</span>
+        <select class="filter-input" id="om-writer" onchange="renderOmPage()" style="width:100px"><option value="">全部</option><option value="內部">內部</option></select>
         <span class="filter-label">廠商</span>
-        <select class="filter-input" id="om-vendor" onchange="renderOmPage()" style="width:110px">
-          <option value="">全部廠商</option>
+        <select class="filter-input" id="om-vendor" onchange="renderOmPage()" style="width:90px">
+          <option value="">全部</option>
           <option>庫奇</option><option>JoDo</option><option>元緣</option><option>歐文</option><option>耐性</option><option>格瑞</option>
         </select>
-        <span class="filter-label">規格</span>
-        <select class="filter-input" id="om-spec-type" onchange="renderOmPage()" style="width:120px">
-          <option value="">全部規格</option>
-          <option>回文</option><option>發文</option><option>發文+圖</option><option>短議題文</option><option>長圖文</option><option>短圖文</option><option>Google星評</option><option>綁定回文</option><option>監控回文</option>
+        <span class="filter-label">類型</span>
+        <select class="filter-input" id="om-spec-type" onchange="renderOmPage()" style="width:100px">
+          <option value="">全部</option>
+          <option>短圖文</option><option>長圖文</option><option>短議題文</option><option>綁定回文</option><option>監控回文</option><option>即時回文</option><option>Google星評</option>
         </select>
         <span class="filter-label">狀態</span>
         <select class="filter-input" id="om-status" onchange="renderOmPage()" style="width:100px">
           <option value="">全部</option>
-          <option>待執行</option><option>已排程</option><option>已上刊</option><option>文章刪除</option>
+          <option>待發包</option><option>撰文中</option><option>文稿審核</option><option>切角審核</option><option>待上刊</option><option>已上刊</option><option>觀察中</option><option>完成</option><option>文章刪除</option>
         </select>
         <button class="btn btn-sm btn-ghost" onclick="clearOmFilters()">清除篩選</button>
       </div>
@@ -1562,8 +1565,9 @@ window.loadAllData = async function(){
         });
 
         return {
-          id:   r.id,
-          name: r.name,
+          id:          r.id,
+          name:        r.name,
+          accessToken: r.accessToken || r['accessToken'] || '',
           platforms: Object.entries(platMap).map(([platform, items]) => ({ platform, items }))
         };
       });
@@ -1722,6 +1726,7 @@ window.syncToGAS = async function(collection, obj){
     socialRecords: 'saveSocialRecord',
     adRecords: 'saveAdRecord',
   };
+  // 直接傳 action 的呼叫（confirmTask / rejectTask / genVendorToken）不走 actionMap
   const action = actionMap[collection];
   if(!action){ console.warn('syncToGAS: unknown collection', collection); return; }
   try { await gasApi(action, obj); } catch(err){ console.error('syncToGAS failed', err); }
@@ -1782,7 +1787,13 @@ const DB = {
   ],
   vendorRecords:[{"id": "VR_歐文_2026-05_1", "vendorId": "VC004", "vendorName": "歐文", "clientName": "永達", "clientId": "", "month": "2026-05", "seq": 1, "date": "2026-05-04", "platform": "Dcard", "section": "保險業", "itemType": "回文", "title": "在直轄做了兩年 真的有比較穩嗎", "link": "https://www.dcard.tw/f/insurance/p/261360720", "content": "保經也有不同生態\n我自己是在永達做2年多了\n前輩很會帶 帶到自己成為很會帶的前輩\n所以與其花時間嘗試 不如實際去看一下新人的教育訓練\n足夠扎實 完全不用擔心 有人肯帶的環境很重要\n學會了才能賺到摳摳~~👌", "note": "", "account": "P", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_2", "vendorId": "VC004", "vendorName": "歐文", "clientName": "永達", "clientId": "", "month": "2026-05", "seq": 2, "date": "2026-05-04", "platform": "FaceBook", "section": "保險業務交流園地", "itemType": "回文", "title": "想轉換台中保經公司☺️", "link": "https://www.facebook.com/1026985057340880/posts/26719788567633843", "content": "我朋友在永達三年不到就達成MDRT\n他說公司制度讓他願意努力\n而且還有很好的前輩傳授經驗\n看他生活越來越好\n我最近也在考慮要轉職跟著他", "note": "", "account": "Dai", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_3", "vendorId": "VC004", "vendorName": "歐文", "clientName": "永達", "clientId": "", "month": "2026-05", "seq": 3, "date": "2026-05-04", "platform": "Dcard", "section": "保險業", "itemType": "回文", "title": "想加入保險業", "link": "https://www.dcard.tw/f/insurance/p/261385390", "content": "發展性佳有很多可以學習的機會\n商品種類不受單一保險公司的限制\n而且有完整教育訓練\n保障能力的同時 未來晉升也透明公開\n \n我是往這幾個方向去找保經的\n最後在永達保經\n有強大的創業平台及大數據報表管理\n提供給你參考囉\n我目前入職到現在 勞動＆收入比例我非常能接受😆", "note": "", "account": "P", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_4", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 4, "date": "2026-05-05", "platform": "Dcard", "section": "閒聊", "itemType": "回文", "title": "吃魚油真的有差嗎? 真實體感分享", "link": "https://www.dcard.tw/f/talk/p/261395793", "content": "哇!!這些價格我買不下去😅\n小資上班族又不只魚油要吃\n我平常固定吃的台酒魚油才500塊一瓶 \n雖然不是複方成份\n但也覺得很夠了", "note": "", "account": "喜", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_5", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 5, "date": "2026-05-05", "platform": "Dcard", "section": "網路購物", "itemType": "回文", "title": "初級大人超推的魚油開箱分享-Notorious魚油", "link": "https://www.dcard.tw/f/buyonline/p/261398858", "content": "我看這瓶60顆1200耶～\n每個月要吃的話，錢包會有點壓力…\n我自己是買台酒的魚油\nrTG型態、Omega-3含量也有達標準\n1瓶一樣60顆，500元搞定", "note": "", "account": "Candy", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_6", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 6, "date": "2026-05-05", "platform": "Threads", "section": "", "itemType": "回文", "title": "跪求高級大人指點 有沒有推薦給初級大人 從年輕就要吃的保健品", "link": "https://www.threads.com/@plmqaz01928374/post/DXtNuq_E690", "content": "魚油跟葉黃素吧\n現在的生活型態很需要補充這些\n我從開始工作後就會固定買來吃 \n是買台酒的\n他們家價格都不貴\n初級大人還可以負擔得起", "note": "", "account": "yc", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_7", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 7, "date": "2026-05-05", "platform": "Threads", "section": "", "itemType": "回文", "title": "求高級大人分享上班族必備的保健品", "link": "https://www.threads.com/@uhsyw_927/post/DXtJ1Yxj_w2", "content": "我幾乎三餐都在外面吃 所以益生菌跟魚油是必備 \n又因為長時間使用電腦 也會買葉黃素 \n我貪圖方便 這些全都在台酒生技官網一次買的\n噢然後需要加班的話 會再多個合利他命B群", "note": "", "account": "so", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_8", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 8, "date": "2026-05-05", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "發文+圖", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@guanhao763/post/DX8q-hYkd4k?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "【Mia】短圖文#1", "note": "指定帳號\nhttps://www.threads.com/@guanhao763", "account": "信", "executed": true, "amount": 210}, {"id": "VR_歐文_2026-05_9", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 9, "date": "2026-05-05", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@guanhao763/post/DX8q-hYkd4k?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "我也有看到欸 好好奇味道", "note": "與前一則間隔半小", "account": "bb", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_10", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 10, "date": "2026-05-05", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@guanhao763/post/DX8q-hYkd4k?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "留友卡~~", "note": "與前一則間隔半小", "account": "em", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_11", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 11, "date": "2026-05-05", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@guanhao763/post/DX8q-hYkd4k?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "不知道你感覺如何\n但我是覺得好吃\n味道跟原版基本一樣👍", "note": "與前一則間隔半小", "account": "fa", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_12", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 12, "date": "2026-05-05", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@guanhao763/post/DX8q-hYkd4k?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "現在已經過了幾個小時 原po還是沒說有沒有被騙感情", "note": "與前一則間隔半小", "account": "ow", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_13", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 13, "date": "2026-05-08", "platform": "Threads", "section": "主題：保健品", "itemType": "發文", "title": "想問脆友們", "link": "https://www.threads.com/@mins_eono/post/DYEkjINE3Ac?xmt=AQG0EFyyntlCxJ5UzwgmvMXjKqBpYnx9J9gt-CcCMbR8ZeRXWSw1xxA63CWGODMom4gkwIkz&slof=1", "content": "台灣菸酒(魚油)#10", "note": "", "account": "min", "executed": true, "amount": 200}, {"id": "VR_歐文_2026-05_14", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 14, "date": "2026-05-08", "platform": "Threads", "section": "主題：保健品", "itemType": "回文", "title": "想問脆友們", "link": "", "content": "我偏固定同一牌～\n只要吃了覺得OK就不太想換，懶得重新適應😂", "note": "", "account": "yin", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_15", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 15, "date": "2026-05-08", "platform": "Threads", "section": "主題：保健品", "itemType": "回文", "title": "想問脆友們", "link": "", "content": "不一定耶 \n有時候看到特價或朋友推薦就會試試看\n還沒找到完全不想換的那種", "note": "", "account": "yin", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_16", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 16, "date": "2026-05-08", "platform": "Threads", "section": "主題：保健品", "itemType": "回文", "title": "想問脆友們", "link": "", "content": "通常前面也會吃很多種才找到適合的吧 找到後就不換了👀", "note": "", "account": "yin", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_17", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 17, "date": "2026-05-09", "platform": "Threads", "section": "主題：保健品", "itemType": "回文", "title": "想問脆友們", "link": "", "content": "我幾乎都固定同一個牌子\n尤其是他同時有賣很多保健品的那種\n像我現在吃的台酒就是啊\n魚油 益生菌 葉黃素都在官網一次買齊", "note": "", "account": "yc", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_18", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 18, "date": "2026-05-09", "platform": "Threads", "section": "主題：保健品", "itemType": "回文", "title": "想問脆友們", "link": "", "content": "後來發現 價格會影響持續度\n現在就選比較好入手的", "note": "", "account": "Fa", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_19", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 19, "date": "2026-05-11", "platform": "Dcard", "section": "閒聊", "itemType": "發文+圖", "title": "大家吃了幾款才找到命定保健品", "link": "https://www.dcard.tw/f/talk/p/261459583?cid=7ceee360-92fa-4068-bbcc-5191b81c269f", "content": "台灣菸酒(魚油)#11", "note": "附圖*4", "account": "yin", "executed": true, "amount": 210}, {"id": "VR_歐文_2026-05_20", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 20, "date": "2026-05-11", "platform": "Dcard", "section": "閒聊", "itemType": "回文", "title": "大家吃了幾款才找到命定保健品", "link": "", "content": "我是益生菌試超多款才找到適合的\n一開始也是看到大家推薦就買，但有些吃了沒什麼感覺\n後來找到比較適合自己體質的就固定回購\n覺得保健品很看人，都要試過才知道適不適合", "note": "", "account": "yin", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_21", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 21, "date": "2026-05-11", "platform": "Dcard", "section": "閒聊", "itemType": "回文", "title": "大家吃了幾款才找到命定保健品", "link": "", "content": "我大概是買過2-3種不同的品牌才比較固定下來，有些不是不好，就是不會想一直吃，現在固定幾款之後就很少再亂換了😅", "note": "", "account": "La", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_22", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 22, "date": "2026-05-12", "platform": "Dcard", "section": "閒聊", "itemType": "回文", "title": "大家吃了幾款才找到命定保健品", "link": "", "content": "我最近在挑魚油\n原來不用一定要吃那麼高含量的 😮", "note": "", "account": "鴨鴨", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_23", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 23, "date": "2026-05-12", "platform": "Dcard", "section": "閒聊", "itemType": "回文", "title": "大家吃了幾款才找到命定保健品", "link": "", "content": "我反而是B群試比較多款 \n有些吃了會覺得比較燥或不太舒服\n魚油我是第一次就吃到體感有差的了 \n跟你一樣是台酒的", "note": "", "account": "羅聖叡", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_24", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 24, "date": "2026-05-13", "platform": "Dcard", "section": "閒聊", "itemType": "回文", "title": "大家吃了幾款才找到命定保健品", "link": "", "content": "現在也吃台酒生技的魚油~\n主要是價格比較沒壓力, 每天的攝取量也足夠, 不會補充過量造成浪費", "note": "", "account": "Peanut", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_25", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 25, "date": "2026-05-05", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文+圖", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@guanhao763/post/DX8q-hYkd4k?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "抱歉各位我來晚了\n看到一堆通知嚇瘋🤩\n原本想說明天再吃的\n為了大家先開了🤩\n麵條的部分不一樣 麵首爾比較細\n這一款好像是阿舍原本的那種粗度口感\n吃起來比較Q\n我個人覺得也比較能抓住醬汁\n吃起來有比較爽🤩\n醬的部分基本上是1:1完美複製\n大家可以衝🤩", "note": "原po回", "account": "信", "executed": true, "amount": 70}, {"id": "VR_歐文_2026-05_26", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 26, "date": "2026-05-06", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@guanhao763/post/DX8q-hYkd4k?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "請問是全台的都可以買嗎?謝謝", "note": "", "account": "min", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_27", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 27, "date": "2026-05-06", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文+圖", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@guanhao763/post/DX8q-hYkd4k?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "我有問店員\n店員說全台的Mia C'bon都有喔🤩\n但我那天是去逛101的\n他們現場還有專門的區域\n超酷🤩", "note": "原po回26", "account": "信", "executed": true, "amount": 70}, {"id": "VR_歐文_2026-05_28", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 28, "date": "2026-05-06", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@moose.60044/post/DX9gp5CFEFL?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "抱歉抱歉 發了就跑去弄自己的事\n沒發現大家都在等我🤩\n有發心得了 請收🤩\nhttps://www.threads.com/@guanhao763/post/DX9lgpwkmt7?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "note": "原po回\nmoose.60044", "account": "信", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_29", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 29, "date": "2026-05-06", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@pei_in_korea/post/DX9ICQmkdgF?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "同好🤩\n這真的超好吃\n淡淡的香氣 醬料都融合得很好\n吃起來很舒服\n現在台灣就買得到超爽🤩", "note": "原po回\npei_in_korea", "account": "信", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_30", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 30, "date": "2026-05-06", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@fan1111693/post/DX87QROAZsq?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "我也覺得跟原版是1:1完美複製\n超好吃🤩", "note": "原po回\nfan1111693", "account": "信", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_31", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 31, "date": "2026-05-06", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@moristar333/post/DX99NJFEnIv?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "快去買🤩\n我是買兩種口味組合的\n店員說只有在Mia C'bon有喔🤩", "note": "原po回\nmoristar333", "account": "信", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_32", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 32, "date": "2026-05-06", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@tanpaobu/post/DX9f5b5E3q0?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "現在不用去韓國就有得吃了\n阿舍我老大🤩", "note": "原po回\ntanpaobu", "account": "信", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_33", "vendorId": "VC004", "vendorName": "歐文", "clientName": "Mia C'bon", "clientId": "", "month": "2026-05", "seq": 33, "date": "2026-05-06", "platform": "Threads", "section": "主題：黑白大廚", "itemType": "回文", "title": "身為黑白大廚的狂粉", "link": "https://www.threads.com/@miacbon/post/DX_OHxhoN18?xmt=AQF0wocjNy-rdpfT3hJXKDJeNKsQOXnFexpLV09dAIauyQ", "content": "哇竟然釣出小編🤩\n我要成為Mia C'bon的信徒了🤩\n現在立刻去登錄發票\n我想去韓國玩🤩", "note": "原po回\nMia C'bon", "account": "信", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_34", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 34, "date": "2026-05-08", "platform": "Threads", "section": "", "itemType": "回文+圖", "title": "補充以下 找她代言的廠商， 請大家一人一信 請廠商不要再跟她合作", "link": "https://www.threads.com/@joyball2020/post/DYD6ggKFBtk?xmt=AQG0bmy9ZMWF4_9ogHC1FAmsSgK7YBPIJwJIjCMrmUp1FQ", "content": "有特別提醒貪貪麵茶的事了，這是他們的回應，廠商都是被她剛開始表現出來的誠意矇騙了，希望他們以後要仔細選合作對象", "note": "貓帳", "account": "LA", "executed": true, "amount": 70}, {"id": "VR_歐文_2026-05_35", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 35, "date": "2026-05-08", "platform": "Threads", "section": "", "itemType": "回文", "title": "家裡狗狗飼料不怎麼愛吃", "link": "https://www.threads.com/@momo___0616/post/DYC1gOAE69D?xmt=AQG0NqDEmWdwFCSuL9CMMfVDMBI5CbLEmYvVs_l9DvQtI-9uMeFCHUOxbXDPYRy0asxFgNYy&slof=1", "content": "養柴柴真的要比較有耐心，我朋友的輝哥就很常看他爸換花樣餵，開罐頭都不一定吃，輝哥爸最近還分倍力羊奶粉給我家的試喝，他說現在輝哥吃飼料加羊奶可以吃光", "note": "狗帳", "account": "喜", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_36", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 36, "date": "2026-05-08", "platform": "Threads", "section": "", "itemType": "回文", "title": "這牌還有人敢買哦🤔", "link": "https://www.threads.com/@hsuan09_04/post/DYDH9DSEgV3?xmt=AQG0cUq6XtswGU3dPPSl8KVpS7284zmFORbxtRJ6rsr0waI-mjvEzTnBqzPYaakdBFyi4po&slof=1", "content": "倍力已經都送過檢驗還增加國際餵食測試，而且當初也跟狗無關吧🤔🧐", "note": "狗帳", "account": "candy", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_37", "vendorId": "VC004", "vendorName": "歐文", "clientName": "全店ihair", "clientId": "", "month": "2026-05", "seq": 37, "date": "2026-05-11", "platform": "Google星評", "section": "", "itemType": "回文", "title": "原本只是想去看看自己頭髮密度的狀況", "link": "https://maps.app.goo.gl/U3z4sERJsVhwuGmj8", "content": "御髮生髮#18 星評", "note": "", "account": "剖", "executed": true, "amount": 90}, {"id": "VR_歐文_2026-05_38", "vendorId": "VC004", "vendorName": "歐文", "clientName": "全店ihair", "clientId": "", "month": "2026-05", "seq": 38, "date": "2026-05-11", "platform": "Google星評", "section": "", "itemType": "回文", "title": "第一次接觸植髮，其實一開始有點緊張", "link": "https://maps.app.goo.gl/RXmXxrY7q6aXN5ML8", "content": "御髮生髮#19 星評", "note": "", "account": "Ling", "executed": true, "amount": 90}, {"id": "VR_歐文_2026-05_39", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台北ihair", "clientId": "", "month": "2026-05", "seq": 39, "date": "2026-05-11", "platform": "Google星評", "section": "", "itemType": "回文", "title": "單純想搞清楚自己現在的狀況", "link": "https://maps.app.goo.gl/KZ1p4BTWYgzuPZ6NA", "content": "台北御髮 #8 星評", "note": "", "account": "林梓齊", "executed": true, "amount": 90}, {"id": "VR_歐文_2026-05_40", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 40, "date": "2026-05-11", "platform": "Threads", "section": "", "itemType": "回文", "title": "想買魚油來吃，大家有推薦的牌子嗎？￼", "link": "https://www.threads.com/@catdd.002/post/DX6TmIGGGcD", "content": "我跟我家人都固定買台酒的魚油～\n一開始是因為長輩要找好吞又沒腥味的魚油，才買台酒生技\n後來我也跟著一起吃，一瓶500元吃一個月很划算", "note": "", "account": "fa", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_41", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 41, "date": "2026-05-11", "platform": "Threads", "section": "", "itemType": "回文", "title": "問脆友 有沒有推薦的魚油跟鋅保健食品～", "link": "https://www.threads.com/@rabay.ciwang/post/DYKM_KICeCS", "content": "自己也定期在補充魚油跟鋅 \n這2個牌子推薦給你\n我覺得都不錯 CP值也高\n魚油👉台酒\n鋅👉克補", "note": "", "account": "min", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_42", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台灣菸酒", "clientId": "", "month": "2026-05", "seq": 42, "date": "2026-05-11", "platform": "Threads", "section": "", "itemType": "回文", "title": "想問各位 有沒有推薦的魚油！！", "link": "https://www.threads.com/@weee.like/post/DYJYQq_kvAn", "content": "我都吃台酒生技的魚油\n是rTG型態的, 吸收度更好!!\nhttps://eshop.ttl.com.tw/%E6%B7%B1%E6%B5%B7%E9%AD%9A%E6%B2%B9%E8%BB%9F%E8%86%A0%E5%9B%8A%E6%96%B0%E8%A6%8F%E6%A0%BC-60%E9%A1%86%E7%93%B6", "note": "", "account": "oli", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_43", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華整外", "clientId": "", "month": "2026-05", "seq": 43, "date": "2026-05-12", "platform": "FaceBook", "section": "醫美整形保養交流討論公開版 Medical Beauty care board", "itemType": "回文", "title": "請問能推薦台北或桃園假體隆乳醫師嗎～救救我哺乳過後的可憐奶🥺", "link": "https://www.facebook.com/686552765061367/posts/2640980006285290/?comment_id=2650169258699698", "content": "推薦桃園風華整形外科的謝松育院長，院長很nice技術也好，做的很自然喔～", "note": "女", "account": "信", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_44", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華整外", "clientId": "", "month": "2026-05", "seq": 44, "date": "2026-05-12", "platform": "PTT", "section": "facelift", "itemType": "回文", "title": "[詢問] 桃園醫美診所推薦", "link": "https://www.ptt.cc/bbs/facelift/M.1777282560.A.805.html", "content": "推風華桃園整所陳宣妤\n技術專業穩定 也不會推銷", "note": "女，要跟#45不同帳號", "account": "信", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_45", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華整外", "clientId": "", "month": "2026-05", "seq": 45, "date": "2026-05-12", "platform": "PTT", "section": "facelift", "itemType": "回文", "title": "[詢問] 新竹不推銷的診所", "link": "https://www.ptt.cc/bbs/facelift/M.1777880246.A.673.html", "content": "新竹風華診所 我都找蘇羿如醫師\n診間服務人員也都很親切 不會一直煩", "note": "女，要跟#44不同帳號", "account": "Paggie", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_46", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華御髮", "clientId": "", "month": "2026-05", "seq": 46, "date": "2026-05-12", "platform": "Babyhome", "section": "閒聊八卦", "itemType": "回文", "title": "地中海禿不是突然禿…老公是從頭頂慢慢變空開始😭", "link": "https://forum.babyhome.com.tw/topic/5067271", "content": "大推風華ihair，在古亭站附近\n我先生都固定找蘇羿如醫生回診，他很親切又專業\n他們有育髮課程，也能植髮，可以跟醫生討論後再決定\n他們也不會硬要推銷，諮詢時很舒服", "note": "女", "account": "AS", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_47", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華醫美", "clientId": "", "month": "2026-05", "seq": 47, "date": "2026-05-12", "platform": "Babyhome", "section": "美體美顏", "itemType": "發文", "title": "產後加上年紀…更想去調整臉型了", "link": "https://forum.babyhome.com.tw/topic/5067671", "content": "風華整外#4 短議題文", "note": "", "account": "P", "executed": true, "amount": 200}, {"id": "VR_歐文_2026-05_48", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華醫美", "clientId": "", "month": "2026-05", "seq": 48, "date": "2026-05-12", "platform": "Babyhome", "section": "美體美顏", "itemType": "回文", "title": "產後加上年紀…更想去調整臉型了", "link": "", "content": "我朋友有做過削骨\n她是做比較自然的調整\n沒有變成很尖的臉\n臉線條變順看起來比較柔和", "note": "", "account": "P", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_49", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華醫美", "clientId": "", "month": "2026-05", "seq": 49, "date": "2026-05-12", "platform": "Babyhome", "section": "美體美顏", "itemType": "回文", "title": "產後加上年紀…更想去調整臉型了", "link": "", "content": "恢復期真的要評估一下時間安排\n尤其有👶的話  前期可能需要多🤏協助", "note": "", "account": "P", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_50", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華醫美", "clientId": "", "month": "2026-05", "seq": 50, "date": "2026-05-12", "platform": "Babyhome", "section": "美體美顏", "itemType": "回文", "title": "產後加上年紀…更想去調整臉型了", "link": "", "content": "削骨我覺得醫師風格差很多\n有些偏明顯改變/有些是微調型\n重點是溝通清楚就好", "note": "", "account": "P", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_51", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華醫美", "clientId": "", "month": "2026-05", "seq": 51, "date": "2026-05-13", "platform": "Babyhome", "section": "美體美顏", "itemType": "回文", "title": "產後加上年紀…更想去調整臉型了", "link": "", "content": "我之前看過陳醫師的案例\n大多是讓輪廓自然一點，不會做很尖", "note": "", "account": "As", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_52", "vendorId": "VC004", "vendorName": "歐文", "clientName": "風華醫美", "clientId": "", "month": "2026-05", "seq": 52, "date": "2026-05-13", "platform": "Babyhome", "section": "美體美顏", "itemType": "回文", "title": "產後加上年紀…更想去調整臉型了", "link": "", "content": "這類手術建議還是多諮詢幾位 ,了解恢復期跟效果 ,再慢慢評估比較安心", "note": "", "account": "Ow", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_53", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 53, "date": "2026-05-13", "platform": "Dcard", "section": "寵物版", "itemType": "發文+圖", "title": "#分享  本來沒打算換主食罐…但貪貪這款真的有點猛", "link": "https://www.dcard.tw/f/pet/p/261471730?cid=1ab1169e-b505-48a8-8b42-22acc463a106", "content": "https://docs.google.com/document/d/1O1iF2l02dPJrfYMNS-tqwzb0z8avbLKV1edvzzTlMa4/edit?usp=sharing", "note": "", "account": "七", "executed": true, "amount": 210}, {"id": "VR_歐文_2026-05_54", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 54, "date": "2026-05-13", "platform": "Dcard", "section": "寵物版", "itemType": "回文", "title": "#分享  本來沒打算換主食罐…但貪貪這款真的有點猛", "link": "", "content": "家有挑食貓…\n看到吃完碗乾淨直接心動~😳", "note": "", "account": "黃湘", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_55", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 55, "date": "2026-05-13", "platform": "Dcard", "section": "寵物版", "itemType": "回文", "title": "#分享  本來沒打算換主食罐…但貪貪這款真的有點猛", "link": "", "content": "還在考慮到底要不要給貓咪長期主食罐，目前主食還是飼料，看到很多人都說罐頭可以補水，貓咪快8歲了，是不是要開始投資主食罐", "note": "", "account": "yin", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_56", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 56, "date": "2026-05-13", "platform": "Dcard", "section": "寵物版", "itemType": "回文", "title": "#分享  本來沒打算換主食罐…但貪貪這款真的有點猛", "link": "", "content": "蜂之罐我家貓咪也是一試成主顧 \n好味、汪喵、肉球世界、自然食各種牌都試過\n只有貪貪到現在還沒吃膩！", "note": "", "account": "羅聖叡", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_57", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 57, "date": "2026-05-14", "platform": "Dcard", "section": "寵物版", "itemType": "回文", "title": "#分享  本來沒打算換主食罐…但貪貪這款真的有點猛", "link": "", "content": "我們家都吃肉絲或肉塊 貪貪肉絲罐也是偶爾回購清單 通常都是有活動的時候去買！", "note": "", "account": "冠丞", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_58", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 58, "date": "2026-05-14", "platform": "Dcard", "section": "寵物版", "itemType": "回文", "title": "#分享  本來沒打算換主食罐…但貪貪這款真的有點猛", "link": "", "content": "我家貓咪也是吃很愛吃這款，目前還沒翻臉（已經很感人🥹", "note": "", "account": "喜", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_59", "vendorId": "VC004", "vendorName": "歐文", "clientName": "歐耐恩", "clientId": "", "month": "2026-05", "seq": 59, "date": "2026-05-12", "platform": "Dcard", "section": "牙齒矯正", "itemType": "發文+圖", "title": "歐耐恩現在狀況是怎樣？", "link": "https://www.dcard.tw/f/orthodontics/p/261470301?cid=56c26ef0-4cec-4958-b214-421d9a049b5a", "content": "https://docs.google.com/document/d/1j-PVGjWc2xuWkgj0Pak92eRU6r3PzwuWHl38zve0tYo/edit?usp=sharing", "note": "", "account": "yin", "executed": true, "amount": 210}, {"id": "VR_歐文_2026-05_60", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 60, "date": "2026-05-13", "platform": "Threads", "section": "", "itemType": "回文", "title": "母親節要送什麼！！！", "link": "https://www.threads.com/@aaze198/post/DXjmjS2gfEW", "content": "點睛品的黃金首飾，輕奢華滿好看的\n選擇滿多種，媽媽不戴當收藏也好！", "note": "", "account": "bb", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_61", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 61, "date": "2026-05-13", "platform": "Babyhome", "section": "", "itemType": "回文", "title": "離婚後自己買鑽戒，會很奇怪嗎?", "link": "https://forum.babyhome.com.tw/topic/5066509", "content": "自己喜歡，戴了會開心有什麼不好！\n我在30歲的時候達到存款目標\n也有去promessa買一顆鑽戒給自己\n不用太大顆，單純紀念這一刻我達到了而已\n別太在意別人說什麼，開心就好", "note": "", "account": "Ow", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_62", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 62, "date": "2026-05-13", "platform": "Threads", "section": "", "itemType": "回文", "title": "母親節送什麼給媽媽？", "link": "https://www.threads.com/@ester_korewa/post/DXcHDS_k_O1", "content": "絕對是黃金！\n要直接買小金塊還是手鍊、項鍊我覺得都滿適合\n最近也去點睛品門市看看要買哪一種\n其實沒想像中要花大錢，樣式還好看~", "note": "", "account": "em", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_63", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 63, "date": "2026-05-13", "platform": "Threads", "section": "", "itemType": "回文+圖", "title": "最近在看婚對戒，但看得好亂", "link": "https://www.threads.com/@linghan2643/post/DXqvjCViYsb?xmt=AQF0UEK5grKNqqo4dsgV-SJjxhgsusrUH0R0rlk0H7lSlQ", "content": "跟你分享我們挑的戒指\n周生生集團旗下的PROMESSA星宇對戒\n低調奢華日常戴也很適合\n這樣買7萬有找!!", "note": "", "account": "fa", "executed": true, "amount": 70}, {"id": "VR_歐文_2026-05_64", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 64, "date": "2026-05-13", "platform": "Dcard", "section": "", "itemType": "發文+圖", "title": "#求婚 幫選好看的大鑽婚戒", "link": "https://www.dcard.tw/f/marriage/p/261473396?cid=40b525b2-f012-48a1-b540-626bec4b0ff9", "content": "點晴品-#21長圖文(1)", "note": "", "account": "yenying", "executed": true, "amount": 210}, {"id": "VR_歐文_2026-05_65", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 65, "date": "2026-05-13", "platform": "Dcard", "section": "", "itemType": "發文+圖", "title": "台灣品牌潔牙骨挑選&評比：阿寶/毛起來/倍力", "link": "https://www.dcard.tw/f/pet/p/261473367?cid=a5af4ec7-3e67-46c5-966a-a166b48e3abb", "content": "https://docs.google.com/document/d/1sPyLczsEUHqi7PxU1bCFZglINf8ZVzsdXi9c56pQUUY/edit?tab=t.0", "note": "", "account": "鴨鴨", "executed": true, "amount": 210}, {"id": "VR_歐文_2026-05_66", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 66, "date": "2026-05-13", "platform": "Dcard", "section": "", "itemType": "回文", "title": "台灣品牌潔牙骨挑選&評比：阿寶/毛起來/倍力", "link": "", "content": "其實不太懂前為何要特別強調潔牙骨內的含肉量?\n含肉量主要只是為了適口性，但肉量多反而更容易滋生細菌，而且仔細看他們的營養標示，蛋白質量跟含肉量根本不成正比，那個%數不知道是怎麼算出來的...", "note": "", "account": "黃湘", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_67", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 67, "date": "2026-05-13", "platform": "Dcard", "section": "", "itemType": "回文", "title": "台灣品牌潔牙骨挑選&評比：阿寶/毛起來/倍力", "link": "", "content": "其實潔牙骨顧名思義就是要有輔助潔牙的效果\n如果只是零食也沒必要買 我就直接買零食就好🤔", "note": "", "account": "喜", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_68", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 68, "date": "2026-05-13", "platform": "Dcard", "section": "", "itemType": "回文", "title": "台灣品牌潔牙骨挑選&評比：阿寶/毛起來/倍力", "link": "", "content": "有買過啾啾棒\n但真的太小支\n我家養邊牧\n沒咬兩口就吞下去了\n隔天直接整支從屁股出來\n啊哈哈哈哈", "note": "", "account": "Candy", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_69", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 69, "date": "2026-05-14", "platform": "Dcard", "section": "", "itemType": "回文", "title": "台灣品牌潔牙骨挑選&評比：阿寶/毛起來/倍力", "link": "", "content": "KT11好像大多都是加在保健食品裡面的益生菌耶", "note": "", "account": "喜", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_70", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 70, "date": "2026-05-14", "platform": "Dcard", "section": "", "itemType": "回文", "title": "台灣品牌潔牙骨挑選&評比：阿寶/毛起來/倍力", "link": "", "content": "毛起來的味道真的蠻重的，聞起來感覺很好吃，但看原po分享會想試看看倍力的，可以分享在哪裡買的嗎？🙏🙏", "note": "", "account": "yenying", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_71", "vendorId": "VC004", "vendorName": "歐文", "clientName": "倍力/貪貪", "clientId": "", "month": "2026-05", "seq": 71, "date": "2026-05-14", "platform": "Dcard", "section": "", "itemType": "回文", "title": "台灣品牌潔牙骨挑選&評比：阿寶/毛起來/倍力", "link": "", "content": "B1\n這個我沒特別了解過ㄟ!!!原來是這樣，今天才恍然大悟\n\nB2\n我也是這樣認為，我還是以功能為導向\n\nB3\n是消化不良嗎？也太可怕\n\nB4\n我當時也有上網了解了一下，好像是針對口腔跟腸胃的乳酸菌\n\nB5\n我上次在南港寵物展看到特價買的～～真心推薦你可以試試看", "note": "原po同一則＠各樓", "account": "", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_72", "vendorId": "VC004", "vendorName": "歐文", "clientName": "歐耐恩", "clientId": "", "month": "2026-05", "seq": 72, "date": "2026-05-13", "platform": "Dcard", "section": "牙齒矯正", "itemType": "回文", "title": "歐耐恩現在狀況是怎樣？", "link": "https://www.dcard.tw/f/orthodontics/p/261470301?cid=56c26ef0-4cec-4958-b214-421d9a049b5a", "content": "就是公說公有理 婆說婆有理 看法院怎麼判", "note": "", "account": "SHU", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_73", "vendorId": "VC004", "vendorName": "歐文", "clientName": "歐耐恩", "clientId": "", "month": "2026-05", "seq": 73, "date": "2026-05-13", "platform": "Dcard", "section": "牙齒矯正", "itemType": "回文", "title": "歐耐恩現在狀況是怎樣？", "link": "https://www.dcard.tw/f/orthodontics/p/261470301?cid=56c26ef0-4cec-4958-b214-421d9a049b5a", "content": "歐耐恩的問題的確很大，光是財務問題就很可怕了，發不出錢的工作當然大家都不願意做\n可是醫生直接拔掉帳戶跟監視器這種管理的權限也很怪，基於不信任也不能就直接這樣處理，應該先採取法律手之類的寄存證信函告知\n總之說雙方都有站不住腳的地方", "note": "", "account": "✿菲菲", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_74", "vendorId": "VC004", "vendorName": "歐文", "clientName": "歐耐恩", "clientId": "", "month": "2026-05", "seq": 74, "date": "2026-05-13", "platform": "Dcard", "section": "牙齒矯正", "itemType": "回文", "title": "歐耐恩現在狀況是怎樣？", "link": "https://www.dcard.tw/f/orthodontics/p/261470301?cid=56c26ef0-4cec-4958-b214-421d9a049b5a", "content": "後面院長是直接跑到現場想砸場子嗎", "note": "", "account": "胡蘿蔔", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_75", "vendorId": "VC004", "vendorName": "歐文", "clientName": "歐耐恩", "clientId": "", "month": "2026-05", "seq": 75, "date": "2026-05-14", "platform": "Dcard", "section": "牙齒矯正", "itemType": "回文", "title": "歐耐恩現在狀況是怎樣？", "link": "https://www.dcard.tw/f/orthodontics/p/261470301?cid=56c26ef0-4cec-4958-b214-421d9a049b5a", "content": "對啊 但好像也沒說啥 兩個也沒特別對質", "note": "回#74", "account": "鴨鴨", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_76", "vendorId": "VC004", "vendorName": "歐文", "clientName": "歐耐恩", "clientId": "", "month": "2026-05", "seq": 76, "date": "2026-05-14", "platform": "Dcard", "section": "牙齒矯正", "itemType": "回文", "title": "歐耐恩現在狀況是怎樣？", "link": "https://www.dcard.tw/f/orthodontics/p/261470301?cid=56c26ef0-4cec-4958-b214-421d9a049b5a", "content": "反正最衰的還是病患 看歐的官網說有些人有收到牙套了 不知道是真還是假🤔", "note": "", "account": "Candy", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_77", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 77, "date": "2026-05-13", "platform": "Dcard", "section": "結婚", "itemType": "回文", "title": "#求婚 幫選好看的大鑽婚戒", "link": "https://www.dcard.tw/f/marriage/p/261473396?cid=40b525b2-f012-48a1-b540-626bec4b0ff9", "content": "之前有考慮過2，但覺得手太醜戴起來不適合\n選了同牌其他排鑽的戒指XD", "note": "間隔半小時", "account": "", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_78", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 78, "date": "2026-05-13", "platform": "Dcard", "section": "結婚", "itemType": "回文", "title": "#求婚 幫選好看的大鑽婚戒", "link": "https://www.dcard.tw/f/marriage/p/261473396?cid=40b525b2-f012-48a1-b540-626bec4b0ff9", "content": "1或3我覺得都好看", "note": "間隔半小時", "account": "", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_79", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 79, "date": "2026-05-13", "platform": "Dcard", "section": "結婚", "itemType": "回文", "title": "#求婚 幫選好看的大鑽婚戒", "link": "https://www.dcard.tw/f/marriage/p/261473396?cid=40b525b2-f012-48a1-b540-626bec4b0ff9", "content": "PROMESSA有模擬戒指整體設計的方式，在iPad上360度看版型、光澤感等等，而且材質到表面設計都能客製，如果想更有儀式感可以選擇納入自己的想法做專屬的鑽戒~", "note": "間隔半小時", "account": "", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_80", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 80, "date": "2026-05-13", "platform": "Dcard", "section": "結婚", "itemType": "回文", "title": "#求婚 幫選好看的大鑽婚戒", "link": "https://www.dcard.tw/f/marriage/p/261473396?cid=40b525b2-f012-48a1-b540-626bec4b0ff9", "content": "我選3 有設計感鑽看起來又夠大顆 氣場很強！", "note": "間隔半小時", "account": "", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_81", "vendorId": "VC004", "vendorName": "歐文", "clientName": "點睛品", "clientId": "", "month": "2026-05", "seq": 81, "date": "2026-05-13", "platform": "Dcard", "section": "結婚", "itemType": "回文", "title": "#求婚 幫選好看的大鑽婚戒", "link": "https://www.dcard.tw/f/marriage/p/261473396?cid=40b525b2-f012-48a1-b540-626bec4b0ff9", "content": "1還滿經典款的 不想失誤這個應該OK", "note": "間隔半小時", "account": "", "executed": true, "amount": 60}, {"id": "VR_歐文_2026-05_82", "vendorId": "VC004", "vendorName": "歐文", "clientName": "歐耐恩", "clientId": "", "month": "2026-05", "seq": 82, "date": "2026-05-13", "platform": "Threads", "section": "", "itemType": "發文", "title": "", "link": "https://www.threads.com/@mins_eono/post/DYR4n5Pk25-?xmt=AQG0nzWel9e0NnCpBLU3OUZSteTxmsMYec1nZFXVgtW2-OU4BPzx-yeakA-mIEOPyTt2YPY&slof=1", "content": "https://today.line.me/tw/v3/article/0MGLePD\n最近刷到歐耐恩的新聞，說白一點這件事裡最無奈的好像還是正在矯正中的患者\n\n畢竟牙齒矯正不是單純買牙套，而是一個需要醫師評估、療程規劃與長期追蹤的醫療行為，很多人一做就是好幾年，花費也不低。\n\n所以我會覺得，這類事情其實很難完全只歸責某一方\n對患者來說，在意的不是誰對誰錯，而是療程能不能繼續、牙齒會不會受影響、後續有沒有人願意處理，如果之後歐耐恩恢復正常運作，那後續診所與醫師是否願意一起配合處理患者問題，我覺得也是大家需要關注的重點之一\n\n像最近醫美針孔事件也是，有時候看起來像品牌問題，但不一定代表醫療技術本身有問題\n身為消費者，其實只是希望自己的感受跟權益能被好好重視而已", "note": "", "account": "", "executed": true, "amount": 200}, {"id": "VR_歐文_2026-05_83", "vendorId": "VC004", "vendorName": "歐文", "clientName": "台北ihair", "clientId": "", "month": "2026-05", "seq": 83, "date": "2026-05-14", "platform": "Google星評", "section": "古亭店星評", "itemType": "回文", "title": "朋友之前有提過這間", "link": "https://maps.app.goo.gl/tJhWpFuEBuafZFAj9", "content": "朋友之前有提過這間，剛好自己也在觀望，就去古亭店看一下。原本最在意的是做完會不會很不自然，現場是會先討論範圍跟線條，過程中也會一直確認，不會直接幫你決定。現在恢復下來看起來還算順，沒有特別突兀，就是那種不會被注意的狀態", "note": "", "account": "", "executed": true, "amount": 90}],
   freelancerRecords:[],
-  omRecords:[],
+  omRecords:[
+    {id:'OM-2601-元緣-001',clientId:'C001',contractId:'CT001',specId:'',clientName:'彩御國際有限公司',month:'2026-01',specType:'短圖文',title:'隱適美/綻雅 牙齒矯正詢問',content:'同意~\n歐的確有不少負評 但也不是沒有好評\n能有一個明確合作的診所的確比較放心',driveLink:'【歐耐恩】#2短圖文',postLink:'https://www.dcard.tw/f/orthodontics/p/260546212',vendorId:'VC003',vendorName:'元緣',platform:'Dcard',actionType:'回文',section:'',vendorFee:48,writerId:'',writerName:'',writerFee:0,status:'已上刊',assignDate:'',cutAngleDate:'',writingDoneDate:'',publishDate:'2026-01-02',observeEndDate:'2026-01-09',lineNotified:false,note:'',created_at:'2026-01-02T00:00:00.000Z'},
+    {id:'OM-2601-元緣-002',clientId:'C002',contractId:'CT002',specId:'',clientName:'風華整外',month:'2026-01',specType:'監控回文',title:'#問 請問這算是禿頭嗎？',content:'還不到禿頭，但真的有點空了\n生髮水我洗了很多牌子，效果真的有限\n還是趕快先找醫生控制最實在',driveLink:'風華輿情監控專案進度表',postLink:'https://www.dcard.tw/f/mancare/p/260589420',vendorId:'VC003',vendorName:'元緣',platform:'Dcard',actionType:'回文',section:'保健',vendorFee:48,writerId:'',writerName:'',writerFee:0,status:'已上刊',assignDate:'',cutAngleDate:'',writingDoneDate:'',publishDate:'2026-01-05',observeEndDate:'',lineNotified:false,note:'',created_at:'2026-01-05T00:00:00.000Z'},
+    {id:'OM-2601-元緣-003',clientId:'C003',contractId:'CT003',specId:'',clientName:'亞星通',month:'2026-01',specType:'監控回文',title:'請問各位40+以上的美女們',content:'推推Ozio卵殼膜精華液\n目前剛開始用 但臉的保濕度明顯提升',driveLink:'【樂法共有】OZIO Beauty Opener_2501~03',postLink:'',vendorId:'VC003',vendorName:'元緣',platform:'Dcard',actionType:'回文',section:'保養',vendorFee:48,writerId:'',writerName:'',writerFee:0,status:'觀察中',assignDate:'2026-01-20',cutAngleDate:'2026-01-19',writingDoneDate:'',publishDate:'2026-01-22',observeEndDate:'2026-01-29',lineNotified:true,note:'',created_at:'2026-01-22T00:00:00.000Z'},
+    {id:'OM-2601-元緣-004',clientId:'C001',contractId:'CT001',specId:'',clientName:'彩御國際有限公司',month:'2026-01',specType:'綁定回文',title:'最近在研究隱形牙套',content:'我在歐耐恩做的，效果很好！',driveLink:'',postLink:'',vendorId:'VC003',vendorName:'元緣',platform:'Dcard',actionType:'回文',section:'',vendorFee:48,writerId:'FL002',writerName:'Jackie',writerFee:50,status:'待發包',assignDate:'',cutAngleDate:'',writingDoneDate:'',publishDate:'',observeEndDate:'',lineNotified:false,note:'',created_at:'2026-05-20T00:00:00.000Z'},
+    {id:'OM-2601-元緣-005',clientId:'C002',contractId:'CT002',specId:'',clientName:'風華整外',month:'2026-01',specType:'監控回文',title:'#詢問天鵝頸醫師求推薦',content:'推風華的謝醫師，技術很穩',driveLink:'',postLink:'https://www.dcard.tw/f/facelift/p/261234567',vendorId:'VC004',vendorName:'歐文',platform:'Dcard',actionType:'回文',section:'醫美',vendorFee:60,writerId:'FL001',writerName:'Nina',writerFee:50,status:'撰文中',assignDate:'2026-05-19',cutAngleDate:'',writingDoneDate:'',publishDate:'',observeEndDate:'',lineNotified:true,note:'',created_at:'2026-05-19T00:00:00.000Z'},
+  ],
   tasks:[],
   serviceCatalog:[
     {id:'SC001',category:'口碑',sub:'文案類型',name:'長圖文',spec:'500~1000字內文案配圖3-5張',unit:'篇',price:3600,freelancerCost:1200,vendorCost:200,note:'過稿'},
@@ -1963,7 +1974,12 @@ function openModal(title,body,onConfirm,wide=false){
   document.getElementById('modal-body').innerHTML=body;
   document.getElementById('modal').className='modal'+(wide?' modal-wide':'');
   _modalCb=onConfirm;
-  document.getElementById('modal-confirm').onclick=()=>{if(_modalCb)_modalCb();};
+  const confirmBtn=document.getElementById('modal-confirm');
+  confirmBtn.style.display=onConfirm?'':'none';
+  confirmBtn.onclick=()=>{if(_modalCb)_modalCb();};
+  // 取消按鈕文字在無確認按鈕時改為「關閉」
+  const cancelBtn=confirmBtn.previousElementSibling;
+  if(cancelBtn) cancelBtn.textContent=onConfirm?'取消':'關閉';
   document.getElementById('modal-overlay').style.display='flex';
 }
 function closeModal(){document.getElementById('modal-overlay').style.display='none';_modalCb=null;}
@@ -2257,7 +2273,7 @@ function openClientDrawer(clientId){
             <button class="btn btn-sm edit-only" onclick="openEditClient('${clientId}')">編輯</button>
           </div>
           <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
-            ${[['執行PM',c.pm],['統一編號',c.ubn],['發票地址',c.invoiceAddr],['狀態',c.status||'進行中'],['備註',c.note]].filter(r=>r[1]).map(([k,v])=>`
+            ${[['品牌別名',c.brandName],['執行PM',c.pm],['統一編號',c.ubn],['發票地址',c.invoiceAddr],['狀態',c.status||'進行中'],['備註',c.note]].filter(r=>r[1]).map(([k,v])=>`
               <div class="flex justify-between gap-3">
                 <span style="font-size:12px;color:var(--text3);white-space:nowrap">${k}</span>
                 <span style="font-size:13px;font-weight:500;text-align:right">${v}</span>
@@ -2286,6 +2302,7 @@ function openClientDrawer(clientId){
                 </div>
                 <span class="tag ${ct.status==='進行中'?'tag-green':'tag-gray'}">${ct.status}</span>
                 <button class="btn btn-xs edit-only" onclick="openEditContract('${ct.id}')">編輯</button>
+                <button class="btn btn-xs edit-only" style="color:var(--red)" onclick="deleteContract('${ct.id}','${clientId}')">✕</button>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
                 <div><span style="color:var(--text3)">走期：</span>${(ct.start||'').slice(0,10)}～${(ct.end||'').slice(0,10)}</div>
@@ -2307,6 +2324,19 @@ function openClientDrawer(clientId){
             <button class="btn btn-sm btn-primary edit-only" onclick="openAddSpec('${clientId}')">＋ 新增</button>
           </div>
         </div>
+        ${contracts.filter(ct=>DB.specItems.some(s=>s.contractId===ct.id&&s.category==='口碑')).length?`
+        <div style="margin-bottom:12px;padding:10px;background:var(--blue-bg);border:1px solid #c7d7f9;border-radius:var(--r);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:500;color:var(--blue-text)">📋 口碑任務</span>
+          <input type="month" id="spec-task-month-${clientId}" value="${new Date().toISOString().slice(0,7)}" style="padding:4px 8px;border:1px solid #c7d7f9;border-radius:4px;font-size:12px;color:var(--text);background:white">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${contracts.filter(ct=>DB.specItems.some(s=>s.contractId===ct.id&&s.category==='口碑')).map(ct=>`
+              <button class="btn btn-sm edit-only" style="background:var(--blue-text);color:#fff;border-color:var(--blue-text)"
+                onclick="genOmTasksFromSpec('${ct.id}',document.getElementById('spec-task-month-${clientId}')?.value)">
+                ＋ 產生 ${ct.contractNo||ct.name} 本月任務
+              </button>`).join('')}
+          </div>
+          <span style="font-size:11px;color:var(--blue-text);opacity:.7;margin-left:auto">依規格數量×月數自動分配</span>
+        </div>`:''}
         ${specs.length?`<div class="table-wrap" style="overflow-x:auto"><table style="min-width:560px">
           <thead><tr><th>類型</th><th>項目</th><th style="text-align:right">數量</th><th style="text-align:right">報價/單</th><th style="text-align:right">總價</th><th style="text-align:right">利潤率</th><th></th></tr></thead>
           <tbody>${specs.map(s=>{
@@ -2457,7 +2487,7 @@ function openAddClient(){
     const contacts=contactsRaw?contactsRaw.split('\n').map(l=>{const p=l.split('/');return{name:p[0]?.trim()||'',phone:p[1]?.trim()||''};}).filter(c=>c.name):[];
     const client={id:nextId('C'),name,ubn:document.getElementById('f-ubn').value,contacts,contact:contacts[0]?.name||'',contactPhone:contacts[0]?.phone||'',pm:document.getElementById('f-pm').value,invoiceAddr:document.getElementById('f-addr').value,status:document.getElementById('f-status').value,note:document.getElementById('f-note').value};
     DB.clients.push(client);
-    
+    syncToGAS('clients', client).catch(e=>console.error('sync client failed',e));
     closeModal();renderClients();toast('客戶已新增','success');
   });
 }
@@ -2489,7 +2519,7 @@ function openEditClient(clientId){
     const contactsRaw=document.getElementById('f-contacts').value.trim();
     const contacts=contactsRaw?contactsRaw.split('\n').map(l=>{const p=l.split('/');return{name:p[0]?.trim()||'',phone:p[1]?.trim()||''};}).filter(c=>c.name):[];
     c.name=name;c.brandName=document.getElementById('f-brand').value.trim();c.ubn=document.getElementById('f-ubn').value;c.contacts=contacts;c.contact=contacts[0]?.name||'';c.contactPhone=contacts[0]?.phone||'';c.pm=document.getElementById('f-pm').value;c.invoiceAddr=document.getElementById('f-addr').value;c.status=document.getElementById('f-status').value;c.note=document.getElementById('f-note').value;
-    
+    syncToGAS('clients', c).catch(e=>console.error('sync client failed',e));
     closeModal();renderClients();openClientDrawer(clientId);toast('客戶資料已更新','success');
   });
 }
@@ -2518,11 +2548,14 @@ function openAddContract(clientId){
       <select class="form-input" id="f-status"><option>進行中</option><option>完成</option><option>暫停</option><option>結束合約</option></select>
     </div>
     <div class="form-group"><label class="form-label">備註</label><textarea class="form-input" id="f-note" placeholder="補充說明..."></textarea></div>
+    <div class="form-group"><label class="form-label">Google Drive 合約連結</label>
+      <input class="form-input" id="f-drive" placeholder="貼上 Google Drive 分享連結">
+    </div>
   `,async ()=>{
     const name=document.getElementById('f-cname').value.trim();if(!name)return alert('請填寫合約名稱');
-    const contract={id:nextId('CT'),clientId,name,start:document.getElementById('f-start').value,end:document.getElementById('f-end').value,total:Number(document.getElementById('f-total').value)||0,payMethod:document.getElementById('f-pay').value,contractNo:document.getElementById('f-cno').value,signDate:document.getElementById('f-sign').value,status:document.getElementById('f-status').value,note:document.getElementById('f-note').value};
+    const contract={id:nextId('CT'),clientId,name,start:document.getElementById('f-start').value,end:document.getElementById('f-end').value,total:Number(document.getElementById('f-total').value)||0,payMethod:document.getElementById('f-pay').value,contractNo:document.getElementById('f-cno').value,signDate:document.getElementById('f-sign').value,status:document.getElementById('f-status').value,note:document.getElementById('f-note').value,driveLink:document.getElementById('f-drive').value.trim()};
     DB.contracts.push(contract);
-    
+    syncToGAS('contracts', contract).catch(e=>console.error('sync contract failed',e));
     closeModal();openClientDrawer(clientId);toast('合約已新增','success');
   });
 }
@@ -2569,12 +2602,19 @@ function openEditContract(contractId){
     ct.status=document.getElementById('f-status').value;
     ct.note=document.getElementById('f-note').value;
     ct.driveLink=document.getElementById('f-drive').value.trim();
-    
+    syncToGAS('contracts', ct).catch(e=>console.error('sync contract failed',e));
     closeModal();openClientDrawer(ct.clientId);toast('合約已更新','success');
   });
 }
 
 // ═══ SPEC FORMS ═══
+function deleteContract(contractId, clientId){
+  if(!confirm('確定刪除此合約？相關規格與請款資料不會自動刪除。'))return;
+  DB.contracts=DB.contracts.filter(x=>x.id!==contractId);
+  syncDeleteGAS('contracts', contractId).catch(()=>{});
+  openClientDrawer(clientId);toast('合約已刪除');
+}
+
 function openAddSpec(clientId){
   openModal('新增規格項目',specFormHTML(clientId),()=>saveSpec(null,clientId));
   setTimeout(renderSpecCostFields,60);
@@ -3802,6 +3842,15 @@ function renderSpecsPage(){
   const clientId=document.getElementById('sp-client')?.value||'';
   const msStart=document.getElementById('sp-month-start')?.value||'';
   const msEnd=document.getElementById('sp-month-end')?.value||'';
+  const spFl=document.getElementById('sp-freelancer');
+  if(spFl&&spFl.options.length===1){
+    const seen=new Set();
+    (DB.omRecords||[]).concat(DB.socialRecords||[]).forEach(r=>{
+      const n=r.executorName||r.writerName||'';
+      if(n&&n!=='內部'&&!seen.has(n)){seen.add(n);const o=document.createElement('option');o.value=n;o.textContent=n;spFl.appendChild(o);}
+    });
+  }
+  const flFilter=spFl?.value||'';
   const curMonth=new Date().toISOString().slice(0,7);
 
   // 進行中合約
@@ -3826,9 +3875,9 @@ function renderSpecsPage(){
       if(r.contractId===spec.contractId&&(r.specType===spec.name||r.item===spec.name||r.specType?.includes(spec.name)))return true;
       return false;
     });
-    const omFiltered=matchRec(DB.omRecords||[]).filter(r=>!filterMonth||(r.publishDate||'').slice(0,7)===filterMonth);
-    const scFiltered=matchRec(DB.socialRecords||[]).filter(r=>!filterMonth||(r.postDate||'').slice(0,7)===filterMonth);
-    const adFiltered=matchRec(DB.adRecords||[]).filter(r=>!filterMonth||(r.date||'').slice(0,7)===filterMonth);
+    const omFiltered=matchRec(DB.omRecords||[]).filter(r=>(!filterMonth||(r.publishDate||'').slice(0,7)===filterMonth)&&(!flFilter||(r.executorName||r.writerName||'')=== flFilter));
+    const scFiltered=matchRec(DB.socialRecords||[]).filter(r=>(!filterMonth||(r.postDate||'').slice(0,7)===filterMonth)&&(!flFilter||(r.executorName||r.writerName||'')=== flFilter));
+    const adFiltered=matchRec(DB.adRecords||[]).filter(r=>(!filterMonth||(r.date||'').slice(0,7)===filterMonth)&&(!flFilter||(r.executorName||r.writerName||'')=== flFilter));
     return omFiltered.length+scFiltered.length+adFiltered.length;
   }
 
@@ -4113,6 +4162,14 @@ function openNavGroup(id){
 }
 
 // ═══ 口碑執行記錄 ═══
+
+const OM_STATUSES = ['待發包','撰文中','文稿審核','切角審核','待上刊','待確認','已上刊','觀察中','完成','文章刪除'];
+const OM_STATUS_COLOR = {
+  '待發包':'tag-gray','撰文中':'tag-amber','文稿審核':'tag-blue',
+  '切角審核':'tag-purple','待上刊':'tag-amber','待確認':'tag-purple','已上刊':'tag-green',
+  '觀察中':'tag-blue','完成':'tag-green','文章刪除':'tag-red'
+};
+
 function genOmId(vendorName){
   const now=new Date();
   const ym=(now.getFullYear()+'').slice(2)+(String(now.getMonth()+1).padStart(2,'0'));
@@ -4123,123 +4180,125 @@ function genOmId(vendorName){
 }
 
 function clearOmFilters(){
-  ['om-client','om-month','om-executor','om-vendor','om-spec-type','om-status'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['om-client','om-month','om-writer','om-vendor','om-spec-type','om-status'].forEach(id=>{
+    const e=document.getElementById(id);if(e)e.value='';
+  });
   renderOmPage();
-}
-
-function vendorRecToOm(r){
-  // 將 vendorRecords 格式轉換為 omRecords 格式供顯示用
-  const client=DB.clients.find(c=>c.name===r.clientName||c.brandName===r.clientName||c.id===r.clientId);
-  return{
-    id:r.id,
-    clientId:r.clientId||(client?client.id:''),
-    clientName:r.clientName||'',
-    contractId:'',
-    specType:r.itemType||'回文',
-    platform:r.platform||'',
-    section:r.section||'',
-    publishDate:r.date||r.month||'',
-    title:r.title||'',
-    content:r.content||'',
-    link:r.link||'',
-    vendorName:r.vendorName||'',
-    vendorFee:r.amount||0,
-    writerId:'', writerName:'', writerFee:0,
-    status:r.executed===true?'已上刊':r.executed===false?'待執行':'待執行',
-    note:r.note||'',
-    _source:'vendor' // 標記來源，避免重複編輯
-  };
 }
 
 function renderOmPage(){
   const el=document.getElementById('om-content');if(!el)return;
-  // 初始化客戶選單（合併 clients + vendorRecords 的 clientName）
+
+  // 初始化客戶選單
   const cSel=document.getElementById('om-client');
   if(cSel&&cSel.options.length<=1){
     DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;cSel.appendChild(o);});
-    const extraNames=[...new Set(DB.vendorRecords.map(r=>r.clientName).filter(n=>n&&!DB.clients.find(c=>c.name===n||c.brandName===n)))];
-    extraNames.forEach(name=>{const o=document.createElement('option');o.value='cn:'+name;o.textContent=name+' *';cSel.appendChild(o);});
   }
-  // 初始化執行人員選單（只帶口碑外包人員）
-  const exSel=document.getElementById('om-executor');
-  if(exSel&&exSel.options.length<=2){DB.freelancers.filter(f=>f.type==='口碑').forEach(f=>{const o=document.createElement('option');o.value=f.id;o.textContent=f.name;exSel.appendChild(o);});}
-  const fClient=document.getElementById('om-client')?.value||'';
-  const fMonth=document.getElementById('om-month')?.value||'';
-  const fExecutor=document.getElementById('om-executor')?.value||'';
-  const fVendor=document.getElementById('om-vendor')?.value||'';
-  const fSpec=document.getElementById('om-spec-type')?.value||'';
-  const fStatus=document.getElementById('om-status')?.value||'';
+  // 初始化寫手選單
+  const wSel=document.getElementById('om-writer');
+  if(wSel&&wSel.options.length<=2){
+    DB.freelancers.filter(f=>f.type==='口碑').forEach(f=>{
+      const o=document.createElement('option');o.value=f.id;o.textContent=f.name;wSel.appendChild(o);
+    });
+  }
 
-  // 合併 omRecords + vendorRecords（避免重複：omRecords 優先，vendorRecords 補充）
-  const omIds=new Set(DB.omRecords.map(r=>r.id));
-  const vendorAsOm=DB.vendorRecords.filter(r=>!omIds.has(r.id)).map(vendorRecToOm);
-  const allRecords=[...DB.omRecords,...vendorAsOm];
+  const fClient  = document.getElementById('om-client')?.value||'';
+  const fMonth   = document.getElementById('om-month')?.value||'';
+  const fWriter  = document.getElementById('om-writer')?.value||'';
+  const fVendor  = document.getElementById('om-vendor')?.value||'';
+  const fSpec    = document.getElementById('om-spec-type')?.value||'';
+  const fStatus  = document.getElementById('om-status')?.value||'';
 
-  let records=allRecords.filter(r=>{
-    if(fClient){
-      if(fClient.startsWith('cn:')){const name=fClient.slice(3);if(r.clientName!==name)return false;}
-      else if(r.clientId!==fClient)return false;
+  let records = DB.omRecords.filter(r=>{
+    if(fClient && r.clientId!==fClient) return false;
+    if(fMonth  && (r.month||r.publishDate||'').slice(0,7)!==fMonth) return false;
+    if(fWriter){
+      if(fWriter==='內部' && r.writerId) return false;
+      else if(fWriter!=='內部' && r.writerId!==fWriter) return false;
     }
-    if(fMonth&&(!r.publishDate||r.publishDate.slice(0,7)!==fMonth))return false;
-    if(fExecutor){
-      if(fExecutor==='內部'&&(r.writerId||r.writerName)&&r.writerName!=='內部')return false;
-      else if(fExecutor!=='內部'&&r.writerId!==fExecutor&&r.writerName!==fExecutor)return false;
-    }
-    if(fVendor&&r.vendorName!==fVendor)return false;
-    if(fSpec&&r.specType!==fSpec)return false;
-    if(fStatus&&r.status!==fStatus)return false;
+    if(fVendor && r.vendorName!==fVendor) return false;
+    if(fSpec   && r.specType!==fSpec) return false;
+    if(fStatus && r.status!==fStatus) return false;
     return true;
-  }).sort((a,b)=>(b.publishDate||'').localeCompare(a.publishDate||''));
+  }).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
 
   // 費用彙總
-  const totalWriter=records.reduce((a,r)=>a+(r.writerFee||0),0);
-  const totalVendor=records.reduce((a,r)=>a+(r.vendorFee||0),0);
-  const statusColors={待執行:'tag-gray',已排程:'tag-amber',已上刊:'tag-green',文章刪除:'tag-red'};
+  const totalWriter = records.reduce((a,r)=>a+(r.writerFee||0),0);
+  const totalVendor = records.reduce((a,r)=>a+(r.vendorFee||0),0);
+
+  // 狀態計數
+  const statusCounts = {};
+  OM_STATUSES.forEach(s=>{ statusCounts[s]=records.filter(r=>r.status===s).length; });
+  const pending = (statusCounts['待發包']||0)+(statusCounts['文稿審核']||0)+(statusCounts['切角審核']||0);
 
   let html=`<div style="padding:16px 24px">
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-      <div class="stat-card" style="border-top:3px solid var(--accent)"><div class="stat-label">執行筆數</div><div class="stat-value">${records.length}</div><div class="stat-change">已篩選</div></div>
-      <div class="stat-card" style="border-top:3px solid #16a34a"><div class="stat-label">已上刊</div><div class="stat-value" style="color:#16a34a">${records.filter(r=>r.status==='已上刊').length}</div><div class="stat-change">筆</div></div>
-      <div class="stat-card" style="border-top:3px solid var(--blue-text)"><div class="stat-label">外包費用</div><div class="stat-value" style="color:var(--blue-text)">${fmt(totalWriter)}</div><div class="stat-change">寫手費用合計</div></div>
-      <div class="stat-card" style="border-top:3px solid var(--amber)"><div class="stat-label">廠商費用</div><div class="stat-value" style="color:var(--amber)">${fmt(totalVendor)}</div><div class="stat-change">帳號費用合計</div></div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">
+      <div class="stat-card" style="border-top:3px solid var(--text3)"><div class="stat-label">全部</div><div class="stat-value">${records.length}</div></div>
+      <div class="stat-card" style="border-top:3px solid var(--red)"><div class="stat-label">待處理</div><div class="stat-value" style="color:var(--red)">${pending}</div><div class="stat-change">發包+審核中</div></div>
+      <div class="stat-card" style="border-top:3px solid #16a34a"><div class="stat-label">已上刊</div><div class="stat-value" style="color:#16a34a">${statusCounts['已上刊']||0}</div></div>
+      <div class="stat-card" style="border-top:3px solid var(--blue-text)"><div class="stat-label">寫手費合計</div><div class="stat-value" style="color:var(--blue-text)">${fmt(totalWriter)}</div></div>
+      <div class="stat-card" style="border-top:3px solid var(--amber)"><div class="stat-label">帳號費合計</div><div class="stat-value" style="color:var(--amber)">${fmt(totalVendor)}</div></div>
     </div>`;
 
+  // 狀態 pipeline 快速切換
+  html+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+    ${OM_STATUSES.map(s=>{
+      const cnt=statusCounts[s]||0;
+      const isSel=fStatus===s;
+      return`<button onclick="document.getElementById('om-status').value='${isSel?'':s}';renderOmPage()"
+        style="padding:4px 10px;border-radius:20px;border:1px solid var(--border);font-size:11px;cursor:pointer;
+        background:${isSel?'var(--navy)':'var(--surface)'};color:${isSel?'#fff':'var(--text2)'}">
+        ${s} <span style="font-size:10px;opacity:.7">${cnt}</span>
+      </button>`;
+    }).join('')}
+  </div>`;
+
   if(!records.length){
-    html+=`<div class="empty-state"><p>目前無執行記錄</p><p style="font-size:12px;margin-top:8px;color:var(--text3)">點擊右上角「新增記錄」開始建立</p></div></div>`;
+    html+=`<div class="empty-state"><p>目前無符合條件的任務</p><p style="font-size:12px;margin-top:8px;color:var(--text3)">請從客戶規格頁產生任務，或點右上角「新增記錄」</p></div></div>`;
     el.innerHTML=html;return;
   }
 
   html+=`<div class="table-wrap"><table>
     <thead><tr>
-      <th style="width:140px">編號</th>
       <th>客戶</th>
-      <th>規格</th>
-      <th>平台／板塊</th>
-      <th>預計發布日</th>
-      <th style="max-width:200px">標題</th>
-      <th>廠商</th>
-      <th>執行人員</th>
-      <th style="text-align:right">外包費</th>
-      <th style="text-align:right">廠商費</th>
+      <th>月份</th>
+      <th>類型</th>
+      <th>標題／置入方向</th>
+      <th>寫手</th>
+      <th>廠商／平台</th>
+      <th style="text-align:right">寫手費</th>
+      <th style="text-align:right">帳號費</th>
       <th>狀態</th>
-      <th style="width:60px"></th>
+      <th style="width:80px"></th>
     </tr></thead>
     <tbody>${records.map(r=>{
-      const client=DB.clients.find(c=>c.id===r.clientId);
+      const cName = DB.clients.find(c=>c.id===r.clientId)?.name || r.clientName||'—';
+      const writerLabel = r.writerId ? (DB.freelancers.find(f=>f.id===r.writerId)?.name||r.writerName||'—') : '內部';
+      const titleShort = (r.title||r.content||'').replace(/\n/g,' ').slice(0,35)||'—';
+      const hasLink = r.postLink||r.driveLink;
       return`<tr>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${r.id||'—'}</td>
-        <td style="font-weight:500">${client?client.name:(r.clientName||'—')}</td>
-        <td><span class="tag tag-blue" style="font-size:11px">${r.specType||'—'}</span></td>
-        <td style="font-size:12px">${r.platform||'—'}${r.section?'<br><span style="color:var(--text3);font-size:11px">'+r.section+'</span>':''}</td>
-        <td style="font-size:12px">${r.publishDate||'—'}</td>
-        <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px" title="${r.title||''}">${r.title||'—'}</td>
-        <td style="font-size:12px">${r.vendorName||'—'}</td>
-        <td style="font-size:12px">${r.writerName||'內部'}</td>
-        <td style="text-align:right;font-size:12px">${r.writerFee?fmt(r.writerFee):'—'}</td>
-        <td style="text-align:right;font-size:12px">${r.vendorFee?fmt(r.vendorFee):'—'}</td>
-        <td><span class="tag ${statusColors[r.status]||'tag-gray'}" style="font-size:11px">${r.status||'待執行'}</span></td>
+        <td style="font-weight:500;font-size:12px">${cName}</td>
+        <td style="font-size:12px;color:var(--text3)">${(r.month||r.publishDate||'').slice(0,7)||'—'}</td>
+        <td><span class="tag tag-blue" style="font-size:10px">${r.specType||'—'}</span></td>
+        <td style="max-width:220px">
+          <div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(r.title||'').replace(/"/g,'')}">${titleShort}</div>
+          ${r.publishDate?`<div style="font-size:10px;color:var(--text3)">上刊：${r.publishDate}</div>`:''}
+        </td>
+        <td style="font-size:12px">${writerLabel}</td>
+        <td style="font-size:12px">${r.vendorName||'—'}${r.platform?`<br><span style="color:var(--text3);font-size:10px">${r.platform}${r.actionType?' · '+r.actionType:''}</span>`:''}</td>
+        <td style="text-align:right;font-size:12px;color:var(--blue-text)">${r.writerFee?fmt(r.writerFee):'—'}</td>
+        <td style="text-align:right;font-size:12px;color:var(--amber)">${r.vendorFee?fmt(r.vendorFee):'—'}</td>
+        <td><span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:10px">${r.status||'待發包'}</span></td>
         <td>
-          <button class="btn btn-xs edit-only" onclick="openOmDrawer('${r.id}')" title="編輯">✏️</button>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            ${r.postLink?`<a href="${r.postLink}" target="_blank" class="btn btn-xs" title="開啟上文連結">🔗</a>`:''}
+            ${r.status==='待確認'?`
+              <button class="btn btn-xs edit-only" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="confirmOmTask('${r.id}')" title="確認上刊">✓</button>
+              <button class="btn btn-xs edit-only" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="rejectOmTask('${r.id}')" title="退回">↩</button>
+            `:''}
+            <button class="btn btn-xs edit-only" onclick="openOmDrawer('${r.id}')" title="編輯">✏️</button>
+            <button class="btn btn-xs edit-only" style="color:var(--red)" onclick="deleteOmRecord('${r.id}')" title="刪除">✕</button>
+          </div>
         </td>
       </tr>`;
     }).join('')}</tbody>
@@ -4247,229 +4306,495 @@ function renderOmPage(){
   el.innerHTML=html;
 }
 
-function openOmDrawer(id){
-  if(!_editMode){toast('請先開啟編輯模式');return;}
-  const rec=id?DB.omRecords.find(r=>r.id===id):null;
-  const clients=DB.clients.map(c=>`<option value="${c.id}"${rec&&rec.clientId===c.id?' selected':''}>${c.name}</option>`).join('');
-  const contracts=rec?DB.contracts.filter(c=>c.clientId===rec.clientId).map(c=>`<option value="${c.id}"${rec.contractId===c.id?' selected':''}>${c.contractNo}</option>`).join(''):'';
-  const freelancers=DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}"${rec&&rec.writerId===f.id?' selected':''}>${f.name}</option>`).join('');
-  const vendors=['庫奇','JoDo','元緣','歐文','耐性','格瑞'].map(v=>`<option${rec&&rec.vendorName===v?' selected':''}>${v}</option>`).join('');
-  const specTypes=['回文','發文','發文+圖','短議題文','長圖文','短圖文','Google星評','綁定回文','監控回文'];
-  const statuses=['待執行','已排程','已上刊','文章刪除'];
+function deleteOmRecord(id){
+  if(!confirm('確定刪除此筆？'))return;
+  DB.omRecords=DB.omRecords.filter(r=>r.id!==id);
+  syncDeleteGAS('omRecords',id).catch(()=>{});
+  renderOmPage();toast('已刪除');
+}
+// ── 樂法確認上刊 ──
+async function confirmOmTask(id){
+  if(!confirm('確認此筆已上刊？'))return;
+  try{
+    const res=await gasApi('confirmTask',{id,confirmedBy:_currentUser?.email||''});
+    if(res.ok){
+      const r=DB.omRecords.find(x=>x.id===id);
+      if(r){ r.status='已上刊'; r.confirmedAt=new Date().toISOString(); }
+      renderOmPage();toast('已確認上刊','success');
+    } else { toast('確認失敗：'+(res.error||''), 'error'); }
+  } catch(e){ toast('網路錯誤','error'); }
+}
 
-  showDrawer(
-    id?'編輯口碑執行記錄':'新增口碑執行記錄',
-    `<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">
-      <div class="form-row">
-        <label class="form-label">客戶 *</label>
-        <select class="form-input" id="om-f-client" onchange="omUpdateContracts()">${clients}</select>
-      </div>
-      <div class="form-row">
-        <label class="form-label">合約</label>
-        <select class="form-input" id="om-f-contract" onchange="omUpdateSpecItems()">${contracts}</select>
-      </div>
-      <div class="form-row">
-        <label class="form-label">規格項目</label>
-        <select class="form-input" id="om-f-specid" onchange="omApplySpec()">
-          <option value="">— 選擇規格 —</option>
-          ${(rec&&rec.contractId?DB.specItems.filter(s=>s.contractId===rec.contractId):DB.specItems.filter(s=>s.contractId===contracts.split('value="')[1]?.split('"')[0])).map(s=>`<option value="${s.id}"${rec&&rec.specId===s.id?' selected':''}>${s.name}（${s.qty}${s.unit}）</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-row">
-        <label class="form-label">規格類型 *</label>
-        <select class="form-input" id="om-f-spec">
-          <optgroup label="文案類型">${['長圖文','特規長圖文','短圖文','特規短圖文','短議題文','特規短議題文'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}</optgroup>
-          <optgroup label="回覆類型">${['即時回文','綁定回文','推樓回文','代發回文','Google星評(1-6等)','Google星評(7等)','社群按讚(機器人)','社群按讚(真人)'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}</optgroup>
-          <optgroup label="輿情監控">${['週監控','進階週監控','雙日監控','進階雙日監控'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}</optgroup>
-        </select>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-row">
-          <label class="form-label">論壇平台 *</label>
-          <select class="form-input" id="om-f-platform">
-            ${['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Instagram','Google星評','媽咪拜','媽咪愛','其他'].map(p=>`<option${rec&&rec.platform===p?' selected':''}>${p}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-row">
-          <label class="form-label">板塊</label>
-          <input class="form-input" id="om-f-section" value="${rec?rec.section||'':''}">
-        </div>
-      </div>
-      <div class="form-row">
-        <label class="form-label">預計發布日</label>
-        <input type="date" class="form-input" id="om-f-date" value="${rec?rec.publishDate||'':''}">
-      </div>
-      <div class="form-row">
-        <label class="form-label">文章標題</label>
-        <input class="form-input" id="om-f-title" value="${rec?(rec.title||'').replace(/"/g,'&quot;'):''}">
-      </div>
-      <div class="form-row">
-        <label class="form-label">置入文案／內容</label>
-        <textarea class="form-input" id="om-f-content" rows="3" style="resize:vertical">${rec?rec.content||'':''}</textarea>
-      </div>
-      <div class="form-row">
-        <label class="form-label">文章連結</label>
-        <input class="form-input" id="om-f-link" value="${rec?rec.link||'':''}">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-row">
-          <label class="form-label">廠商</label>
-          <select class="form-input" id="om-f-vendor" onchange="omUpdateVendorFee()">
-            <option value="">內部執行</option>${vendors}
-          </select>
-        </div>
-        <div class="form-row">
-          <label class="form-label">帳號費用</label>
-          <input type="number" class="form-input" id="om-f-vendor-fee" value="${rec?rec.vendorFee||'':''}">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-row">
-          <label class="form-label">寫手</label>
-          <select class="form-input" id="om-f-writer" onchange="omUpdateWriterFee()">
-            <option value="">無（內部）</option>${freelancers}
-          </select>
-        </div>
-        <div class="form-row">
-          <label class="form-label">外包費用</label>
-          <input type="number" class="form-input" id="om-f-writer-fee" value="${rec?rec.writerFee||'':''}">
-        </div>
-      </div>
-      <div class="form-row">
-        <label class="form-label">執行狀態</label>
-        <select class="form-input" id="om-f-status">${statuses.map(s=>`<option${rec&&rec.status===s?' selected':''}>${s}</option>`).join('')}</select>
-      </div>
-      <div class="form-row">
-        <label class="form-label">備註</label>
-        <input class="form-input" id="om-f-note" value="${rec?rec.note||'':''}">
-      </div>
+// ── 退回廠商（待確認 → 待上刊）──
+async function rejectOmTask(id){
+  const reason=prompt('退回原因（廠商會看到）：');
+  if(reason===null)return;
+  try{
+    const res=await gasApi('rejectTask',{id,reason});
+    if(res.ok){
+      const r=DB.omRecords.find(x=>x.id===id);
+      if(r){ r.status='待上刊'; r.rejectReason=reason; }
+      renderOmPage();toast('已退回，廠商需重新回報');
+    } else { toast('退回失敗：'+(res.error||''),'error'); }
+  } catch(e){ toast('網路錯誤','error'); }
+}
+
+// ── 廠商 Token 管理 ──
+async function openVendorTokenModal(){
+  const vendors = DB.vendorCompanies||[];
+  if(!vendors.length){toast('尚無廠商資料');return;}
+  openModal('廠商填報連結管理',`
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <p style="font-size:12px;color:var(--text3)">每間廠商有專屬連結，他們書籤存一次即可永久使用。點「產生連結」後複製給廠商。</p>
+      ${vendors.map(v=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--surface2);border-radius:var(--r);flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:500;min-width:60px">${v.name}</span>
+          <input id="vt-${v.id}" class="form-input" style="flex:1;min-width:200px;font-size:11px;font-family:var(--font-mono)" placeholder="尚未產生" readonly value="${v.accessToken||''}">
+          <button class="btn btn-sm" onclick="genVendorToken('${v.id}')">產生連結</button>
+          <button class="btn btn-sm" onclick="copyVendorLink('${v.id}')" ${v.accessToken?'':'disabled'}>複製</button>
+        </div>`).join('')}
     </div>`,
-    ()=>saveOmRecord(id)
+    null,true
   );
 }
 
+async function genVendorToken(vendorId){
+  try{
+    const res=await gasApi('genVendorToken',{vendorId});
+    if(res.token){
+      const v=DB.vendorCompanies.find(x=>x.id===vendorId);
+      if(v) v.accessToken=res.token;
+      const el=document.getElementById('vt-'+vendorId);
+      if(el) el.value=res.token;
+      toast('Token 已產生','success');
+    }
+  } catch(e){ toast('產生失敗','error'); }
+}
+
+function copyVendorLink(vendorId){
+  const v=DB.vendorCompanies.find(x=>x.id===vendorId);
+  if(!v?.accessToken){toast('請先產生連結');return;}
+  const gasUrl=document.getElementById('gas-url-input')?.value||'';
+  if(!gasUrl){toast('請先在設定中填入 GAS URL');return;}
+  const link=gasUrl+'?action=getVendorTasks&token='+v.accessToken;
+  navigator.clipboard.writeText(link).then(()=>toast('已複製連結！','success'))
+    .catch(()=>{
+      const ta=document.createElement('textarea');ta.value=link;
+      document.body.appendChild(ta);ta.select();document.execCommand('copy');
+      document.body.removeChild(ta);toast('已複製連結！','success');
+    });
+}
+
+// ── Drawer 開啟 ──
+function openOmDrawer(id){
+  if(!_editMode){toast('請先開啟編輯模式');return;}
+  const rec = id ? DB.omRecords.find(r=>r.id===id) : null;
+
+  const clientOpts = DB.clients.map(c=>`<option value="${c.id}"${rec&&rec.clientId===c.id?' selected':''}>${c.name}</option>`).join('');
+  const writerOpts = `<option value="">內部（不計費）</option>`+
+    DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}"${rec&&rec.writerId===f.id?' selected':''}>${f.name}</option>`).join('');
+  const vendorOpts = `<option value="">— 選擇廠商 —</option>`+
+    (DB.vendorCompanies||[]).map(v=>`<option value="${v.id}"${rec&&rec.vendorId===v.id?' selected':''}>${v.name}</option>`).join('');
+  const statusOpts = OM_STATUSES.map(s=>`<option${rec&&rec.status===s?' selected':''}>${s}</option>`).join('');
+
+  // 合約選項
+  const contractOpts = rec
+    ? DB.contracts.filter(c=>c.clientId===rec.clientId).map(c=>`<option value="${c.id}"${rec.contractId===c.id?' selected':''}>${c.contractNo||c.name}</option>`).join('')
+    : '';
+  // 規格選項
+  const specOpts = rec&&rec.contractId
+    ? DB.specItems.filter(s=>s.contractId===rec.contractId&&s.category==='口碑').map(s=>`<option value="${s.id}"${rec.specId===s.id?' selected':''}>${s.name}</option>`).join('')
+    : '';
+
+  // 廠商平台選項
+  const vendorPlatformOpts = rec&&rec.vendorId
+    ? omGetVendorPlatformOpts(rec.vendorId, rec.platform, rec.actionType)
+    : '';
+
+  showDrawer(
+    id ? '編輯口碑任務' : '新增口碑任務',
+    `<div style="display:flex;flex-direction:column;gap:12px;padding:4px 0">
+
+      <!-- 基本資訊 -->
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;border-bottom:1px solid var(--border)">基本資訊</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">客戶 *</label>
+          <select class="form-input" id="om-f-client" onchange="omUpdateContracts()">${clientOpts}</select>
+        </div>
+        <div class="form-row"><label class="form-label">執行月份</label>
+          <input type="month" class="form-input" id="om-f-month" value="${rec?rec.month||'':''}">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">合約</label>
+          <select class="form-input" id="om-f-contract" onchange="omUpdateSpecItems()">
+            <option value="">—</option>${contractOpts}
+          </select>
+        </div>
+        <div class="form-row"><label class="form-label">規格項目</label>
+          <select class="form-input" id="om-f-specid" onchange="omApplySpec()">
+            <option value="">— 選擇規格 —</option>${specOpts}
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">文章類型 *</label>
+          <select class="form-input" id="om-f-spec">
+            <optgroup label="文案類型">
+              ${['短圖文','長圖文','短議題文'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}
+            </optgroup>
+            <optgroup label="回覆類型">
+              ${['綁定回文','監控回文','即時回文','Google星評'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}
+            </optgroup>
+            <optgroup label="其他">
+              ${['瀏覽','按讚','追蹤','其他'].map(s=>`<option${rec&&rec.specType===s?' selected':''}>${s}</option>`).join('')}
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-row"><label class="form-label">執行狀態</label>
+          <select class="form-input" id="om-f-status">${statusOpts}</select>
+        </div>
+      </div>
+
+      <!-- 文章內容 -->
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:4px">文章內容</div>
+      <div class="form-row"><label class="form-label">文章標題</label>
+        <input class="form-input" id="om-f-title" value="${rec?(rec.title||'').replace(/"/g,'&quot;'):''}">
+      </div>
+      <div class="form-row"><label class="form-label">置入文案 / 切角方向</label>
+        <textarea class="form-input" id="om-f-content" rows="3" style="resize:vertical">${rec?rec.content||'':''}</textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">雲端文稿連結</label>
+          <input class="form-input" id="om-f-drive" value="${rec?rec.driveLink||'':''}">
+        </div>
+        <div class="form-row"><label class="form-label">上文連結</label>
+          <input class="form-input" id="om-f-post" value="${rec?rec.postLink||'':''}">
+        </div>
+      </div>
+
+      <!-- 廠商 / 帳號 -->
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:4px">口碑商（帳號廠商）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">口碑商</label>
+          <select class="form-input" id="om-f-vendor" onchange="omUpdateVendorPlatforms()">${vendorOpts}</select>
+        </div>
+        <div class="form-row"><label class="form-label">平台</label>
+          <select class="form-input" id="om-f-platform" onchange="omUpdateActionTypes()">
+            <option value="">— 選平台 —</option>
+            ${vendorPlatformOpts}
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">項目</label>
+          <select class="form-input" id="om-f-action" onchange="omAutoVendorFee()">
+            <option value="">— 選項目 —</option>
+          </select>
+        </div>
+        <div class="form-row"><label class="form-label">板塊</label>
+          <input class="form-input" id="om-f-section" value="${rec?rec.section||'':''}">
+        </div>
+        <div class="form-row"><label class="form-label">帳號費 <span style="color:var(--accent);font-size:10px">自動帶入</span></label>
+          <input type="number" class="form-input" id="om-f-vendor-fee" value="${rec?rec.vendorFee||'':''}">
+        </div>
+      </div>
+
+      <!-- 寫手 -->
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:4px">寫手</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">寫手</label>
+          <select class="form-input" id="om-f-writer" onchange="omAutoWriterFee()">${writerOpts}</select>
+        </div>
+        <div class="form-row"><label class="form-label">寫手費 <span style="color:var(--accent);font-size:10px">自動帶入</span></label>
+          <input type="number" class="form-input" id="om-f-writer-fee" value="${rec?rec.writerFee||'':''}">
+        </div>
+      </div>
+
+      <!-- 日期流程 -->
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:4px">日期</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">發包日</label>
+          <input type="date" class="form-input" id="om-f-assign" value="${rec?rec.assignDate||'':''}">
+        </div>
+        <div class="form-row"><label class="form-label">切角提供日</label>
+          <input type="date" class="form-input" id="om-f-cutangle" value="${rec?rec.cutAngleDate||'':''}">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div class="form-row"><label class="form-label">撰文完成日</label>
+          <input type="date" class="form-input" id="om-f-writing-done" value="${rec?rec.writingDoneDate||'':''}">
+        </div>
+        <div class="form-row"><label class="form-label">上刊日</label>
+          <input type="date" class="form-input" id="om-f-publish" value="${rec?rec.publishDate||'':''}">
+        </div>
+        <div class="form-row"><label class="form-label">觀察結束日</label>
+          <input type="date" class="form-input" id="om-f-observe" value="${rec?rec.observeEndDate||'':''}">
+        </div>
+      </div>
+
+      <div class="form-row"><label class="form-label">備註</label>
+        <input class="form-input" id="om-f-note" value="${rec?rec.note||'':''}">
+      </div>
+
+      <!-- LINE 通知 -->
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:4px">LINE 通知</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="omCopyLineMsg('writer')" style="background:var(--green-bg);color:var(--green);border-color:var(--green)">📋 複製寫手通知</button>
+        <button class="btn btn-sm" onclick="omCopyLineMsg('vendor')" style="background:var(--amber-bg);color:var(--amber);border-color:var(--amber)">📋 複製口碑商通知</button>
+        <button class="btn btn-sm" onclick="omCopyLineMsg('client')" style="background:var(--blue-bg);color:var(--blue-text);border-color:var(--blue-text)">📋 複製客戶切角審核通知</button>
+      </div>
+
+    </div>`,
+    ()=>saveOmRecord(id)
+  );
+
+  // 如果有舊資料，初始化廠商平台選項
+  if(rec&&rec.vendorId){
+    setTimeout(()=>{
+      omUpdateVendorPlatforms(rec.platform, rec.actionType);
+    },50);
+  }
+}
+
+// ── 廠商平台/項目 聯動 ──
+function omGetVendorPlatformOpts(vendorId, selPlatform, selAction){
+  const vc = (DB.vendorCompanies||[]).find(v=>v.id===vendorId);
+  if(!vc) return '';
+  const platforms = [...new Set((vc.platforms||[]).flatMap ? vc.platforms : [])];
+  return platforms.map(p=>`<option${p===selPlatform?' selected':''}>${p}</option>`).join('');
+}
+
+function omUpdateVendorPlatforms(selPlatform, selAction){
+  const vendorId = document.getElementById('om-f-vendor')?.value;
+  const platSel  = document.getElementById('om-f-platform');
+  if(!platSel) return;
+  if(!vendorId){ platSel.innerHTML='<option value="">— 選廠商後出現 —</option>'; return; }
+
+  const vc = (DB.vendorCompanies||[]).find(v=>v.id===vendorId);
+  if(!vc){ platSel.innerHTML='<option value="">—</option>'; return; }
+
+  // 取 items 裡所有 platform
+  let items = vc.platforms; // 已是 [{platform, items:[]}] 格式（loadAllData 轉換後）
+  const platforms = items ? items.map(p=>p.platform) : [];
+  platSel.innerHTML = '<option value="">— 選平台 —</option>'+
+    platforms.map(p=>`<option${p===selPlatform?' selected':''}>${p}</option>`).join('');
+
+  omUpdateActionTypes(selAction);
+}
+
+function omUpdateActionTypes(selAction){
+  const vendorId  = document.getElementById('om-f-vendor')?.value;
+  const platform  = document.getElementById('om-f-platform')?.value;
+  const actionSel = document.getElementById('om-f-action');
+  if(!actionSel) return;
+  if(!vendorId||!platform){ actionSel.innerHTML='<option value="">—</option>'; return; }
+
+  const vc = (DB.vendorCompanies||[]).find(v=>v.id===vendorId);
+  if(!vc){ actionSel.innerHTML='<option value="">—</option>'; return; }
+
+  const platData = (vc.platforms||[]).find(p=>p.platform===platform);
+  const actions  = platData ? (platData.items||[]) : [];
+  actionSel.innerHTML = '<option value="">— 選項目 —</option>'+
+    actions.map(a=>`<option value="${a.item}"${a.item===selAction?' selected':''}>${a.item}${a.price!=null?' ('+a.price+')':''}</option>`).join('');
+  omAutoVendorFee();
+}
+
+function omAutoVendorFee(){
+  const vendorId  = document.getElementById('om-f-vendor')?.value;
+  const platform  = document.getElementById('om-f-platform')?.value;
+  const action    = document.getElementById('om-f-action')?.value;
+  const feeEl     = document.getElementById('om-f-vendor-fee');
+  if(!feeEl||!vendorId||!platform||!action) return;
+  const vc = (DB.vendorCompanies||[]).find(v=>v.id===vendorId);
+  if(!vc) return;
+  const platData = (vc.platforms||[]).find(p=>p.platform===platform);
+  const item = platData ? (platData.items||[]).find(i=>i.item===action) : null;
+  if(item&&item.price!=null) feeEl.value=item.price;
+}
+
+function omAutoWriterFee(){
+  const writerId = document.getElementById('om-f-writer')?.value;
+  const specType = document.getElementById('om-f-spec')?.value;
+  const feeEl    = document.getElementById('om-f-writer-fee');
+  if(!feeEl) return;
+  if(!writerId){ feeEl.value=''; return; }
+  const writer = DB.freelancers.find(f=>f.id===writerId);
+  if(!writer) return;
+  const item = (writer.items||[]).find(i=>i.item===specType||(i.item&&specType&&specType.includes(i.item)));
+  if(item&&item.price!=null) feeEl.value=item.price;
+}
+
+// ── 聯動更新 ──
 function omUpdateContracts(){
-  const clientId=document.getElementById('om-f-client')?.value;
-  const sel=document.getElementById('om-f-contract');
-  if(!sel)return;
-  const contracts=DB.contracts.filter(c=>c.clientId===clientId);
-  sel.innerHTML='<option value="">—</option>'+contracts.map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join('');
+  const clientId = document.getElementById('om-f-client')?.value;
+  const sel = document.getElementById('om-f-contract');
+  if(!sel) return;
+  sel.innerHTML='<option value="">—</option>'+
+    DB.contracts.filter(c=>c.clientId===clientId).map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join('');
   omUpdateSpecItems();
 }
 function omUpdateSpecItems(){
-  const contractId=document.getElementById('om-f-contract')?.value;
-  const sel=document.getElementById('om-f-specid');
-  if(!sel)return;
-  const specs=contractId?DB.specItems.filter(s=>s.contractId===contractId&&s.category==='口碑'):[];
-  sel.innerHTML='<option value="">— 選擇規格 —</option>'+specs.map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit}）</option>`).join('');
+  const contractId = document.getElementById('om-f-contract')?.value;
+  const sel = document.getElementById('om-f-specid');
+  if(!sel) return;
+  const specs = contractId ? DB.specItems.filter(s=>s.contractId===contractId&&s.category==='口碑') : [];
+  sel.innerHTML='<option value="">— 選擇規格 —</option>'+
+    specs.map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit}）</option>`).join('');
 }
 function omApplySpec(){
-  const specId=document.getElementById('om-f-specid')?.value;
-  if(!specId)return;
-  const spec=DB.specItems.find(s=>s.id===specId);
-  if(!spec)return;
-  const specSel=document.getElementById('om-f-spec');
-  if(specSel&&spec.name){
-    // 嘗試比對規格類型選項
-    const opts=Array.from(specSel.options);
-    const match=opts.find(o=>o.value===spec.name||spec.name.includes(o.value));
-    if(match)specSel.value=match.value;
+  const specId = document.getElementById('om-f-specid')?.value;
+  if(!specId) return;
+  const spec = DB.specItems.find(s=>s.id===specId);
+  if(!spec) return;
+  const specSel = document.getElementById('om-f-spec');
+  if(specSel){
+    const match = Array.from(specSel.options).find(o=>o.value===spec.name||(spec.name&&spec.name.includes(o.value)));
+    if(match) specSel.value=match.value;
   }
-}
-// 社群連動
-function scUpdateContracts(){
-  const clientId=document.getElementById('sc-f-client')?.value;
-  const sel=document.getElementById('sc-f-contract');
-  if(!sel)return;
-  sel.innerHTML='<option value="">—</option>'+DB.contracts.filter(c=>c.clientId===clientId).map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join('');
-  scUpdateSpecItems();
-}
-function scUpdateSpecItems(){
-  const contractId=document.getElementById('sc-f-contract')?.value;
-  const sel=document.getElementById('sc-f-specid');
-  if(!sel)return;
-  const specs=contractId?DB.specItems.filter(s=>s.contractId===contractId&&s.category==='社群'):[];
-  sel.innerHTML='<option value="">— 選擇規格 —</option>'+specs.map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit}）</option>`).join('');
-}
-function scApplySpec(){
-  const specId=document.getElementById('sc-f-specid')?.value;
-  if(!specId)return;
-  const spec=DB.specItems.find(s=>s.id===specId);
-  if(!spec)return;
-  const specSel=document.getElementById('sc-f-spec');
-  if(specSel){const match=Array.from(specSel.options).find(o=>o.value===spec.name||spec.name.includes(o.value));if(match)specSel.value=match.value;}
-}
-// 廣告連動
-function adUpdateContracts(){
-  const clientId=document.getElementById('ad-f-client')?.value;
-  const sel=document.getElementById('ad-f-contract');
-  if(!sel)return;
-  sel.innerHTML='<option value="">—</option>'+DB.contracts.filter(c=>c.clientId===clientId).map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join('');
-  adUpdateSpecItems();
-}
-function adUpdateSpecItems(){
-  const contractId=document.getElementById('ad-f-contract')?.value;
-  const sel=document.getElementById('ad-f-specid');
-  if(!sel)return;
-  const specs=contractId?DB.specItems.filter(s=>s.contractId===contractId&&s.category==='廣告'):[];
-  sel.innerHTML='<option value="">— 選擇規格 —</option>'+specs.map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit}）</option>`).join('');
+  omAutoWriterFee();
 }
 
-function omUpdateWriterFee(){
-  const writerId=document.getElementById('om-f-writer')?.value;
-  const specType=document.getElementById('om-f-spec')?.value;
-  if(!writerId||!specType)return;
-  const writer=DB.freelancers.find(f=>f.id===writerId);
-  if(!writer)return;
-  const item=writer.items.find(i=>(i.item||i.name)&&specType.includes((i.item||i.name).replace('-常規','').replace('-簡易','')));
-  if(item){const feeEl=document.getElementById('om-f-writer-fee');if(feeEl&&!feeEl.value)feeEl.value=item.price;}
+// ── LINE 通知文字 ──
+function omCopyLineMsg(type){
+  const clientId  = document.getElementById('om-f-client')?.value;
+  const clientName= DB.clients.find(c=>c.id===clientId)?.name||'（客戶）';
+  const specType  = document.getElementById('om-f-spec')?.value||'';
+  const content   = document.getElementById('om-f-content')?.value||'';
+  const title     = document.getElementById('om-f-title')?.value||'';
+  const drive     = document.getElementById('om-f-drive')?.value||'';
+  const platform  = document.getElementById('om-f-platform')?.value||'';
+  const action    = document.getElementById('om-f-action')?.value||'';
+  const month     = document.getElementById('om-f-month')?.value||new Date().toISOString().slice(0,7);
+  const writerId  = document.getElementById('om-f-writer')?.value;
+  const writerName= writerId?(DB.freelancers.find(f=>f.id===writerId)?.name||'—'):'內部';
+  const vendorId  = document.getElementById('om-f-vendor')?.value;
+  const vendorName= vendorId?(DB.vendorCompanies||[]).find(v=>v.id===vendorId)?.name||'—':'—';
+  const assignDate= document.getElementById('om-f-assign')?.value||'待確認';
+  const cutDate   = document.getElementById('om-f-cutangle')?.value||'待確認';
+
+  let msg='';
+  if(type==='writer'){
+    msg=`【口碑任務通知】\n客戶：${clientName}\n月份：${month}\n類型：${specType}\n${title?'標題：'+title+'\n':''}置入方向：\n${content||'（待補充）'}\n${drive?'文稿雲端：'+drive+'\n':''}發包日：${assignDate}\n截稿日：${cutDate}\n\n請確認後開始撰文，完成後回覆「完成」並附上文稿連結。`;
+  } else if(type==='vendor'){
+    msg=`【口碑商上文需求】\n客戶：${clientName}\n月份：${month}\n平台：${platform}\n項目：${action}\n${title?'標題／目標文章：'+title+'\n':''}置入文案：\n${content||'（待補充）'}\n${drive?'文稿：'+drive+'\n':''}執行後請回填連結與帳號，謝謝！`;
+  } else {
+    msg=`【切角審核請求】\n客戶：${clientName}\n月份：${month}\n類型：${specType}\n${title?'標題：'+title+'\n':''}置入方向草稿：\n${content||'（待補充）'}\n${drive?'文稿連結：'+drive+'\n':''}請確認置入方向是否符合需求，有修改意見請直接回覆，謝謝！`;
+  }
+
+  navigator.clipboard.writeText(msg).then(()=>{
+    toast('已複製'+{writer:'寫手',vendor:'口碑商',client:'客戶切角審核'}[type]+'通知文字！','success');
+  }).catch(()=>{
+    // fallback
+    const ta=document.createElement('textarea');
+    ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    toast('已複製通知文字','success');
+  });
 }
 
-function omUpdateVendorFee(){
-  const vendorName=document.getElementById('om-f-vendor')?.value;
-  const platform=document.getElementById('om-f-platform')?.value;
-  const specType=document.getElementById('om-f-spec')?.value;
-  if(!vendorName||!platform)return;
-  const vendor=DB.vendors.find(v=>v.name===vendorName);
-  if(!vendor)return;
-  const item=vendor.items.find(i=>i.platform===platform&&specType&&specType.includes(i.action));
-  if(item){const feeEl=document.getElementById('om-f-vendor-fee');if(feeEl&&!feeEl.value)feeEl.value=item.price;}
-}
-
+// ── 儲存 ──
 function saveOmRecord(existingId){
-  const clientId=document.getElementById('om-f-client')?.value;
-  const contractId=document.getElementById('om-f-contract')?.value;
-  const specType=document.getElementById('om-f-spec')?.value;
-  const platform=document.getElementById('om-f-platform')?.value;
-  if(!clientId||!specType||!platform){toast('請填寫必填欄位（客戶、規格、平台）');return;}
+  const clientId  = document.getElementById('om-f-client')?.value;
+  const specType  = document.getElementById('om-f-spec')?.value;
+  if(!clientId||!specType){toast('請填寫必填欄位（客戶、文章類型）');return;}
 
-  const vendorName=document.getElementById('om-f-vendor')?.value||'';
-  const writerId=document.getElementById('om-f-writer')?.value||'';
-  const writer=DB.freelancers.find(f=>f.id===writerId);
-  const newId=existingId||genOmId(vendorName);
+  const writerId  = document.getElementById('om-f-writer')?.value||'';
+  const vendorId  = document.getElementById('om-f-vendor')?.value||'';
+  const writer    = DB.freelancers.find(f=>f.id===writerId);
+  const vendor    = (DB.vendorCompanies||[]).find(v=>v.id===vendorId);
+  const newId     = existingId || genOmId(vendor?vendor.name:'');
+  const month     = document.getElementById('om-f-month')?.value || new Date().toISOString().slice(0,7);
 
-  const specId=document.getElementById('om-f-specid')?.value||'';
   const rec={
-    id:newId,
-    clientId, contractId:contractId||'', specId,
-    clientName:DB.clients.find(c=>c.id===clientId)?.name||'',
-    specType, platform,
-    section:document.getElementById('om-f-section')?.value||'',
-    publishDate:document.getElementById('om-f-date')?.value||'',
-    title:document.getElementById('om-f-title')?.value||'',
-    content:document.getElementById('om-f-content')?.value||'',
-    link:document.getElementById('om-f-link')?.value||'',
-    vendorName, vendorFee:parseFloat(document.getElementById('om-f-vendor-fee')?.value)||0,
-    writerId, writerName:writer?writer.name:'',
-    writerFee:parseFloat(document.getElementById('om-f-writer-fee')?.value)||0,
-    status:document.getElementById('om-f-status')?.value||'待執行',
-    note:document.getElementById('om-f-note')?.value||''
+    id: newId,
+    clientId,
+    contractId: document.getElementById('om-f-contract')?.value||'',
+    specId:     document.getElementById('om-f-specid')?.value||'',
+    clientName: DB.clients.find(c=>c.id===clientId)?.name||'',
+    month,
+    specType,
+    title:          document.getElementById('om-f-title')?.value||'',
+    content:        document.getElementById('om-f-content')?.value||'',
+    driveLink:      document.getElementById('om-f-drive')?.value||'',
+    postLink:       document.getElementById('om-f-post')?.value||'',
+    vendorId,
+    vendorName:     vendor?vendor.name:'',
+    platform:       document.getElementById('om-f-platform')?.value||'',
+    actionType:     document.getElementById('om-f-action')?.value||'',
+    section:        document.getElementById('om-f-section')?.value||'',
+    vendorFee:      parseFloat(document.getElementById('om-f-vendor-fee')?.value)||0,
+    writerId,
+    writerName:     writer?writer.name:'',
+    writerFee:      parseFloat(document.getElementById('om-f-writer-fee')?.value)||0,
+    status:         document.getElementById('om-f-status')?.value||'待發包',
+    assignDate:     document.getElementById('om-f-assign')?.value||'',
+    cutAngleDate:   document.getElementById('om-f-cutangle')?.value||'',
+    writingDoneDate:document.getElementById('om-f-writing-done')?.value||'',
+    publishDate:    document.getElementById('om-f-publish')?.value||'',
+    observeEndDate: document.getElementById('om-f-observe')?.value||'',
+    lineNotified:   false,
+    note:           document.getElementById('om-f-note')?.value||'',
+    created_at:     existingId?(DB.omRecords.find(r=>r.id===existingId)?.created_at||new Date().toISOString()):new Date().toISOString()
   };
 
-  if(existingId){const idx=DB.omRecords.findIndex(r=>r.id===existingId);if(idx>=0)DB.omRecords[idx]=rec;}
-  else DB.omRecords.push(rec);
-  closeDrawer();renderOmPage();toast('儲存成功');
+  if(existingId){
+    const idx=DB.omRecords.findIndex(r=>r.id===existingId);
+    if(idx>=0) DB.omRecords[idx]=rec;
+  } else {
+    DB.omRecords.push(rec);
+  }
+  syncToGAS('omRecords', rec).catch(e=>console.error('sync om failed',e));
+  closeDrawer(); renderOmPage(); toast('儲存成功','success');
 }
+
+// ── 從規格產生本月任務 ──
+function genOmTasksFromSpec(contractId, month){
+  const ct = DB.contracts.find(c=>c.id===contractId);
+  if(!ct){toast('找不到合約');return;}
+  const specs = DB.specItems.filter(s=>s.contractId===contractId && s.category==='口碑');
+  if(!specs.length){toast('此合約無口碑規格項目');return;}
+
+  const m = month || new Date().toISOString().slice(0,7);
+  // 計算合約月數以分配每月數量
+  function mthlyQty(spec){
+    if(!ct.start||!ct.end) return spec.qty;
+    const months = Math.max(1,Math.round((new Date(ct.end)-new Date(ct.start))/(1000*60*60*24*30)));
+    return Math.ceil(spec.qty/months);
+  }
+
+  let created=0;
+  specs.forEach(spec=>{
+    const qty = mthlyQty(spec);
+    for(let i=0;i<qty;i++){
+      const newId = `OM-${m.replace('-','')}-${ct.clientId.slice(-3)}-${String(DB.omRecords.length+created+1).padStart(3,'0')}`;
+      DB.omRecords.push({
+        id: newId,
+        clientId:   ct.clientId,
+        contractId: ct.id,
+        specId:     spec.id,
+        clientName: DB.clients.find(c=>c.id===ct.clientId)?.name||'',
+        month:      m,
+        specType:   spec.name,
+        title:'', content:'', driveLink:'', postLink:'',
+        vendorId:'', vendorName:'', platform:'', actionType:'', section:'',
+        vendorFee:0, writerId:'', writerName:'', writerFee:0,
+        status:'待發包',
+        assignDate:'', cutAngleDate:'', writingDoneDate:'',
+        publishDate:'', observeEndDate:'', lineNotified:false,
+        note:'', created_at: new Date().toISOString()
+      });
+      created++;
+    }
+  });
+
+  toast(`已產生 ${created} 筆口碑任務（${m}）`,'success');
+  // 切換到口碑執行記錄頁
+  navigateTo('exec-om');
+  document.getElementById('om-client').value=ct.clientId;
+  document.getElementById('om-month').value=m;
+  renderOmPage();
+}
+
 
 // 社群/廣告佔位
 // ═══ 社群執行記錄 ═══
