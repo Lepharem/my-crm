@@ -1527,22 +1527,68 @@ window.loadAllData = async function(){
     else if(!DB.adRecords) DB.adRecords = [];
 
     // vendor_companies（廠商定價，新）
+    // GAS 格式：{id, name, platforms(JSON), items(JSON flat: [{platform,name,price}])}
+    // 前端 renderVendorPricePage 要巢狀：{id, name, platforms:[{platform, items:[{item,price}]}]}
     const vcRaw = data.vendor_companies || data.fin_vendor_companies || [];
-    if(vcRaw.length) DB.vendorCompanies = vcRaw.filter(r => r.id);
+    if(vcRaw.length) {
+      DB.vendorCompanies = vcRaw.filter(r => r.id && r.id !== 'id').map(r => {
+        // 解析 items（JSON 字串）
+        let flatItems = r.items;
+        if(typeof flatItems === 'string') {
+          try { flatItems = JSON.parse(flatItems); } catch(e) { flatItems = []; }
+        }
+        if(!Array.isArray(flatItems)) flatItems = [];
+
+        // 解析 platforms 名稱清單
+        let platNames = r.platforms;
+        if(typeof platNames === 'string') {
+          try { platNames = JSON.parse(platNames); } catch(e) { platNames = []; }
+        }
+        if(!Array.isArray(platNames)) platNames = [];
+
+        // 依 platform 分組，建成巢狀結構
+        const platMap = {};
+        // 先建空槽確保順序
+        platNames.forEach(p => { if(!platMap[p]) platMap[p] = []; });
+        // 把 flat items 分配進去
+        flatItems.forEach(it => {
+          const pk = it.platform || '';
+          if(!platMap[pk]) platMap[pk] = [];
+          platMap[pk].push({
+            item:  it.item  || it.name || '',
+            price: it.price != null ? Number(it.price) || 0 : null,
+            note:  it.note  || ''
+          });
+        });
+
+        return {
+          id:   r.id,
+          name: r.name,
+          platforms: Object.entries(platMap).map(([platform, items]) => ({ platform, items }))
+        };
+      });
+    }
 
     // ref_service_catalog（樂法服務報價，有資料才覆蓋靜態）
     const scRaw = data.service_catalog || data.ref_service_catalog || [];
     if(scRaw.length) DB.serviceCatalog = scRaw.filter(r => r.id && r.id !== 'id');
 
-    // hr_freelancer_records（外包人員報價，有資料才覆蓋靜態）
-    const flRaw = data.freelancer_records || data.hr_freelancer_records || [];
+    // ref_freelancer_pricing（外包人員報價設定，有資料才覆蓋靜態）
+    // 注意：fin_freelancer_records 是執行記錄，這裡是「定價」表，兩者不同
+    const flRaw = data.freelancer_pricing || data.ref_freelancer_pricing || [];
     if(flRaw.length) {
-      // GAS 格式：{id, name, type, payMethod, items(JSON string or array)}
+      // Sheet 欄位：id, name, type, payMethod, items(JSON：[{item,price,note}])
       DB.freelancers = flRaw.filter(r => r.id && r.id !== 'id').map(r => {
-        if(typeof r.items === 'string') {
-          try { r.items = JSON.parse(r.items); } catch(e) { r.items = []; }
+        let items = r.items;
+        if(typeof items === 'string') {
+          try { items = JSON.parse(items); } catch(e) { items = []; }
         }
-        if(!Array.isArray(r.items)) r.items = [];
+        if(!Array.isArray(items)) items = [];
+        r.items = items.map(it => ({
+          item:  it.item  || it.name || '',
+          price: it.price != null ? Number(it.price) : 0,
+          note:  it.note  || ''
+        }));
         return r;
       });
     }
@@ -1762,18 +1808,20 @@ const DB = {
     {id:'SC021',category:'社群',sub:'社群內容經營',name:'文案',spec:'純文案不包含圖片設計',unit:'篇',price:2000,freelancerCost:0,vendorCost:0,note:'價格會依照實際需求浮動'}
   ],
   freelancers:[
-    {id:'FL001',name:'Nina',type:'口碑',payMethod:'月結',items:[{"name": "長圖文", "price": 1100}, {"name": "短圖文", "price": 850}, {"name": "短議題文", "price": 550}, {"name": "綁定回文", "price": 50}, {"name": "Google星評", "price": 550}, {"name": "KOC媒合", "price": 600}, {"name": "KOL媒合", "price": 1200}, {"name": "報告整合", "price": 200}, {"name": "即時回文-常規", "price": 200}, {"name": "即時回文-特殊", "price": 300}, {"name": "口碑上刊紀錄", "price": 100}, {"name": "聲量分析月報/季報/結案報告", "price": 200}, {"name": "口碑操作月報/季報/結案報告", "price": 500}, {"name": "KOL/KOC成效月報/季報/結案報告", "price": 200}, {"name": "每日監控", "price": 200}, {"name": "雙日監控", "price": 800}, {"name": "每週監控", "price": 700}, {"name": "每月監控", "price": 1200}]},
-    {id:'FL002',name:'Jackie',type:'口碑',payMethod:'月結',items:[{"name": "長圖文", "price": 1100}, {"name": "短圖文", "price": 850}, {"name": "短議題文", "price": 550}, {"name": "綁定回文", "price": 50}, {"name": "Google星評", "price": 100}, {"name": "KOC媒合", "price": 600}, {"name": "KOL媒合", "price": 1200}, {"name": "報告整合", "price": 200}, {"name": "即時回文-常規", "price": 200}, {"name": "即時回文-簡易", "price": 20}, {"name": "口碑上刊紀錄", "price": 100}, {"name": "聲量分析月報/季報/結案報告", "price": 200}, {"name": "口碑操作月報/季報/結案報告", "price": 500}, {"name": "KOL/KOC成效月報/季報/結案報告", "price": 200}, {"name": "每日監控", "price": 200}, {"name": "雙日監控", "price": 800}, {"name": "每週監控", "price": 700}, {"name": "每月監控", "price": 1200}]},
-    {id:'FL003',name:'Lousia',type:'口碑',payMethod:'月結',items:[{"name": "長圖文", "price": 1000}, {"name": "短圖文", "price": 800}, {"name": "短議題文", "price": 700}, {"name": "綁定回文", "price": 60}, {"name": "Google星評", "price": 200}, {"name": "KOC媒合", "price": 800}, {"name": "KOL媒合", "price": 1000}, {"name": "報告整合", "price": 300}, {"name": "即時回文-常規", "price": 100}, {"name": "即時回文-特殊", "price": 150}, {"name": "口碑上刊紀錄", "price": 500}, {"name": "口碑操作月報/季報/結案報告", "price": 800}, {"name": "KOL/KOC成效月報/季報/結案報告", "price": 500}]},
-    {id:'FL004',name:'跳跳',type:'口碑',payMethod:'月結',items:[{"name": "長圖文", "price": 1200}, {"name": "短圖文", "price": 800}, {"name": "短議題文", "price": 500}, {"name": "綁定回文", "price": 50}, {"name": "Google星評", "price": 60}, {"name": "KOC媒合", "price": 600}, {"name": "KOL媒合", "price": 1200}, {"name": "報告整合", "price": 200}, {"name": "即時回文-常規", "price": 200}, {"name": "即時回文-特殊", "price": 300}, {"name": "口碑上刊紀錄", "price": 100}, {"name": "聲量分析月報/季報/結案報告", "price": 200}, {"name": "口碑操作月報/季報/結案報告", "price": 500}, {"name": "KOL/KOC成效月報/季報/結案報告", "price": 200}, {"name": "每日監控", "price": 200}, {"name": "雙日監控", "price": 800}, {"name": "每週監控", "price": 700}, {"name": "每月監控", "price": 1200}]},
-    {id:'FL005',name:'羿琦',type:'口碑',payMethod:'月結',items:[{"name": "長圖文", "price": 1200}, {"name": "短圖文", "price": 850}, {"name": "短議題文", "price": 700}, {"name": "綁定回文", "price": 80}, {"name": "Google星評", "price": 100}, {"name": "KOC媒合", "price": 1500}, {"name": "KOL媒合", "price": 4000}, {"name": "報告整合", "price": 2500}, {"name": "即時回文-常規", "price": 85}, {"name": "即時回文-簡易", "price": 70}]},
-    {id:'FL006',name:'妙妙',type:'口碑',payMethod:'月結',items:[{"name": "長圖文", "price": 1100}, {"name": "短圖文", "price": 850}, {"name": "短議題文", "price": 550}, {"name": "綁定回文", "price": 50}, {"name": "Google星評", "price": 100}, {"name": "即時回文-常規", "price": 150}, {"name": "即時回文-簡易", "price": 50}, {"name": "口碑上刊紀錄", "price": 100}, {"name": "每週監控", "price": 700}]},
-    {id:'FL007',name:'阿圓',type:'社群',payMethod:'勞報',items:[{"name": "單圖文(企劃)", "price": 1500}, {"name": "多圖文(企劃)", "price": 2500}]},
-    {id:'FL008',name:'楊楊',type:'社群',payMethod:'勞報',items:[{"name": "月報", "price": 2000}]},
-    {id:'FL009',name:'大喬',type:'社群',payMethod:'發票',items:[{"name": "單圖文(設計)", "price": 1500}, {"name": "多圖文(設計)", "price": 2500}]},
-    {id:'FL010',name:'莊皓',type:'社群',payMethod:'勞報',items:[{"name": "單圖文(設計)", "price": 1800}, {"name": "多圖文(設計)", "price": 2800}]},
-    {id:'FL011',name:'Eason',type:'社群',payMethod:'勞報',items:[{"name": "單圖文(設計)", "price": 1300}, {"name": "多圖文(設計)", "price": 2300}]},
-    {id:'FL012',name:'豹哥',type:'社群',payMethod:'發票',items:[{"name": "平面圖片", "price": 500}, {"name": "短影音", "price": 8000}]}
+    {id:'FL001',name:'Nina',type:'口碑',payMethod:'月結',items:[{"item": "長圖文", "price": 1100}, {"item": "短圖文", "price": 850}, {"item": "短議題文", "price": 550}, {"item": "綁定回文", "price": 50}, {"item": "Google星評", "price": 550}, {"item": "KOC媒合", "price": 600}, {"item": "KOL媒合", "price": 1200}, {"item": "報告整合", "price": 200}, {"item": "即時回文-常規", "price": 200}, {"item": "即時回文-特殊", "price": 300}, {"item": "口碑上刊紀錄", "price": 100}, {"item": "聲量分析月報/季報/結案報告", "price": 200}, {"item": "口碑操作月報/季報/結案報告", "price": 500}, {"item": "KOL/KOC成效月報/季報/結案報告", "price": 200}, {"item": "每日監控", "price": 200}, {"item": "雙日監控", "price": 800}, {"item": "每週監控", "price": 700}, {"item": "每月監控", "price": 1200}]},
+    {id:'FL002',name:'Jackie',type:'口碑',payMethod:'月結',items:[{"item": "長圖文", "price": 1100}, {"item": "短圖文", "price": 850}, {"item": "短議題文", "price": 550}, {"item": "綁定回文", "price": 50}, {"item": "Google星評", "price": 100}, {"item": "KOC媒合", "price": 600}, {"item": "KOL媒合", "price": 1200}, {"item": "報告整合", "price": 200}, {"item": "即時回文-常規", "price": 200}, {"item": "即時回文-簡易", "price": 20}, {"item": "口碑上刊紀錄", "price": 100}, {"item": "聲量分析月報/季報/結案報告", "price": 200}, {"item": "口碑操作月報/季報/結案報告", "price": 500}, {"item": "KOL/KOC成效月報/季報/結案報告", "price": 200}, {"item": "每日監控", "price": 200}, {"item": "雙日監控", "price": 800}, {"item": "每週監控", "price": 700}, {"item": "每月監控", "price": 1200}]},
+    {id:'FL003',name:'Lousia',type:'口碑',payMethod:'月結',items:[{"item": "長圖文", "price": 1000}, {"item": "短圖文", "price": 800}, {"item": "短議題文", "price": 700}, {"item": "綁定回文", "price": 60}, {"item": "Google星評", "price": 200}, {"item": "KOC媒合", "price": 800}, {"item": "KOL媒合", "price": 1000}, {"item": "報告整合", "price": 300}, {"item": "即時回文-常規", "price": 100}, {"item": "即時回文-特殊", "price": 150}, {"item": "口碑上刊紀錄", "price": 500}, {"item": "口碑操作月報/季報/結案報告", "price": 800}, {"item": "KOL/KOC成效月報/季報/結案報告", "price": 500}]},
+    {id:'FL004',name:'跳跳',type:'口碑',payMethod:'月結',items:[{"item": "長圖文", "price": 1200}, {"item": "短圖文", "price": 800}, {"item": "短議題文", "price": 500}, {"item": "綁定回文", "price": 50}, {"item": "Google星評", "price": 60}, {"item": "KOC媒合", "price": 600}, {"item": "KOL媒合", "price": 1200}, {"item": "報告整合", "price": 200}, {"item": "即時回文-常規", "price": 200}, {"item": "即時回文-特殊", "price": 300}, {"item": "口碑上刊紀錄", "price": 100}, {"item": "聲量分析月報/季報/結案報告", "price": 200}, {"item": "口碑操作月報/季報/結案報告", "price": 500}, {"item": "KOL/KOC成效月報/季報/結案報告", "price": 200}, {"item": "每日監控", "price": 200}, {"item": "雙日監控", "price": 800}, {"item": "每週監控", "price": 700}, {"item": "每月監控", "price": 1200}]},
+    {id:'FL005',name:'羿琦',type:'口碑',payMethod:'月結',items:[{"item": "長圖文", "price": 1200}, {"item": "短圖文", "price": 850}, {"item": "短議題文", "price": 700}, {"item": "綁定回文", "price": 80}, {"item": "Google星評", "price": 100}, {"item": "KOC媒合", "price": 1500}, {"item": "KOL媒合", "price": 4000}, {"item": "報告整合", "price": 2500}, {"item": "即時回文-常規", "price": 85}, {"item": "即時回文-簡易", "price": 70}]},
+    {id:'FL006',name:'妙妙',type:'口碑',payMethod:'月結',items:[{"item": "長圖文", "price": 1100}, {"item": "短圖文", "price": 850}, {"item": "短議題文", "price": 550}, {"item": "綁定回文", "price": 50}, {"item": "Google星評", "price": 100}, {"item": "即時回文-常規", "price": 150}, {"item": "即時回文-簡易", "price": 50}, {"item": "口碑上刊紀錄", "price": 100}, {"item": "每週監控", "price": 700}]},
+    {id:'FL007',name:'阿圓',type:'社群',payMethod:'勞報',items:[{"item": "單圖文(企劃)", "price": 1500}, {"item": "多圖文(企劃)", "price": 2500}]},
+    {id:'FL008',name:'楊楊',type:'社群',payMethod:'勞報',items:[{"item": "月報", "price": 2000}]},
+    {id:'FL009',name:'大喬',type:'社群',payMethod:'發票',items:[{"item": "單圖文(設計)", "price": 1500}, {"item": "多圖文(設計)", "price": 2500}]},
+    {id:'FL010',name:'莊皓',type:'社群',payMethod:'勞報',items:[{"item": "單圖文(設計)", "price": 1800}, {"item": "多圖文(設計)", "price": 2800}]},
+    {id:'FL011',name:'Eason',type:'社群',payMethod:'勞報',items:[{"item": "單圖文(設計)", "price": 1300}, {"item": "多圖文(設計)", "price": 2300}]},
+    {id:'FL012',name:'Lazaro',type:'社群',payMethod:'勞報',items:[{"item": "單圖文(設計)", "price": 1300}, {"item": "多圖文(設計)", "price": 2300}, {"item": "急件費", "price": 150}]},
+    {id:'FL013',name:'豹哥',type:'社群',payMethod:'發票',items:[{"item": "平面圖片", "price": 500}, {"item": "短影音", "price": 8000}]},
+    {id:'FL014',name:'Sherry',type:'社群',payMethod:'勞報',items:[{"item": "單圖文(企劃)", "price": 1300}, {"item": "多圖文(企劃)", "price": 2300}]}
   ],
   vendorCompanies:[
     {id:'VC001',name:'庫奇',platforms:['Dcard','PTT','FB','Mobile01','Babyhome','媽咪拜','媽咪愛','Fashionguide','Youtube','巴哈姆特','threads','Google'],items:[{platform:'Dcard',name:'開文',price:150},{platform:'Dcard',name:'回文',price:100},{platform:'Dcard',name:'按讚',price:30},{platform:'PTT',name:'回文',price:150},{platform:'FB',name:'按讚',price:30},{platform:'Mobile01',name:'引用',price:null},{platform:'Babyhome',name:'轉發',price:null},{platform:'媽咪拜',name:'1-6等帳號',price:null},{platform:'媽咪愛',name:'7等以上帳號',price:null},{platform:'threads',name:'開文',price:250},{platform:'threads',name:'回文',price:120},{platform:'threads',name:'引用',price:30},{platform:'threads',name:'轉發',price:120},{platform:'threads',name:'按讚',price:30},{platform:'PTT',name:'開文',price:250},{platform:'PTT',name:'回文',price:150},{platform:'Google',name:'1-6等帳號',price:80},{platform:'Google',name:'7等以上帳號',price:150}]},
