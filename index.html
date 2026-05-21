@@ -268,6 +268,10 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
   .page-area{padding-bottom:64px}
   .content{padding:16px}
   .form-row,.form-row-3{grid-template-columns:1fr}
+  /* Dashboard: 本月執行摘要三格在小螢幕改為單欄 */
+  .home-exec-grid{grid-template-columns:1fr!important}
+  /* 部門排程在小螢幕直排 */
+  .home-dept-grid{grid-template-columns:1fr!important}
 }
 
 /* ── SCROLLBAR ── */
@@ -535,6 +539,10 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
     <div class="nav-item" onclick="navTo('vendor-exec',this)" id="nav-vendor-exec">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
       廠商執行表
+    </div>
+    <div class="nav-item" onclick="navTo('monthly-checkup',this)" id="nav-monthly-checkup">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      月結盤點
     </div>
     <div class="nav-item" onclick="navTo('plan-schedule',this)" id="nav-plan-schedule">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -965,9 +973,9 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
         <span class="filter-label">執行人員</span>
         <select class="filter-input" id="social-executor" onchange="renderExecSocial()" style="width:110px"><option value="">全部</option><option value="內部">內部</option></select>
         <span class="filter-label">狀態</span>
-        <select class="filter-input" id="social-status" onchange="renderExecSocial()" style="width:100px">
+        <select class="filter-input" id="social-status" onchange="renderExecSocial()" style="width:110px">
           <option value="">全部</option>
-          <option>待執行</option><option>已排程</option><option>已發佈</option><option>已封存</option>
+          <option>待企劃</option><option>企劃審核</option><option>素材製作</option><option>素材審核</option><option>待排程</option><option>已排程</option><option>已發佈</option><option>觀察中</option><option>完成</option><option>已封存</option>
         </select>
         <button class="btn btn-sm btn-ghost" onclick="clearSocialFilters()">清除篩選</button>
       </div>
@@ -995,6 +1003,11 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
         <span class="filter-label">類型</span>
         <select class="filter-input" id="ad-type" onchange="renderExecAd()" style="width:100px">
           <option value="">全部</option><option>Google</option><option>Meta</option>
+        </select>
+        <span class="filter-label">狀態</span>
+        <select class="filter-input" id="ad-status" onchange="renderExecAd()" style="width:110px">
+          <option value="">全部</option>
+          <option>待設定</option><option>審核中</option><option>投遞中</option><option>暫停</option><option>完成</option><option>已封存</option>
         </select>
         <button class="btn btn-sm btn-ghost" onclick="clearAdFilters()">清除篩選</button>
       </div>
@@ -1128,6 +1141,26 @@ tfoot td{background:var(--surface2);font-weight:600;color:var(--text)}
         <button class="btn btn-sm btn-ghost" onclick="clearVeFilters()">清除篩選</button>
       </div>
       <div style="flex:1;overflow-y:auto" id="vendor-exec-content"></div>
+    </div>
+
+    <!-- ══ 月結盤點 ══ -->
+    <div id="page-monthly-checkup" class="page page-locked">
+      <div class="topbar">
+        <div class="topbar-left"><div class="topbar-title">月結盤點</div><div class="topbar-sub">各合約規格執行率 × 請款狀態</div></div>
+        <div class="topbar-actions">
+          <input type="month" class="filter-input" id="checkup-ym" style="width:140px" value="">
+          <button class="btn btn-primary" onclick="runMonthlyCheckup()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>執行盤點
+          </button>
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto" id="checkup-content">
+        <div class="empty-state" style="padding:60px 24px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;margin:0 auto 12px;opacity:.3;display:block"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <p>選擇月份後按「執行盤點」</p>
+          <p style="font-size:12px;margin-top:4px;color:var(--text3)">將從 GAS 即時計算各合約本月規格完成率與請款狀況</p>
+        </div>
+      </div>
     </div>
 
     <!-- ══ 打卡頁面 ══ -->
@@ -1713,6 +1746,7 @@ window.loadAllData = async function(){
           'exec-om': renderOmPage,
           'exec-social': renderExecSocial,
           'exec-ad': renderExecAd,
+          'monthly-checkup': ()=>{},
         };
         if(rerenderMap[pid]) rerenderMap[pid]();
       }
@@ -1980,7 +2014,7 @@ function navTo(id, btn){
   closeDrawer();
   closeSidebar();
   // render
-  const renders={home:renderHome,clients:renderClients,receivable:renderReceivable,'receivable-overview':renderReceivableOverview,'settings-catalog':renderCatalogPage,'settings-freelancer':renderFreelancerPage,'settings-vendor':renderVendorPricePage,'settings-theme':renderThemePage,'settings-permissions':renderPermissionsPage,summary:renderSummary,performance:renderPerformance,'biz-schedule':renderSchedule,'plan-schedule':renderSchedule2,projects:renderProjects,specs:renderSpecsPage,'vendor-exec':renderVendorExec,'freelancer-stats':renderFreelancerStats,'exec-om':renderOmPage,'exec-social':renderExecSocial,'exec-ad':renderExecAd,clock:function(){hrStartClock();hrLoadAttendanceStatus();},hr:hrRenderPage,logs:hrLoadLogs,'fb-tax':renderFbTax};
+  const renders={home:renderHome,clients:renderClients,receivable:renderReceivable,'receivable-overview':renderReceivableOverview,'settings-catalog':renderCatalogPage,'settings-freelancer':renderFreelancerPage,'settings-vendor':renderVendorPricePage,'settings-theme':renderThemePage,'settings-permissions':renderPermissionsPage,summary:renderSummary,performance:renderPerformance,'biz-schedule':renderSchedule,'plan-schedule':renderSchedule2,projects:renderProjects,specs:renderSpecsPage,'vendor-exec':renderVendorExec,'freelancer-stats':renderFreelancerStats,'exec-om':renderOmPage,'exec-social':renderExecSocial,'exec-ad':renderExecAd,'monthly-checkup':()=>{},clock:function(){hrStartClock();hrLoadAttendanceStatus();},hr:hrRenderPage,logs:hrLoadLogs,'fb-tax':renderFbTax};
   if(renders[id])renders[id]();
 }
 function goHome(){navTo('home',document.getElementById('nav-home'));}
@@ -2056,27 +2090,130 @@ function renderHome(){
   const d=new Date();
   document.getElementById('today-date').textContent=d.toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
 
-  // Stats row
   const totalContract=DB.contracts.reduce((a,c)=>a+c.total,0);
   const totalReceived=DB.receivables.reduce((a,r)=>a+r.payments.filter(p=>p.status==='已入款').reduce((b,p)=>b+p.amount,0),0);
   const pendingTasks=DB.tasks.filter(t=>t.status!=='已完成').length;
   const overdueTasks=DB.tasks.filter(t=>t.status!=='已完成'&&t.dueDate&&t.dueDate<today()).length;
+  const thisMonth=today().slice(0,7);
+  const todayStr=today();
 
   // 本月執行摘要
-  const thisMonth=today().slice(0,7);
   const omThisMonth=(DB.omRecords||[]).filter(r=>(r.publishDate||r.date||'').slice(0,7)===thisMonth);
   const socialThisMonth=(DB.socialRecords||[]).filter(r=>(r.postDate||'').slice(0,7)===thisMonth);
   const adThisMonth=(DB.adRecords||[]).filter(r=>(r.date||'').slice(0,7)===thisMonth);
   const omDone=omThisMonth.filter(r=>r.status==='已上刊'||r.status==='觀察中'||r.status==='完成').length;
-  const socialDone=socialThisMonth.filter(r=>r.status==='已發佈').length;
+  const socialDone=socialThisMonth.filter(r=>r.status==='已發佈'||r.status==='觀察中'||r.status==='完成').length;
   const adBudget=adThisMonth.reduce((a,r)=>a+(r.budget||0),0);
 
   // 逾期應收款
-  const todayStr=today();
   const overduePayments=DB.receivables.flatMap(ra=>
     ra.payments.filter(p=>p.status!=='已入款'&&p.dueDate&&p.dueDate<todayStr)
       .map(p=>({...p,contractId:ra.contractId,clientId:ra.clientId,contractNo:ra.contractNo}))
   );
+
+  // ── A2 通知中心 ──
+  const notices=[];
+
+  // 1. 逾期應收款
+  if(overduePayments.length){
+    const amt=overduePayments.reduce((a,p)=>a+(p.amount||0),0);
+    notices.push({
+      level:'red', icon:'💰',
+      title:`逾期應收款 ${overduePayments.length} 筆，合計 ${fmt(amt)}`,
+      tags: overduePayments.slice(0,4).map(p=>{
+        const cl=DB.clients.find(c=>c.id===p.clientId);
+        return`${cl?cl.name:'—'} · ${p.dueDate}`;
+      }),
+      more: overduePayments.length>4?`等 ${overduePayments.length-4} 筆`:'',
+      action:`navTo('receivable')`, actionLabel:'查看應收'
+    });
+  }
+
+  // 2. 廠商任務待確認超過3天
+  const vendorPending=(DB.omRecords||[]).filter(r=>{
+    if(r.status!=='待確認') return false;
+    // 沒有 confirmedAt，用 created_at 估算
+    const base=r.publishDate||r.created_at||'';
+    if(!base) return false;
+    const diffDays=(new Date(todayStr)-new Date(base.slice(0,10)))/86400000;
+    return diffDays>=3;
+  });
+  if(vendorPending.length){
+    notices.push({
+      level:'amber', icon:'📋',
+      title:`廠商上刊待確認 ${vendorPending.length} 筆（超過3天未確認）`,
+      tags: vendorPending.slice(0,4).map(r=>`${r.clientName||'—'} · ${r.platform||'—'}`),
+      more: vendorPending.length>4?`等 ${vendorPending.length-4} 筆`:'',
+      action:`navTo('exec-om')`, actionLabel:'前往口碑'
+    });
+  }
+
+  // 3. HR 待審請假
+  if(typeof D!=='undefined'){
+    const pendingLeave=(D.leave_requests||[]).filter(r=>r.status==='pending');
+    if(pendingLeave.length){
+      notices.push({
+        level:'amber', icon:'🗓️',
+        title:`HR 請假待審核 ${pendingLeave.length} 筆`,
+        tags: pendingLeave.slice(0,4).map(r=>{
+          const m=(D.members||[]).find(x=>String(x.id)===String(r.member_id));
+          return`${m?m.name_zh:'—'} · ${r.start_date||''}`;
+        }),
+        more: pendingLeave.length>4?`等 ${pendingLeave.length-4} 筆`:'',
+        action:`navTo('hr')`, actionLabel:'前往HR'
+      });
+    }
+  }
+
+  // 4. 進行中合約本月規格完成率 < 50%
+  const lowSpecContracts=[];
+  DB.contracts.filter(c=>c.status==='進行中').forEach(ct=>{
+    const ctSpecs=DB.specItems.filter(s=>s.contractId===ct.id);
+    if(!ctSpecs.length) return;
+    let totalQty=0, totalDone=0;
+    ctSpecs.forEach(s=>{
+      const mQty=Number(s.monthlyQty||Math.ceil((s.qty||0)/Math.max(1,Math.round(((new Date(ct.end||todayStr)-new Date(ct.start||todayStr))/2592000000))))||0);
+      const src=s.category==='社群'?(DB.socialRecords||[]):s.category==='廣告'?(DB.adRecords||[]):(DB.omRecords||[]);
+      const done=src.filter(r=>r.contractId===ct.id&&r.specId===s.id&&
+        (r.publishDate||r.postDate||r.date||'').slice(0,7)===thisMonth&&
+        (r.status==='已上刊'||r.status==='已發佈'||r.status==='完成'||r.status==='觀察中'||r.status==='投遞中')).length;
+      totalQty+=mQty; totalDone+=done;
+    });
+    if(totalQty>0&&totalDone/totalQty<0.5){
+      const cl=DB.clients.find(c=>c.id===ct.clientId);
+      lowSpecContracts.push({name:(cl?cl.name:'—')+' · '+(ct.contractNo||ct.name||''),done:totalDone,qty:totalQty});
+    }
+  });
+  if(lowSpecContracts.length){
+    notices.push({
+      level:'blue', icon:'📊',
+      title:`本月規格執行率偏低 ${lowSpecContracts.length} 個合約（＜50%）`,
+      tags: lowSpecContracts.slice(0,4).map(r=>`${r.name} ${r.done}/${r.qty}`),
+      more: lowSpecContracts.length>4?`等 ${lowSpecContracts.length-4} 個`:'',
+      action:`navTo('specs')`, actionLabel:'查看規格'
+    });
+  }
+
+  const noticeLevelStyle={
+    red:'background:#fef2f2;border-color:#fca5a5',
+    amber:'background:#fffbeb;border-color:#fcd34d',
+    blue:'background:#eff6ff;border-color:#93c5fd'
+  };
+  const noticeTitleStyle={red:'color:#991b1b',amber:'color:#92400e',blue:'color:#1d4ed8'};
+  const noticeBtnStyle={red:'background:#991b1b;color:#fff;border-color:#991b1b',amber:'background:#92400e;color:#fff;border-color:#92400e',blue:'background:#1d4ed8;color:#fff;border-color:#1d4ed8'};
+
+  const noticeHtml=notices.map(n=>`
+    <div style="${noticeLevelStyle[n.level]||''};border:1px solid;border-radius:var(--r2);padding:12px 16px;display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:16px;flex-shrink:0;margin-top:1px">${n.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;${noticeTitleStyle[n.level]||''};margin-bottom:6px">${n.title}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${n.tags.map(t=>`<span style="background:#fff;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;color:var(--text2)">${t}</span>`).join('')}
+          ${n.more?`<span style="font-size:11px;color:var(--text3);padding:2px 6px">…${n.more}</span>`:''}
+        </div>
+      </div>
+      <button class="btn btn-xs" style="${noticeBtnStyle[n.level]||''};flex-shrink:0;white-space:nowrap" onclick="${n.action}">${n.actionLabel}</button>
+    </div>`).join('');
 
   const todayDate=today();
   const depts=['營運','業務','企劃'];
@@ -2112,41 +2249,27 @@ function renderHome(){
       </div>
     </div>
 
-    ${overduePayments.length?`
-    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--r2);padding:14px 18px;display:flex;align-items:flex-start;gap:12px">
-      <span style="font-size:18px;flex-shrink:0">⚠️</span>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;color:#991b1b;margin-bottom:6px">逾期應收款 ${overduePayments.length} 筆</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${overduePayments.slice(0,6).map(p=>{
-            const client=DB.clients.find(c=>c.id===p.clientId);
-            return`<span style="background:#fff;border:1px solid #fca5a5;border-radius:4px;padding:3px 8px;font-size:11px;color:#991b1b">${client?client.name:'—'} · ${p.dueDate} · ${fmt(p.amount)}</span>`;
-          }).join('')}
-          ${overduePayments.length>6?`<span style="font-size:11px;color:#991b1b;padding:3px 8px">…等 ${overduePayments.length-6} 筆</span>`:''}
-        </div>
-      </div>
-      <button class="btn btn-xs" style="background:#991b1b;color:#fff;border-color:#991b1b;flex-shrink:0" onclick="navTo('receivable')">查看應收</button>
-    </div>`:''}
+    ${noticeHtml}
 
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px">
       <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">本月執行摘要 · ${thisMonth}</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r)">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" class="home-exec-grid">
+        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r);cursor:pointer" onclick="navTo('exec-om')">
           <div style="font-size:20px;font-weight:700;color:var(--blue-text)">${omDone}<span style="font-size:12px;color:var(--text3);font-weight:400"> / ${omThisMonth.length}</span></div>
           <div style="font-size:11px;color:var(--text3);margin-top:2px">口碑已上刊</div>
         </div>
-        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r)">
+        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r);cursor:pointer" onclick="navTo('exec-social')">
           <div style="font-size:20px;font-weight:700;color:#166534">${socialDone}<span style="font-size:12px;color:var(--text3);font-weight:400"> / ${socialThisMonth.length}</span></div>
           <div style="font-size:11px;color:var(--text3);margin-top:2px">社群已發佈</div>
         </div>
-        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r)">
+        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--r);cursor:pointer" onclick="navTo('exec-ad')">
           <div style="font-size:20px;font-weight:700;color:var(--amber)">${adThisMonth.length>0?fmt(adBudget):'—'}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:2px">廣告費用（本月）</div>
         </div>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px" class="home-dept-grid">
       ${depts.map(dept=>{
         const tasks=deptTasks[dept];
         const deptColor={'營運':'var(--accent)','業務':'#16a34a','企劃':'var(--purple)'}[dept];
@@ -2401,7 +2524,7 @@ function openClientDrawer(clientId){
                 <div><span style="color:var(--text3)">付款：</span>${ct.payMethod||'—'}</div>
               </div>
               ${ct.note?`<div style="margin-top:6px;font-size:11px;color:var(--text3)">${ct.note}</div>`:''}
-              ${ct.clientToken?`<div style="margin-top:8px;display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:20px">✓ 客戶連結已啟用</span><button class="btn btn-xs" onclick="copyClientDashLink('${ct.id}')">複製連結</button></div>`:''}
+              ${ct.clientToken?`<div style="margin-top:8px;display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:20px">✓ 客戶連結已啟用</span><button class="btn btn-xs" onclick="copyClientDashLink('${ct.id}')">複製連結</button><button class="btn btn-xs" style="color:var(--red)" onclick="revokeClientDashToken('${ct.id}')">撤銷</button></div>`:`<div style="margin-top:8px"><button class="btn btn-xs btn-primary edit-only" onclick="genAndCopyClientReport('${ct.id}')">🔗 產生客戶報表連結</button></div>`}
             </div>
           </div>`).join('')||'<div class="empty-state"><p>尚無合約資料</p></div>'}
       </div>
@@ -2412,6 +2535,7 @@ function openClientDrawer(clientId){
           <span style="font-size:12px;color:var(--text3)">合計 ${fmt(totalSpec)}</span>
           <div class="ml-auto flex gap-2">
             ${specs.filter(s=>!s.contractId).length?`<button class="btn btn-sm edit-only" style="color:var(--amber);border-color:var(--amber)" onclick="openAssignContract('${clientId}')">⚠ ${specs.filter(s=>!s.contractId).length}筆未串合約</button>`:''}
+            ${contracts.filter(ct=>DB.specItems.some(s=>s.contractId===ct.id&&(s.category==='口碑'||!s.category))).length?`<button class="btn btn-sm edit-only" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openBatchAssignVendor('${contracts.find(ct=>DB.specItems.some(s=>s.contractId===ct.id&&(s.category==='口碑'||!s.category)))?.id}')">⚡ 派發廠商任務</button>`:''}
             <button class="btn btn-sm edit-only" onclick="openPickCatalog('${clientId}')">從報價總表選取</button>
             <button class="btn btn-sm btn-primary edit-only" onclick="openAddSpec('${clientId}')">＋ 新增</button>
           </div>
@@ -4790,11 +4914,22 @@ function omApplySpec(){
   if(!specId) return;
   const spec = DB.specItems.find(s=>s.id===specId);
   if(!spec) return;
+  // 帶入規格類型
   const specSel = document.getElementById('om-f-spec');
   if(specSel){
     const match = Array.from(specSel.options).find(o=>o.value===spec.name||(spec.name&&spec.name.includes(o.value)));
     if(match) specSel.value=match.value;
   }
+  // 帶入客戶名稱（給 GAS 用）
+  const clientId=document.getElementById('om-f-client')?.value;
+  if(clientId&&!document.getElementById('om-f-clientname')?.value){
+    const cl=DB.clients.find(c=>c.id===clientId);
+    const el=document.getElementById('om-f-clientname');
+    if(el&&cl) el.value=cl.name;
+  }
+  // 帶入月份（若尚未填）
+  const monthEl=document.getElementById('om-f-month');
+  if(monthEl&&!monthEl.value) monthEl.value=new Date().toISOString().slice(0,7);
   omAutoWriterFee();
 }
 
@@ -4941,6 +5076,15 @@ function genOmTasksFromSpec(contractId, month){
 
 // 社群/廣告佔位
 // ═══ 社群執行記錄 ═══
+const SOCIAL_STATUSES = ['待企劃','企劃審核','素材製作','素材審核','待排程','已排程','已發佈','觀察中','完成','已封存'];
+const SOCIAL_STATUS_COLOR = {
+  '待企劃':'tag-gray','企劃審核':'tag-amber','素材製作':'tag-blue','素材審核':'tag-amber',
+  '待排程':'tag-purple','已排程':'tag-blue','已發佈':'tag-green','觀察中':'tag-green',
+  '完成':'tag-green','已封存':'tag-red'
+};
+// 狀態機：點一下往前推一步（終止態不推）
+const SOCIAL_NEXT = {'待企劃':'企劃審核','企劃審核':'素材製作','素材製作':'素材審核','素材審核':'待排程','待排程':'已排程','已排程':'已發佈','已發佈':'觀察中','觀察中':'完成'};
+
 function clearSocialFilters(){
   ['social-client','social-month','social-executor','social-status'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   renderExecSocial();
@@ -4964,18 +5108,33 @@ function renderExecSocial(){
     if(fStatus&&r.status!==fStatus)return false;
     return true;
   }).sort((a,b)=>(b.postDate||'').localeCompare(a.postDate||''));
-  const statusColors={待執行:'tag-gray',已排程:'tag-amber',已發佈:'tag-green',已封存:'tag-red'};
+
+  // 狀態計數列（仿 OM_STATUSES 設計）
+  const statusCounts={};
+  SOCIAL_STATUSES.forEach(s=>{statusCounts[s]=DB.socialRecords.filter(r=>r.status===s).length;});
+  const statusBarHtml=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+    ${SOCIAL_STATUSES.map(s=>{
+      const n=statusCounts[s];
+      return`<button onclick="document.getElementById('social-status').value='${s}';renderExecSocial()" style="background:none;border:none;cursor:pointer;padding:0">
+        <span class="tag ${SOCIAL_STATUS_COLOR[s]||'tag-gray'}" style="font-size:11px;cursor:pointer">${s} ${n}</span>
+      </button>`;
+    }).join('')}
+    <button onclick="document.getElementById('social-status').value='';renderExecSocial()" style="background:none;border:none;cursor:pointer;padding:0"><span class="tag tag-gray" style="font-size:11px">全部 ${DB.socialRecords.length}</span></button>
+  </div>`;
+
   let html=`<div style="padding:16px 24px">
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
       <div class="stat-card" style="border-top:3px solid var(--accent)"><div class="stat-label">執行筆數</div><div class="stat-value">${records.length}</div><div class="stat-change">已篩選</div></div>
-      <div class="stat-card" style="border-top:3px solid #16a34a"><div class="stat-label">已發佈</div><div class="stat-value" style="color:#16a34a">${records.filter(r=>r.status==='已發佈').length}</div><div class="stat-change">篇</div></div>
+      <div class="stat-card" style="border-top:3px solid #16a34a"><div class="stat-label">已發佈／觀察中</div><div class="stat-value" style="color:#16a34a">${records.filter(r=>r.status==='已發佈'||r.status==='觀察中'||r.status==='完成').length}</div><div class="stat-change">篇</div></div>
       <div class="stat-card" style="border-top:3px solid var(--blue-text)"><div class="stat-label">外包費用</div><div class="stat-value" style="color:var(--blue-text)">${fmt(records.reduce((a,r)=>a+(r.executorFee||0),0))}</div><div class="stat-change">合計</div></div>
-    </div>`;
+    </div>
+    ${statusBarHtml}`;
   if(!records.length){html+=`<div class="empty-state"><p>目前無執行記錄</p><p style="font-size:12px;margin-top:8px;color:var(--text3)">點擊右上角「新增記錄」開始建立</p></div></div>`;el.innerHTML=html;return;}
   html+=`<div class="table-wrap"><table>
-    <thead><tr><th>編號</th><th>客戶</th><th>規格類型</th><th>發布日期</th><th>標題／主題</th><th>素材連結</th><th>執行人員</th><th style="text-align:right">外包費</th><th>狀態</th><th>備註</th><th style="width:50px"></th></tr></thead>
+    <thead><tr><th>編號</th><th>客戶</th><th>規格類型</th><th>發布日期</th><th>標題／主題</th><th>素材連結</th><th>執行人員</th><th style="text-align:right">外包費</th><th>狀態</th><th>備註</th><th style="width:80px" class="edit-only"></th></tr></thead>
     <tbody>${records.map(r=>{
       const client=DB.clients.find(c=>c.id===r.clientId);
+      const nextSt=SOCIAL_NEXT[r.status];
       return`<tr>
         <td style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${r.id||'—'}</td>
         <td style="font-weight:500">${client?client.name:(r.clientName||'—')}</td>
@@ -4985,12 +5144,22 @@ function renderExecSocial(){
         <td style="font-size:12px">${r.assetLink?`<a href="${r.assetLink}" target="_blank" style="color:var(--accent)">檢視</a>`:'—'}</td>
         <td style="font-size:12px">${r.executorName||'內部'}</td>
         <td style="text-align:right;font-size:12px">${r.executorFee?fmt(r.executorFee):'—'}</td>
-        <td><span class="tag ${statusColors[r.status]||'tag-gray'}" style="font-size:11px">${r.status||'待執行'}</span></td>
+        <td>
+          <span class="tag ${SOCIAL_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:11px">${r.status||'待企劃'}</span>
+          ${nextSt?`<button class="btn btn-xs edit-only" style="margin-left:4px;font-size:10px" title="推進至${nextSt}" onclick="socialAdvanceStatus('${r.id}','${nextSt}')">→${nextSt}</button>`:''}
+        </td>
         <td style="font-size:12px;color:var(--text3)">${r.note||'—'}</td>
         <td class="edit-only"><div style="display:flex;gap:4px"><button class="btn btn-xs" onclick="openSocialDrawer('${r.id}')" title="編輯">✏️</button><button class="btn btn-xs" style="color:var(--red)" onclick="deleteSocialRecord('${r.id}')" title="刪除">✕</button></div></td>
       </tr>`;
     }).join('')}</tbody></table></div></div>`;
   el.innerHTML=html;
+}
+
+function socialAdvanceStatus(id, nextStatus){
+  const r=DB.socialRecords.find(x=>x.id===id);if(!r)return;
+  r.status=nextStatus;
+  syncToGAS('socialRecords',r).catch(e=>console.error(e));
+  renderExecSocial();toast(`已更新：${nextStatus}`,'success');
 }
 
 function openSocialDrawer(id){
@@ -5000,7 +5169,7 @@ function openSocialDrawer(id){
   const clients=DB.clients.map(c=>`<option value="${c.id}"${rec&&rec.clientId===c.id?' selected':''}>${c.name}</option>`).join('');
   const freelancers=DB.freelancers.filter(f=>f.type==='社群').map(f=>`<option value="${f.id}"${rec&&rec.executorId===f.id?' selected':''}>${f.name}</option>`).join('');
   const specTypes=['單圖文','多圖文','Reels','限時動態','直播','其他'];
-  const statuses=['待執行','已排程','已發佈','已封存'];
+  const statuses=SOCIAL_STATUSES;
   const scContracts=rec?DB.contracts.filter(c=>c.clientId===rec.clientId).map(c=>`<option value="${c.id}"${rec.contractId===c.id?' selected':''}>${c.contractNo||c.name}</option>`).join(''):'';
   const scSpecs=rec&&rec.contractId?DB.specItems.filter(s=>s.contractId===rec.contractId&&s.category==='社群').map(s=>`<option value="${s.id}"${rec.specId===s.id?' selected':''}>${s.name}（${s.qty}${s.unit}）</option>`).join(''):'';
   showDrawer(id?'編輯社群執行記錄':'新增社群執行記錄',
@@ -5042,6 +5211,40 @@ function saveSocialRecord(existingId){
   closeDrawer();renderExecSocial();toast('儲存成功');
 }
 
+// ── A3 社群/廣告規格連動 ──
+function scUpdateContracts(){
+  const clientId=document.getElementById('sc-f-client')?.value||'';
+  const sel=document.getElementById('sc-f-contract');if(!sel)return;
+  sel.innerHTML='<option value="">—</option>'+(clientId?DB.contracts.filter(c=>c.clientId===clientId).map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join(''):'');
+  scUpdateSpecItems();
+}
+function scUpdateSpecItems(){
+  const contractId=document.getElementById('sc-f-contract')?.value||'';
+  const sel=document.getElementById('sc-f-specid');if(!sel)return;
+  sel.innerHTML='<option value="">— 選擇規格 —</option>'+(contractId?DB.specItems.filter(s=>s.contractId===contractId&&(s.category==='社群'||!s.category)).map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit||''}）</option>`).join(''):'');
+}
+function scApplySpec(){
+  const specId=document.getElementById('sc-f-specid')?.value;if(!specId)return;
+  const spec=DB.specItems.find(s=>s.id===specId);if(!spec)return;
+  // 帶入規格類型
+  const specSel=document.getElementById('sc-f-spec');
+  if(specSel){const match=Array.from(specSel.options).find(o=>o.value===spec.name||(spec.name&&spec.name.includes(o.value)));if(match)specSel.value=match.value;}
+  // 帶入月份（若空白）
+  const monthEl=document.getElementById('sc-f-date');
+  if(monthEl&&!monthEl.value) monthEl.value=new Date().toISOString().slice(0,10);
+}
+function adUpdateContracts(){
+  const clientId=document.getElementById('ad-f-client')?.value||'';
+  const sel=document.getElementById('ad-f-contract');if(!sel)return;
+  sel.innerHTML='<option value="">—</option>'+(clientId?DB.contracts.filter(c=>c.clientId===clientId).map(c=>`<option value="${c.id}">${c.contractNo||c.name}</option>`).join(''):'');
+  adUpdateSpecItems();
+}
+function adUpdateSpecItems(){
+  const contractId=document.getElementById('ad-f-contract')?.value||'';
+  const sel=document.getElementById('ad-f-specid');if(!sel)return;
+  sel.innerHTML='<option value="">— 選擇規格 —</option>'+(contractId?DB.specItems.filter(s=>s.contractId===contractId&&(s.category==='廣告'||!s.category)).map(s=>`<option value="${s.id}">${s.name}（${s.qty}${s.unit||''}）</option>`).join(''):'');
+}
+
 function deleteSocialRecord(id){
   if(!confirm('確定刪除此社群記錄？'))return;
   DB.socialRecords=DB.socialRecords.filter(x=>x.id!==id);
@@ -5050,8 +5253,15 @@ function deleteSocialRecord(id){
 }
 
 // ═══ 廣告執行記錄 ═══
+const AD_STATUSES = ['待設定','審核中','投遞中','暫停','完成','已封存'];
+const AD_STATUS_COLOR = {
+  '待設定':'tag-gray','審核中':'tag-amber','投遞中':'tag-green',
+  '暫停':'tag-amber','完成':'tag-green','已封存':'tag-red'
+};
+const AD_NEXT = {'待設定':'審核中','審核中':'投遞中','投遞中':'暫停','暫停':'投遞中'};
+
 function clearAdFilters(){
-  ['ad-client','ad-month','ad-type'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['ad-client','ad-month','ad-type','ad-status'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   renderExecAd();
 }
 
@@ -5069,22 +5279,32 @@ function renderExecAd(){
   const fClient=document.getElementById('ad-client')?.value||'';
   const fMonth=document.getElementById('ad-month')?.value||'';
   const fType=document.getElementById('ad-type')?.value||'';
+  const fStatus=document.getElementById('ad-status')?.value||'';
   let records=[...DB.adRecords].filter(r=>{
     if(fClient&&r.clientId!==fClient)return false;
     if(fMonth&&(!r.date||r.date.slice(0,7)!==fMonth))return false;
     if(fType&&r.adType!==fType)return false;
+    if(fStatus&&r.status!==fStatus)return false;
     return true;
   }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const totalBudget=records.reduce((a,r)=>a+(r.budget||0),0);
   const totalSvc=records.reduce((a,r)=>a+(r.svcFee||0),0);
   const groups={};
   records.forEach(r=>{const key=(r.clientId||r.clientName)+'_'+r.adType;if(!groups[key])groups[key]={clientName:r.clientName,adType:r.adType,totalBudget:0,contractBudget:r.contractBudget||0};groups[key].totalBudget+=r.budget||0;});
+  // 狀態計數列
+  const adStatusCounts={};
+  AD_STATUSES.forEach(s=>{adStatusCounts[s]=DB.adRecords.filter(r=>r.status===s).length;});
+  const adStatusBarHtml=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+    ${AD_STATUSES.map(s=>{const n=adStatusCounts[s];return`<button onclick="document.getElementById('ad-status').value='${s}';renderExecAd()" style="background:none;border:none;cursor:pointer;padding:0"><span class="tag ${AD_STATUS_COLOR[s]||'tag-gray'}" style="font-size:11px;cursor:pointer">${s} ${n}</span></button>`;}).join('')}
+    <button onclick="document.getElementById('ad-status').value='';renderExecAd()" style="background:none;border:none;cursor:pointer;padding:0"><span class="tag tag-gray" style="font-size:11px">全部 ${DB.adRecords.length}</span></button>
+  </div>`;
   let html=`<div style="padding:16px 24px">
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
       <div class="stat-card" style="border-top:3px solid var(--accent)"><div class="stat-label">投遞筆數</div><div class="stat-value">${records.length}</div><div class="stat-change">已篩選</div></div>
       <div class="stat-card" style="border-top:3px solid var(--blue-text)"><div class="stat-label">總投遞費用</div><div class="stat-value" style="color:var(--blue-text)">${fmt(totalBudget)}</div><div class="stat-change">各筆費用加總</div></div>
       <div class="stat-card" style="border-top:3px solid var(--amber)"><div class="stat-label">廣告服務費</div><div class="stat-value" style="color:var(--amber)">${fmt(totalSvc)}</div><div class="stat-change">20% 合計</div></div>
-    </div>`;
+    </div>
+    ${adStatusBarHtml}`;
   if(Object.keys(groups).length){
     html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">`;
     Object.values(groups).forEach(g=>{
@@ -5099,14 +5319,19 @@ function renderExecAd(){
   }
   if(!records.length){html+=`<div class="empty-state"><p>目前無廣告投遞記錄</p><p style="font-size:12px;margin-top:8px;color:var(--text3)">點擊右上角「新增記錄」開始建立</p></div></div>`;el.innerHTML=html;return;}
   html+=`<div class="table-wrap"><table>
-    <thead><tr><th>投遞日期</th><th>客戶</th><th>類型</th><th>廣告組合名稱</th><th>素材</th><th style="text-align:right">曝光數</th><th style="text-align:right">觸及數</th><th style="text-align:right">點擊數</th><th style="text-align:right">CTR</th><th style="text-align:right">CPM</th><th style="text-align:right">CPC</th><th style="text-align:right">私訊數</th><th style="text-align:right">每次成果成本</th><th style="text-align:right">費用</th><th style="text-align:right">服務費</th><th>CTA</th><th>備註</th><th style="width:50px"></th></tr></thead>
+    <thead><tr><th>投遞日期</th><th>客戶</th><th>類型</th><th>狀態</th><th>廣告組合名稱</th><th>素材</th><th style="text-align:right">曝光數</th><th style="text-align:right">觸及數</th><th style="text-align:right">點擊數</th><th style="text-align:right">CTR</th><th style="text-align:right">CPM</th><th style="text-align:right">CPC</th><th style="text-align:right">私訊數</th><th style="text-align:right">每次成果成本</th><th style="text-align:right">費用</th><th style="text-align:right">服務費</th><th>CTA</th><th>備註</th><th style="width:80px" class="edit-only"></th></tr></thead>
     <tbody>${records.map(r=>{
       const client=DB.clients.find(c=>c.id===r.clientId);
       const fees=calcAdFees(r.budget||0,r.adType);
+      const nextSt=AD_NEXT[r.status];
       return`<tr>
         <td style="font-size:12px">${r.date||'—'}</td>
         <td style="font-weight:500;font-size:12px">${client?client.name:(r.clientName||'—')}</td>
         <td><span class="tag" style="font-size:11px;background:${r.adType==='Google'?'#e8f0fe':'#e7f3ff'};color:${r.adType==='Google'?'#4285F4':'#1877F2'}">${r.adType||'—'}</span></td>
+        <td>
+          <span class="tag ${AD_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:11px">${r.status||'待設定'}</span>
+          ${nextSt?`<button class="btn btn-xs edit-only" style="margin-left:4px;font-size:10px" title="切換至${nextSt}" onclick="adAdvanceStatus('${r.id}','${nextSt}')">→${nextSt}</button>`:''}
+        </td>
         <td style="font-size:12px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.adGroup||'—'}</td>
         <td style="font-size:12px">${r.material||'—'}</td>
         <td style="text-align:right;font-size:12px">${r.impression?Number(r.impression).toLocaleString():'—'}</td>
@@ -5165,6 +5390,7 @@ function openAdDrawer(id){
       </div>
       <div id="ad-fee-preview" style="background:var(--bg2);border-radius:8px;padding:12px;font-size:12px;color:var(--text2)">輸入費用後自動計算各項費用</div>
       <div class="form-row"><label class="form-label">CTA</label><input class="form-input" id="ad-f-cta" value="${rec?rec.cta||'':''}"></div>
+      <div class="form-row"><label class="form-label">執行狀態</label><select class="form-input" id="ad-f-status">${AD_STATUSES.map(s=>`<option${rec&&rec.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
       <div class="form-row"><label class="form-label">備註</label><input class="form-input" id="ad-f-note" value="${rec?rec.note||'':''}"></div>
     </div>`,
     ()=>saveAdRecord(id)
@@ -5186,6 +5412,13 @@ function updateAdFeePreview(){
   }
 }
 
+function adAdvanceStatus(id, nextStatus){
+  const r=DB.adRecords.find(x=>x.id===id);if(!r)return;
+  r.status=nextStatus;
+  syncToGAS('adRecords',r).catch(e=>console.error(e));
+  renderExecAd();toast(`已更新：${nextStatus}`,'success');
+}
+
 function saveAdRecord(existingId){
   if(!DB.adRecords)DB.adRecords=[];
   const clientId=document.getElementById('ad-f-client')?.value;
@@ -5197,7 +5430,8 @@ function saveAdRecord(existingId){
   const newId=existingId||('AD-'+(now.getFullYear()+'').slice(2)+String(now.getMonth()+1).padStart(2,'0')+'-'+String((DB.adRecords.length+1)).padStart(3,'0'));
   const adContractId=document.getElementById('ad-f-contract')?.value||'';
   const adSpecId=document.getElementById('ad-f-specid')?.value||'';
-  const rec={id:newId,clientId,contractId:adContractId,specId:adSpecId,clientName:DB.clients.find(c=>c.id===clientId)?.name||'',adType,date:document.getElementById('ad-f-date')?.value||'',adGroup:document.getElementById('ad-f-group')?.value||'',material:document.getElementById('ad-f-material')?.value||'',impression:parseFloat(document.getElementById('ad-f-imp')?.value)||0,reach:parseFloat(document.getElementById('ad-f-reach')?.value)||0,clicks:parseFloat(document.getElementById('ad-f-clicks')?.value)||0,ctr:parseFloat(document.getElementById('ad-f-ctr')?.value)||0,cpm:parseFloat(document.getElementById('ad-f-cpm')?.value)||0,cpc:parseFloat(document.getElementById('ad-f-cpc')?.value)||0,messages:parseFloat(document.getElementById('ad-f-msg')?.value)||0,costPerResult:parseFloat(document.getElementById('ad-f-cpr')?.value)||0,budget,contractBudget:parseFloat(document.getElementById('ad-f-contract-budget')?.value)||0,svcFee:fees.svc,vatFee:fees.vat||0,foreignTax:fees.foreign||0,txFee:fees.tx||0,totalCost:fees.total,cta:document.getElementById('ad-f-cta')?.value||'',note:document.getElementById('ad-f-note')?.value||''};
+  const existingRec=existingId?DB.adRecords.find(r=>r.id===existingId):null;
+  const rec={id:newId,clientId,contractId:adContractId,specId:adSpecId,clientName:DB.clients.find(c=>c.id===clientId)?.name||'',adType,date:document.getElementById('ad-f-date')?.value||'',adGroup:document.getElementById('ad-f-group')?.value||'',material:document.getElementById('ad-f-material')?.value||'',impression:parseFloat(document.getElementById('ad-f-imp')?.value)||0,reach:parseFloat(document.getElementById('ad-f-reach')?.value)||0,clicks:parseFloat(document.getElementById('ad-f-clicks')?.value)||0,ctr:parseFloat(document.getElementById('ad-f-ctr')?.value)||0,cpm:parseFloat(document.getElementById('ad-f-cpm')?.value)||0,cpc:parseFloat(document.getElementById('ad-f-cpc')?.value)||0,messages:parseFloat(document.getElementById('ad-f-msg')?.value)||0,costPerResult:parseFloat(document.getElementById('ad-f-cpr')?.value)||0,budget,contractBudget:parseFloat(document.getElementById('ad-f-contract-budget')?.value)||0,svcFee:fees.svc,vatFee:fees.vat||0,foreignTax:fees.foreign||0,txFee:fees.tx||0,totalCost:fees.total,cta:document.getElementById('ad-f-cta')?.value||'',status:document.getElementById('ad-f-status')?.value||(existingRec?.status||'待設定'),note:document.getElementById('ad-f-note')?.value||''};
   if(existingId){const idx=DB.adRecords.findIndex(r=>r.id===existingId);if(idx>=0)DB.adRecords[idx]=rec;}
   else DB.adRecords.push(rec);
   syncToGAS('adRecords', rec).catch(e=>console.error('sync ad failed',e));
@@ -5209,6 +5443,179 @@ function deleteAdRecord(id){
   DB.adRecords=DB.adRecords.filter(x=>x.id!==id);
   syncDeleteGAS('adRecords',id).catch(()=>{});
   renderExecAd();
+}
+
+// ════════════════════════════════════════
+//  B1 — 月結盤點
+// ════════════════════════════════════════
+async function runMonthlyCheckup(){
+  const ymEl=document.getElementById('checkup-ym');
+  const ym=ymEl?.value||new Date().toISOString().slice(0,7);
+  if(ymEl&&!ymEl.value) ymEl.value=ym;
+  const el=document.getElementById('checkup-content');
+  el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text3)">盤點中…</div>`;
+  try{
+    const res=await gasApi('getMonthlyCheckup',{ym});
+    renderCheckupResult(res,ym);
+  }catch(e){
+    // GAS 未部署時，用本地資料計算
+    renderCheckupLocal(ym);
+  }
+}
+
+function renderCheckupLocal(ym){
+  const results=DB.contracts.filter(c=>c.status==='進行中').map(ct=>{
+    const cl=DB.clients.find(c=>c.id===ct.clientId)||{};
+    const ctSpecs=DB.specItems.filter(s=>s.contractId===ct.id);
+    const mos=Math.max(1,Math.round(((new Date(ct.end||ym+'-28')-new Date(ct.start||ym+'-01'))/2592000000)));
+    const specs=ctSpecs.map(s=>{
+      const mQty=Number(s.monthlyQty||Math.ceil((s.qty||0)/mos)||0);
+      const src=s.category==='社群'?(DB.socialRecords||[]):s.category==='廣告'?(DB.adRecords||[]):(DB.omRecords||[]);
+      const done=src.filter(r=>r.contractId===ct.id&&r.specId===s.id&&
+        (r.publishDate||r.postDate||r.date||'').slice(0,7)===ym&&
+        (r.status==='已上刊'||r.status==='已發佈'||r.status==='完成'||r.status==='觀察中'||r.status==='投遞中')).length;
+      return{specName:s.name,category:s.category||'口碑',qty:mQty,done,gap:mQty-done};
+    });
+    const totalGap=specs.reduce((a,r)=>a+Math.max(0,r.gap),0);
+    const ra=DB.receivables.find(r=>r.contractId===ct.id)||{payments:[]};
+    const pendingPayments=ra.payments.filter(p=>p.status!=='已入款'&&p.dueDate&&p.dueDate.slice(0,7)<=ym)
+      .map(p=>({id:p._id||p.id,period:p.period,dueDate:p.dueDate,amount:p.amount}));
+    return{contractId:ct.id,contractNo:ct.contractNo||'',clientName:cl.name||'',status:ct.status,specs,totalGap,pendingPayments};
+  });
+  renderCheckupResult({results},ym);
+}
+
+function renderCheckupResult(res,ym){
+  const el=document.getElementById('checkup-content');
+  const results=res.results||[];
+  if(!results.length){el.innerHTML=`<div class="empty-state" style="padding:60px"><p>本月無進行中合約</p></div>`;return;}
+  const catColor={'口碑':'tag-blue','社群':'tag-green','廣告':'tag-amber','其他':'tag-gray'};
+  el.innerHTML=`<div style="padding:20px 24px">
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px">盤點月份：${ym}　共 ${results.length} 個進行中合約</div>
+    ${results.map(r=>{
+      const totalQty=r.specs.reduce((a,s)=>a+s.qty,0);
+      const totalDone=r.specs.reduce((a,s)=>a+s.done,0);
+      const compPct=totalQty>0?Math.round(totalDone/totalQty*100):100;
+      const compColor=compPct>=80?'#16a34a':compPct>=50?'#d97706':'#dc2626';
+      return`<div class="card" style="margin-bottom:14px">
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+            <div style="font-size:14px;font-weight:600;flex:1">${r.clientName}</div>
+            <div style="font-size:12px;color:var(--text3)">${r.contractNo}</div>
+            <span class="tag ${r.totalGap>0?'tag-red':'tag-green'}">${r.totalGap>0?r.totalGap+' 項未達':'全數完成'}</span>
+            ${r.pendingPayments.length?`<span class="tag tag-amber">${r.pendingPayments.length} 期請款待確認</span>`:''}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+            <div>
+              <div style="font-size:11px;color:var(--text3);margin-bottom:4px">規格完成率</div>
+              <div style="background:var(--border);border-radius:4px;height:8px;margin-bottom:3px"><div style="background:${compColor};width:${compPct}%;height:8px;border-radius:4px;transition:width .4s"></div></div>
+              <div style="font-size:12px;font-weight:600;color:${compColor}">${compPct}% （${totalDone}/${totalQty}）</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text3);margin-bottom:4px">待收款項</div>
+              <div style="font-size:14px;font-weight:600;color:${r.pendingPayments.length?'#d97706':'#16a34a'}">
+                ${r.pendingPayments.length?fmt(r.pendingPayments.reduce((a,p)=>a+(p.amount||0),0)):'無待收'}
+              </div>
+            </div>
+          </div>
+          ${r.specs.length?`<table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:var(--surface2)"><th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text3)">規格</th><th style="padding:6px 10px;text-align:left;font-size:11px;color:var(--text3)">類型</th><th style="padding:6px 10px;text-align:center;font-size:11px;color:var(--text3)">月目標</th><th style="padding:6px 10px;text-align:center;font-size:11px;color:var(--text3)">已完成</th><th style="padding:6px 10px;text-align:center;font-size:11px;color:var(--text3)">缺口</th></tr></thead>
+            <tbody>${r.specs.map(s=>`<tr style="border-top:1px solid var(--border)">
+              <td style="padding:6px 10px;font-weight:500">${s.specName}</td>
+              <td style="padding:6px 10px"><span class="tag ${catColor[s.category]||'tag-gray'}" style="font-size:10px">${s.category}</span></td>
+              <td style="padding:6px 10px;text-align:center">${s.qty||'—'}</td>
+              <td style="padding:6px 10px;text-align:center;color:${s.done>0?'#16a34a':'var(--text3)'};font-weight:${s.done>0?'600':'400'}">${s.done}</td>
+              <td style="padding:6px 10px;text-align:center"><span class="${s.gap>0?'tag tag-red':'tag tag-green'}" style="font-size:10px">${s.gap>0?'-'+s.gap:'OK'}</span></td>
+            </tr>`).join('')}</tbody>
+          </table>`:'<div style="font-size:12px;color:var(--text3)">尚未建立規格項目</div>'}
+          ${r.pendingPayments.length?`<div style="margin-top:10px;padding:8px 10px;background:var(--amber-bg);border-radius:var(--r);font-size:12px;color:var(--amber)">
+            ⚠️ 待請款：${r.pendingPayments.map(p=>`第 ${p.period} 期 ${fmt(p.amount)} (${p.dueDate})`).join('　')}
+          </div>`:''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ════════════════════════════════════════
+//  B2 — 廠商任務批次派發（從規格頁觸發）
+// ════════════════════════════════════════
+function openBatchAssignVendor(contractId){
+  const ct=DB.contracts.find(c=>c.id===contractId);if(!ct)return;
+  const cl=DB.clients.find(c=>c.id===ct.clientId)||{};
+  const specs=DB.specItems.filter(s=>s.contractId===contractId&&(s.category==='口碑'||!s.category));
+  if(!specs.length){toast('此合約無口碑規格');return;}
+  const vendorOpts=DB.vendorCompanies.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  const ym=new Date().toISOString().slice(0,7);
+  openModal('批次派發廠商任務 — '+cl.name,`
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">合約：${ct.contractNo||ct.name}　　月份：<input type="month" id="ba-month" value="${ym}" class="form-input" style="width:130px;display:inline-block;padding:4px 8px;font-size:12px"></div>
+    <div style="font-size:12px;font-weight:600;margin-bottom:8px">選擇廠商並設定派發數量</div>
+    <div style="max-height:320px;overflow-y:auto">
+    ${specs.map(s=>`
+      <div style="padding:10px;border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;background:var(--surface2)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:500;flex:1">${s.name}</span>
+          <span style="font-size:11px;color:var(--text3)">合約數：${s.qty}${s.unit||''}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 80px;gap:8px;align-items:center">
+          <select class="form-input" id="ba-vendor-${s.id}" style="font-size:12px">
+            <option value="">—不派發—</option>${vendorOpts}
+          </select>
+          <input type="number" class="form-input" id="ba-qty-${s.id}" placeholder="數量" min="1" style="font-size:12px;text-align:center">
+        </div>
+      </div>`).join('')}
+    </div>`,
+  async ()=>{
+    const month=document.getElementById('ba-month')?.value||ym;
+    const tasks=[];
+    specs.forEach(s=>{
+      const vendorId=document.getElementById('ba-vendor-'+s.id)?.value;
+      const qty=parseInt(document.getElementById('ba-qty-'+s.id)?.value)||0;
+      if(!vendorId||qty<=0) return;
+      const vendor=DB.vendorCompanies.find(v=>v.id===vendorId);
+      for(let i=0;i<qty;i++){
+        tasks.push({
+          specId:s.id,contractId,clientId:ct.clientId,clientName:cl.name||'',
+          specType:s.name,month,vendorId,vendorName:vendor?.name||'',
+          platform:'',section:'',actionType:'',title:'',content:'',qty:1
+        });
+      }
+    });
+    if(!tasks.length){toast('請至少選擇一個廠商並填寫數量');return;}
+    try{
+      const res=await gasApi('batchAssignVendorTasks',{tasks});
+      const count=res.count||tasks.length;
+      // 更新本地 omRecords
+      tasks.forEach(t=>{
+        const id='OA-'+Date.now()+Math.random().toString(36).slice(2,5);
+        (DB.omRecords=DB.omRecords||[]).push({...t,id,status:'待上刊',created_at:new Date().toISOString()});
+      });
+      closeModal();toast(`已派發 ${count} 筆任務至廠商`,'success');
+    }catch(e){
+      toast('派發失敗，請確認 GAS 已部署');
+    }
+  });
+}
+
+// ════════════════════════════════════════
+//  B3 — 客戶報表（合約 drawer 已有入口，這裡補產生邏輯）
+// ════════════════════════════════════════
+async function genAndCopyClientReport(contractId){
+  const ct=DB.contracts.find(c=>c.id===contractId);if(!ct)return;
+  if(ct.clientToken){
+    copyClientDashLink(contractId);
+    toast('連結已複製','success');
+    return;
+  }
+  toast('產生中…');
+  try{
+    const res=await gasApi('genClientToken',{contractId});
+    if(res.token){
+      ct.clientToken=res.token;
+      copyClientDashLink(contractId);
+      toast('連結已產生並複製','success');
+    }
+  }catch(e){toast('產生失敗：'+e.message);}
 }
 
 function renderVendorExec(){
@@ -5276,11 +5683,13 @@ function renderVendorExec(){
       <div class="stat-card"><div class="stat-label">已執行</div><div class="stat-value" style="color:#16a34a">${doneCount}<span style="font-size:14px;color:var(--text3);font-weight:400"> / ${records.length}</span></div></div>
       <div class="stat-card" style="border-top:3px solid var(--accent)"><div class="stat-label">已執行金額</div><div class="stat-value">${fmt(totalAmt)}</div></div>
     </div>
-    <div class="table-wrap" style="overflow-x:auto"><table style="min-width:820px">
+    <div class="table-wrap" style="overflow-x:auto"><table style="min-width:980px">
       <thead><tr>
         <th style="width:32px">編號</th>
         <th>廠商</th>
         <th>客戶</th>
+        <th>合約</th>
+        <th>規格</th>
         <th>日期</th>
         <th>平台</th>
         <th>版位</th>
@@ -5293,11 +5702,17 @@ function renderVendorExec(){
       <tbody>${records.map(r=>{
         const c=DB.clients.find(x=>x.id===r.clientId||x.name===r.clientName||x.brandName===r.clientName);
         const clientDisplay=c?c.name:(r.clientName||'—');
+        const ct=r.contractId?DB.contracts.find(x=>x.id===r.contractId):null;
+        const contractDisplay=ct?(ct.contractNo||ct.name||'—'):'—';
+        const sp=r.specId?DB.specItems.find(x=>x.id===r.specId):null;
+        const specDisplay=sp?sp.name:'—';
         const isExecuted=r.executed===true||r.done===true;
         return`<tr>
           <td style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">${r.seq||'—'}</td>
           <td style="font-weight:500;white-space:nowrap;color:var(--blue-text)">${r.vendorName||'—'}</td>
           <td style="font-weight:500;white-space:nowrap">${clientDisplay}</td>
+          <td style="font-size:12px;color:var(--text2);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis">${contractDisplay}</td>
+          <td style="font-size:12px;color:var(--text3);white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis">${specDisplay}</td>
           <td style="font-family:var(--font-mono);font-size:12px">${r.date||r.month||'—'}</td>
           <td>${r.platform||'—'}</td>
           <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text3)">${r.section||'—'}</td>
@@ -7384,7 +7799,7 @@ function renderFbTax() {
       <button class="btn btn-sm" onclick="fbTaxChangeWeek(1)">下一週 ›</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;align-items:start">
       <div>${weekHTMLs.join('')}</div>
       <div>
         <div class="card" style="margin-bottom:16px">
