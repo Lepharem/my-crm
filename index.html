@@ -1789,6 +1789,7 @@ window.syncToGAS = async function(collection, obj){
     clients: 'saveClient',
     contracts: 'saveContract',
     receivables: 'saveContractPayment',
+    tasks: 'saveTask',
     specItems: 'saveSpecItem',
     vendorRecords: 'saveVendorRecord',
     freelancerRecords: 'saveFreelancerRecord',
@@ -1810,6 +1811,7 @@ window.syncDeleteGAS = async function(collection, id){
     contracts:          'crm_contracts',
     contacts:           'crm_contacts',
     activities:         'crm_activities',
+    tasks:              'ops_tasks',
     specItems:          'fin_spec_items',
     vendorRecords:      'fin_vendor_records',
     vendorCompanies:    'fin_vendor_companies',
@@ -2066,8 +2068,62 @@ function openDrawer(title,sub,tabsHtml,bodyFn){
   document.getElementById('drawer').classList.add('open');
 }
 function closeDrawer(){
-  document.getElementById('drawer-overlay').classList.remove('open');
-  document.getElementById('drawer').classList.remove('open');
+  // 關閉客戶 drawer（openDrawer 用的）
+  document.getElementById('drawer-overlay')?.classList.remove('open');
+  document.getElementById('drawer')?.classList.remove('open');
+  // 關閉 side-drawer（showDrawer 用的）
+  const dr=document.getElementById('side-drawer');
+  const ov=document.getElementById('side-drawer-overlay');
+  if(dr){dr.style.transform='translateX(100%)';}
+  if(ov){ov.style.opacity='0';setTimeout(()=>{ov.style.display='none';},260);}
+  _sideDrawerCb=null;
+  window._sideDrawerOpen=false;
+}
+
+// ── showDrawer：用於口碑/社群/廣告的右側表單 drawer ──
+let _sideDrawerCb=null;
+function showDrawer(title, bodyHTML, onSave){
+  if(!_editMode){toast('請先開啟編輯模式');return;}
+  // 確保 side-drawer DOM 存在（懶建立）
+  if(!document.getElementById('side-drawer')){
+    const ov=document.createElement('div');
+    ov.id='side-drawer-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:600;display:none';
+    ov.onclick=()=>closeDrawer();
+    const dr=document.createElement('div');
+    dr.id='side-drawer';
+    dr.style.cssText='position:fixed;top:0;right:0;bottom:0;width:min(540px,100vw);background:var(--surface);z-index:601;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);box-shadow:-4px 0 24px rgba(0,0,0,.15)';
+    dr.innerHTML=`
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0">
+        <div id="sd-title" style="font-size:15px;font-weight:600;flex:1"></div>
+        <button onclick="closeDrawer()" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text3)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="sd-body" style="flex:1;overflow-y:auto;padding:16px 20px"></div>
+      <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+        <button class="btn" onclick="closeDrawer()">取消</button>
+        <button class="btn btn-primary" id="sd-save">儲存</button>
+      </div>`;
+    document.body.appendChild(ov);
+    document.body.appendChild(dr);
+  }
+  document.getElementById('sd-title').textContent=title;
+  document.getElementById('sd-body').innerHTML=bodyHTML;
+  _sideDrawerCb=onSave;
+  document.getElementById('sd-save').onclick=()=>{if(_sideDrawerCb)_sideDrawerCb();};
+  // 開啟
+  const ov=document.getElementById('side-drawer-overlay');
+  const dr=document.getElementById('side-drawer');
+  ov.style.display='block';
+  dr.style.display='flex';
+  requestAnimationFrame(()=>{
+    dr.style.transform='translateX(0)';
+    ov.style.opacity='1';
+  });
+  // 讓 closeDrawer 也能關閉 side-drawer
+  const origClose=window._sideDrawerOpen;
+  window._sideDrawerOpen=true;
 }
 function switchDTab(el,paneId){
   el.closest('.drawer-tabs').querySelectorAll('.dtab').forEach(t=>t.classList.remove('active'));
@@ -2310,14 +2366,28 @@ function renderTaskItem(t){
     </div>
     <div class="task-actions">
       <button class="btn btn-xs edit-only" onclick="openEditTask('${t.id}')">編輯</button>
+      <button class="btn btn-xs edit-only" style="color:var(--red)" onclick="deleteTask('${t.id}')">✕</button>
     </div>
   </div>`;
+}
+
+function deleteTask(id){
+  if(!confirm('確定刪除此排程？'))return;
+  DB.tasks=DB.tasks.filter(x=>x.id!==id);
+  syncDeleteGAS('tasks',id).catch(()=>{});
+  renderHome();
+  // 同時更新排程頁（如果開著）
+  const sc1=document.getElementById('schedule-content');
+  const sc2=document.getElementById('schedule-content2');
+  if(sc1&&sc1.innerHTML) renderSchedule();
+  if(sc2&&sc2.innerHTML) renderSchedule2();
 }
 
 function toggleTask(id){
   const t=DB.tasks.find(x=>x.id===id);
   if(!t)return;
   t.status=t.status==='已完成'?'未開始':'已完成';
+  syncToGAS('tasks',t).catch(e=>console.error('sync task failed',e));
   renderHome();
 }
 
@@ -2345,7 +2415,7 @@ function openAddTask(dept=''){
   `,()=>{
     const title=document.getElementById('f-title').value.trim();
     if(!title)return alert('請填寫排程標題');
-    DB.tasks.push({
+    const task={
       id:nextId('T'),
       title,
       dept:document.getElementById('f-dept').value,
@@ -2354,7 +2424,9 @@ function openAddTask(dept=''){
       assignee:document.getElementById('f-assignee').value,
       status:document.getElementById('f-status').value,
       note:document.getElementById('f-note').value
-    });
+    };
+    DB.tasks.push(task);
+    syncToGAS('tasks',task).catch(e=>console.error('sync task failed',e));
     closeModal(); renderHome(); toast('排程已新增','success');
   });
 }
@@ -2391,6 +2463,7 @@ function openEditTask(id){
     t.note=document.getElementById('f-note').value;
     if(document.getElementById('f-est'))t.estDate=document.getElementById('f-est').value;
     if(document.getElementById('f-reason'))t.reason=document.getElementById('f-reason').value;
+    syncToGAS('tasks',t).catch(e=>console.error('sync task failed',e));
     closeModal(); renderHome(); toast('排程已更新','success');
   });
 }
@@ -2535,7 +2608,12 @@ function openClientDrawer(clientId){
           <span style="font-size:12px;color:var(--text3)">合計 ${fmt(totalSpec)}</span>
           <div class="ml-auto flex gap-2">
             ${specs.filter(s=>!s.contractId).length?`<button class="btn btn-sm edit-only" style="color:var(--amber);border-color:var(--amber)" onclick="openAssignContract('${clientId}')">⚠ ${specs.filter(s=>!s.contractId).length}筆未串合約</button>`:''}
-            ${contracts.filter(ct=>DB.specItems.some(s=>s.contractId===ct.id&&(s.category==='口碑'||!s.category))).length?`<button class="btn btn-sm edit-only" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openBatchAssignVendor('${contracts.find(ct=>DB.specItems.some(s=>s.contractId===ct.id&&(s.category==='口碑'||!s.category)))?.id}')">⚡ 派發廠商任務</button>`:''}
+            ${contracts.filter(ct=>DB.specItems.some(s=>s.contractId===ct.id&&(s.category==='口碑'||!s.category))).length?`
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${contracts.filter(ct=>DB.specItems.some(s=>s.contractId===ct.id&&(s.category==='口碑'||!s.category))).map(ct=>`
+                <button class="btn btn-sm edit-only" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openBatchAssignVendor('${ct.id}')">⚡ ${ct.contractNo||ct.name||'派發任務'}</button>
+              `).join('')}
+            </div>`:''}
             <button class="btn btn-sm edit-only" onclick="openPickCatalog('${clientId}')">從報價總表選取</button>
             <button class="btn btn-sm btn-primary edit-only" onclick="openAddSpec('${clientId}')">＋ 新增</button>
           </div>
@@ -2674,6 +2752,10 @@ function togglePayment(raId,idx){
   p.status=p.status==='已入款'?'未入款':'已入款';
   if(p.status==='已入款')p.paidDate=today();
   else p.paidDate='';
+  // 同步到 GAS
+  if(p._id){
+    gasApi('updatePaymentStatus',{id:p._id,status:p.status,paidDate:p.paidDate||''}).catch(e=>console.error('sync payment failed',e));
+  }
   openClientDrawer(ra.clientId);
   toast(p.status==='已入款'?'已標記入款':'已取消入款');
 }
@@ -2871,9 +2953,7 @@ async function revokeClientDashToken(contractId){
 function copyClientDashLink(contractId){
   const ct=DB.contracts.find(x=>x.id===contractId);
   if(!ct?.clientToken){toast('請先產生連結');return;}
-  const gasUrl=document.getElementById('gas-url-input')?.value||'';
-  if(!gasUrl){toast('請先在設定中填入 GAS URL');return;}
-  const link=gasUrl+'?view=client&token='+ct.clientToken;
+  const link=GAS_URL+'?view=client&token='+ct.clientToken;
   navigator.clipboard.writeText(link).then(()=>toast('已複製客戶連結！','success'))
     .catch(()=>{
       const ta=document.createElement('textarea');ta.value=link;
@@ -2895,6 +2975,7 @@ function openEditSpec(specId,clientId){
 function deleteSpec(specId,clientId){
   if(!confirm('確定刪除？'))return;
   DB.specItems=DB.specItems.filter(x=>x.id!==specId);
+  syncDeleteGAS('specItems',specId).catch(()=>{});
   openClientDrawer(clientId);toast('規格已刪除');
 }
 
@@ -3049,8 +3130,8 @@ function saveSpec(specId,clientId){
   const price=Number(document.getElementById('f-price').value)||0;
   const{extCost,intCost,costDetail}=getSpecCostData();
   const data={contractId:document.getElementById('f-contract')?.value||'',clientId,category:cat,name,spec:document.getElementById('f-spec').value,qty,unit:document.getElementById('f-unit').value||'篇',price,extCost,intCost,cost:extCost,...costDetail,totalPrice:qty*price,totalCost:qty*(extCost+intCost)};
-  if(specId){const s=DB.specItems.find(x=>x.id===specId);if(s)Object.assign(s,data);}
-  else DB.specItems.push({id:nextId('S'),...data});
+  if(specId){const s=DB.specItems.find(x=>x.id===specId);if(s)Object.assign(s,data);syncToGAS('specItems',{id:specId,...data}).catch(()=>{});}
+  else{const newSpec={id:nextId('S'),...data};DB.specItems.push(newSpec);syncToGAS('specItems',newSpec).catch(()=>{});}
   window._editingSpec=null;
   closeModal();openClientDrawer(clientId);toast(specId?'規格已更新':'規格已新增','success');
 }
@@ -4641,9 +4722,7 @@ async function genVendorToken(vendorId){
 function copyVendorLink(vendorId){
   const v=DB.vendorCompanies.find(x=>x.id===vendorId);
   if(!v?.accessToken){toast('請先產生連結');return;}
-  const gasUrl=document.getElementById('gas-url-input')?.value||'';
-  if(!gasUrl){toast('請先在設定中填入 GAS URL');return;}
-  const link=gasUrl+'?action=getVendorTasks&token='+v.accessToken;
+  const link=GAS_URL+'?action=getVendorTasks&token='+v.accessToken;
   navigator.clipboard.writeText(link).then(()=>toast('已複製連結！','success'))
     .catch(()=>{
       const ta=document.createElement('textarea');ta.value=link;
@@ -4920,13 +4999,6 @@ function omApplySpec(){
     const match = Array.from(specSel.options).find(o=>o.value===spec.name||(spec.name&&spec.name.includes(o.value)));
     if(match) specSel.value=match.value;
   }
-  // 帶入客戶名稱（給 GAS 用）
-  const clientId=document.getElementById('om-f-client')?.value;
-  if(clientId&&!document.getElementById('om-f-clientname')?.value){
-    const cl=DB.clients.find(c=>c.id===clientId);
-    const el=document.getElementById('om-f-clientname');
-    if(el&&cl) el.value=cl.name;
-  }
   // 帶入月份（若尚未填）
   const monthEl=document.getElementById('om-f-month');
   if(monthEl&&!monthEl.value) monthEl.value=new Date().toISOString().slice(0,7);
@@ -5065,12 +5137,19 @@ function genOmTasksFromSpec(contractId, month){
     }
   });
 
-  toast(`已產生 ${created} 筆口碑任務（${m}）`,'success');
+  toast(`已產生 ${created} 筆口碑任務（${m}），同步中…`,'success');
+  // 批次 sync 到 GAS
+  const newRecs=DB.omRecords.slice(-created);
+  Promise.all(newRecs.map(r=>gasApi('saveOmRecord',r))).catch(e=>console.error('batch sync om failed',e));
   // 切換到口碑執行記錄頁
-  navigateTo('exec-om');
-  document.getElementById('om-client').value=ct.clientId;
-  document.getElementById('om-month').value=m;
-  renderOmPage();
+  navTo('exec-om');
+  setTimeout(()=>{
+    const omClient=document.getElementById('om-client');
+    const omMonth=document.getElementById('om-month');
+    if(omClient) omClient.value=ct.clientId;
+    if(omMonth) omMonth.value=m;
+    renderOmPage();
+  },100);
 }
 
 
