@@ -1628,6 +1628,17 @@ window.loadAllData = async function(){
     const actRaw = data.activities || data.crm_activities || [];
     if(actRaw.length) DB.activities = actRaw.filter(r => r.id);
 
+    // fb_tax（FB 境外稅額記錄）
+    const fbTaxRaw = data.fb_tax || data.fin_fb_tax || [];
+    if(fbTaxRaw.length) {
+      DB.fbTax = {};
+      fbTaxRaw.filter(r => r.id && r.date).forEach(r => {
+        DB.fbTax[r.date] = { id: r.id, amount: Number(r.amount) || 0, note: r.note || '' };
+      });
+    } else if(!DB.fbTax) {
+      DB.fbTax = {};
+    }
+
     // ── HR 資料填入 D 物件（支援新舊 key）──
     if(typeof D !== 'undefined') {
       D.members        = data.members        || data.hr_members        || [];
@@ -1820,6 +1831,7 @@ const DB = {
     {id:'OM-2601-元緣-005',clientId:'C002',contractId:'CT002',specId:'',clientName:'風華整外',month:'2026-01',specType:'監控回文',title:'#詢問天鵝頸醫師求推薦',content:'推風華的謝醫師，技術很穩',driveLink:'',postLink:'https://www.dcard.tw/f/facelift/p/261234567',vendorId:'VC004',vendorName:'歐文',platform:'Dcard',actionType:'回文',section:'醫美',vendorFee:60,writerId:'FL001',writerName:'Nina',writerFee:50,status:'撰文中',assignDate:'2026-05-19',cutAngleDate:'',writingDoneDate:'',publishDate:'',observeEndDate:'',lineNotified:true,note:'',created_at:'2026-05-19T00:00:00.000Z'},
   ],
   tasks:[],
+  fbTax:{},
   serviceCatalog:[
     {id:'SC001',category:'口碑',sub:'文案類型',name:'長圖文',spec:'500~1000字內文案配圖3-5張',unit:'篇',price:3600,freelancerCost:1200,vendorCost:200,note:'過稿'},
     {id:'SC002',category:'口碑',sub:'文案類型',name:'特規長圖文',spec:'500~1000字內文案配圖3-5張+原PO無限次回覆',unit:'篇',price:5000,freelancerCost:1700,vendorCost:1200,note:'過稿'},
@@ -7142,21 +7154,65 @@ async function hrSaveSalary(){
 
 // ═══════════════════════════════════════════════════════
 //  FB 稅額計算模組
-//  資料存在 localStorage key: 'fbTaxData'
-//  格式: { 'YYYY-MM-DD': number }  (每日 TWD 消費金額)
+//  資料來源：Google Sheets fin_fb_tax（透過 GAS）
+//  格式：DB.fbTax = { 'YYYY-MM-DD': { id, amount, note } }
 //  稅率：3%
 // ═══════════════════════════════════════════════════════
 
 const FB_TAX_RATE = 0.03;
-const FB_TAX_KEY  = 'fbTaxData';
+const FB_TAX_LS_KEY = 'fbTaxData'; // 舊版 localStorage key，僅用於一次性遷移
 
-// ── 讀取 / 寫入 ──
+// ── 讀取：直接從 DB.fbTax（loadAllData 已填入）──
 function fbTaxLoad() {
-  try { return JSON.parse(localStorage.getItem(FB_TAX_KEY) || '{}'); }
-  catch(e) { return {}; }
+  return DB.fbTax || {};
 }
-function fbTaxSave(data) {
-  localStorage.setItem(FB_TAX_KEY, JSON.stringify(data));
+
+// ── 寫入：同步到 GAS + 更新 DB.fbTax ──
+async function fbTaxSave(date, amount, note) {
+  if (!DB.fbTax) DB.fbTax = {};
+  const existing = DB.fbTax[date];
+  const payload  = { date, amount, note: note || '', ...(existing ? { id: existing.id } : {}) };
+  try {
+    const res = await gasApi('saveFbTax', payload);
+    DB.fbTax[date] = { id: res.id || existing?.id || '', amount, note: note || '' };
+  } catch(e) {
+    console.error('fbTaxSave failed', e);
+    toast('儲存失敗：' + e.message, 'error');
+  }
+}
+
+// ── 刪除：同步到 GAS + 從 DB.fbTax 移除 ──
+async function fbTaxDelete(date) {
+  const existing = DB.fbTax?.[date];
+  if (!existing?.id) { delete DB.fbTax[date]; return; }
+  try {
+    await gasApi('deleteFbTax', { id: existing.id });
+    delete DB.fbTax[date];
+  } catch(e) {
+    console.error('fbTaxDelete failed', e);
+    toast('刪除失敗：' + e.message, 'error');
+  }
+}
+
+// ── 一次性遷移：把 localStorage 舊資料搬到 GAS ──
+async function fbTaxMigrateFromLocal() {
+  let old = {};
+  try { old = JSON.parse(localStorage.getItem(FB_TAX_LS_KEY) || '{}'); } catch(e) {}
+  const entries = Object.entries(old).filter(([, v]) => v > 0);
+  if (!entries.length) return 0;
+  let count = 0;
+  for (const [date, amount] of entries) {
+    if (!DB.fbTax?.[date]) { // 不覆蓋雲端已有資料
+      await fbTaxSave(date, Number(amount), '');
+      count++;
+    }
+  }
+  if (count > 0) {
+    localStorage.removeItem(FB_TAX_LS_KEY);
+    toast(`已將 ${count} 筆舊資料遷移至雲端`, 'success');
+    renderFbTax();
+  }
+  return count;
 }
 
 // ── 日期工具 ──
@@ -7207,8 +7263,13 @@ function renderFbTax() {
 
   if (!_fbTaxViewWeek) _fbTaxViewWeek = fbTaxWeekStart(fbTaxDateStr(new Date()));
 
-  const data   = fbTaxLoad();
+  const data     = fbTaxLoad(); // DB.fbTax: { date: { id, amount, note } }
   const todayStr = fbTaxDateStr(new Date());
+
+  // 自動檢查 localStorage 舊資料並提示遷移
+  let oldLocal = {};
+  try { oldLocal = JSON.parse(localStorage.getItem(FB_TAX_LS_KEY) || '{}'); } catch(e) {}
+  const hasOld = Object.values(oldLocal).some(v => v > 0);
 
   // 本週 + 上週 各7天
   const weeks = [
@@ -7218,22 +7279,24 @@ function renderFbTax() {
 
   const weekHTMLs = weeks.map(({ label, start }) => {
     const days = Array.from({ length: 7 }, (_, i) => fbTaxAddDays(start, i));
-    const weekTotal  = days.reduce((s, d) => s + (Number(data[d]) || 0), 0);
-    const weekTax    = Math.round(weekTotal * FB_TAX_RATE);
-    const endDate    = days[6];
+    const weekTotal = days.reduce((s, d) => s + (Number(data[d]?.amount) || 0), 0);
+    const weekTax   = Math.round(weekTotal * FB_TAX_RATE);
+    const endDate   = days[6];
 
     const dayRows = days.map(d => {
-      const amt    = data[d] !== undefined ? data[d] : '';
+      const rec    = data[d];
+      const amt    = rec ? rec.amount : '';
+      const note   = rec ? rec.note  : '';
       const tax    = amt !== '' && Number(amt) > 0 ? Math.round(Number(amt) * FB_TAX_RATE) : '';
-      const isToday = d === todayStr;
+      const isToday  = d === todayStr;
       const isFuture = d > todayStr;
-      const bgStyle = isToday ? 'background:#fffbeb;' : '';
+      const bgStyle  = isToday ? 'background:#fffbeb;' : '';
       return `<tr style="${bgStyle}${isFuture ? 'opacity:.5;' : ''}">
         <td style="font-size:13px;white-space:nowrap;padding:9px 12px;${isToday ? 'font-weight:600;color:var(--accent)' : ''}">${fbTaxDisplayDate(d)}${isToday ? ' <span style="font-size:10px;background:var(--accent);color:#fff;border-radius:3px;padding:1px 5px;vertical-align:middle">今天</span>' : ''}</td>
         <td style="padding:6px 8px">
           <input type="number" min="0" step="1"
             style="width:120px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:var(--font);text-align:right;background:${isFuture ? 'var(--surface2)' : 'var(--surface)'}"
-            value="${amt}"
+            value="${amt !== '' ? amt : ''}"
             placeholder="0"
             ${isFuture ? 'disabled' : ''}
             data-date="${d}"
@@ -7288,14 +7351,15 @@ function renderFbTax() {
     </div>`;
   });
 
-  // 月份統計（從 data 計算）
+  // 月份統計
   const monthMap = {};
-  Object.entries(data).forEach(([d, v]) => {
-    if (!v || Number(v) <= 0) return;
+  Object.entries(data).forEach(([d, rec]) => {
+    const v = Number(rec?.amount) || 0;
+    if (v <= 0) return;
     const ym = d.slice(0, 7);
     if (!monthMap[ym]) monthMap[ym] = { total: 0, tax: 0 };
-    monthMap[ym].total += Number(v);
-    monthMap[ym].tax   += Math.round(Number(v) * FB_TAX_RATE);
+    monthMap[ym].total += v;
+    monthMap[ym].tax   += Math.round(v * FB_TAX_RATE);
   });
   const monthRows = Object.entries(monthMap)
     .sort((a, b) => b[0].localeCompare(a[0]))
@@ -7307,6 +7371,11 @@ function renderFbTax() {
     </tr>`).join('');
 
   el.innerHTML = `
+    ${hasOld ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:var(--r2);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:18px">📦</span>
+      <div style="flex:1;font-size:13px;color:var(--amber)">偵測到舊版瀏覽器暫存資料，點擊「一鍵遷移」可搬移到雲端</div>
+      <button class="btn btn-sm" style="background:var(--amber);color:#fff;border-color:var(--amber)" onclick="fbTaxMigrateFromLocal().then(n=>n>0&&renderFbTax())">一鍵遷移</button>
+    </div>` : ''}
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
       <button class="btn btn-sm" onclick="fbTaxChangeWeek(-1)">‹ 上一週</button>
       <span style="font-size:13px;color:var(--text3);min-width:180px;text-align:center">
@@ -7352,41 +7421,49 @@ function renderFbTax() {
 }
 
 function fbTaxInputChange(input) {
-  const data = fbTaxLoad();
   const date = input.dataset.date;
   const val  = parseFloat(input.value);
   if (!date) return;
-  if (isNaN(val) || val <= 0) {
-    delete data[date];
-  } else {
-    data[date] = Math.round(val);
-  }
-  fbTaxSave(data);
-  // 即時更新該列稅額顯示（不重繪整頁，避免失焦）
+
+  // 即時更新該列稅額顯示（不等 GAS，先算給你看）
   const row = input.closest('tr');
   if (row) {
     const cells = row.querySelectorAll('td');
     const tax = (!isNaN(val) && val > 0) ? Math.round(val * FB_TAX_RATE) : '';
-    if (cells[2]) cells[2].textContent = tax !== '' ? fbTaxFmt(tax) : '—';
-    if (cells[2]) cells[2].style.color = tax ? 'var(--amber)' : 'var(--text3)';
+    if (cells[2]) { cells[2].textContent = tax !== '' ? fbTaxFmt(tax) : '—'; cells[2].style.color = tax ? 'var(--amber)' : 'var(--text3)'; }
     if (cells[3]) cells[3].textContent = (!isNaN(val) && val > 0) ? fbTaxFmt(Math.round(val)) : '—';
   }
-  // 延遲 300ms 重算週小計（避免每次按鍵都全 re-render）
+
+  // Debounce 500ms 後才寫入 GAS（避免每按一鍵就送一次請求）
   clearTimeout(window._fbTaxTimer);
-  window._fbTaxTimer = setTimeout(() => renderFbTax(), 300);
+  window._fbTaxTimer = setTimeout(async () => {
+    if (isNaN(val) || val <= 0) {
+      if (DB.fbTax?.[date]) {
+        await fbTaxDelete(date);
+      }
+    } else {
+      await fbTaxSave(date, Math.round(val), '');
+    }
+    // 重算週小計
+    renderFbTax();
+    // 重新聚焦（renderFbTax 會重繪 DOM，要把 focus 找回來）
+    const newInput = document.querySelector(`input[data-date="${date}"]`);
+    if (newInput) { newInput.focus(); newInput.setSelectionRange(newInput.value.length, newInput.value.length); }
+  }, 600);
 }
 
 function fbTaxExportWeek() {
   if (!_fbTaxViewWeek) _fbTaxViewWeek = fbTaxWeekStart(fbTaxDateStr(new Date()));
-  const data = fbTaxLoad();
+  const data = fbTaxLoad(); // DB.fbTax
   const days = Array.from({ length: 7 }, (_, i) => fbTaxAddDays(_fbTaxViewWeek, i));
   const lines = ['日期\t消費金額(TWD)\t稅額(3%)\t備註'];
   let totalAmt = 0, totalTax = 0;
   days.forEach(d => {
-    const amt = Number(data[d]) || 0;
+    const rec = data[d];
+    const amt = rec ? Number(rec.amount) : 0;
     const tax = Math.round(amt * FB_TAX_RATE);
     totalAmt += amt; totalTax += tax;
-    lines.push(`${d}\t${amt || ''}\t${amt > 0 ? tax : ''}\t`);
+    lines.push(`${d}\t${amt || ''}\t${amt > 0 ? tax : ''}\t${rec?.note || ''}`);
   });
   lines.push(`\t合計 ${fbTaxFmt(totalAmt)}\t應繳 ${fbTaxFmt(totalTax)}\t`);
   const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
