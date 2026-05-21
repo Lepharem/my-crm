@@ -1552,6 +1552,7 @@ window.loadAllData = async function(){
           invoiceDate:   (row.invoiceDate  || row.invoice_date   || '').slice(0,10),
           invoiceMemo:   row.invoiceMemo   || '',
           invoiceItems:  row.invoiceItems  || '',
+          _id:           row.id || '',  // 保留原始 row id 供 updatePaymentStatus 使用
         });
         raMap[key].total += amt;
       });
@@ -1816,7 +1817,6 @@ window.syncDeleteGAS = async function(collection, id){
     vendorRecords:      'fin_vendor_records',
     vendorCompanies:    'fin_vendor_companies',
     freelancerRecords:  'fin_freelancer_records',
-    tasks:              'ops_tasks',
     omRecords:          'ops_om_records',
     socialRecords:      'ops_social_records',
     adRecords:          'ops_ad_records',
@@ -4461,7 +4461,9 @@ function openAddFreelancerRecord(){
     const clientId=document.getElementById('f-client').value;
     if(!person||!clientId)return alert('請填寫外包人員與客戶');
     if(!DB.freelancerRecords)DB.freelancerRecords=[];
-    DB.freelancerRecords.push({id:nextId('FR'),person,clientId,month:document.getElementById('f-month').value,type:document.getElementById('f-type').value,item:document.getElementById('f-item').value,amount:Number(document.getElementById('f-amount').value)||0,note:document.getElementById('f-note').value});
+    const newRec={id:nextId('FR'),person,clientId,month:document.getElementById('f-month').value,type:document.getElementById('f-type').value,item:document.getElementById('f-item').value,amount:Number(document.getElementById('f-amount').value)||0,note:document.getElementById('f-note').value};
+    DB.freelancerRecords.push(newRec);
+    syncToGAS('freelancerRecords',newRec).catch(e=>console.error('sync fl failed',e));
     closeModal();renderFreelancerStats();toast('外包記錄已新增','success');
   });
 }
@@ -4482,16 +4484,15 @@ function openEditFreelancerRecord(id){
     r.amount=Number(document.getElementById('f-amount').value)||0;
     r.month=document.getElementById('f-month').value;
     r.item=document.getElementById('f-item').value;
+    syncToGAS('freelancerRecords',r).catch(e=>console.error('sync fl failed',e));
     closeModal();renderFreelancerStats();toast('已更新','success');
   });
 }
-function deleteFreelancerRecord(id){if(!confirm('確定刪除？'))return;DB.freelancerRecords=DB.freelancerRecords?.filter(x=>x.id!==id)||[];renderFreelancerStats();}
+function deleteFreelancerRecord(id){if(!confirm('確定刪除？'))return;DB.freelancerRecords=DB.freelancerRecords?.filter(x=>x.id!==id)||[];syncDeleteGAS('freelancerRecords',id).catch(()=>{});renderFreelancerStats();}
 
 // ═══ VENDOR EXEC (updated) ═══
 function clearVeFilters(){['ve-client','ve-month-start','ve-month-end','ve-vendor','ve-type'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});renderVendorExec();}
 function exportToSheets(){toast('請先設定 Google Sheets 串接後使用');}
-function syncFromSheets(){toast('請先設定 Google Sheets 串接後使用');}
-
 function syncFromSheets(){toast('請先設定 Google Sheets 串接後使用');}
 
 // ═══ 二級選單 ═══
@@ -6719,48 +6720,6 @@ function renderPermissionsPage(){
   ];
   const roles=Object.entries(DB.permissions.roles);
   el.innerHTML=`
-    <div style="background:var(--blue-bg);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:var(--r2);padding:14px 16px;margin-bottom:16px;font-size:13px">
-      <div style="font-weight:600;margin-bottom:4px">關於帳戶登入</div>
-      <div style="color:var(--text2);line-height:1.6">串接 Firebase 後，每位使用者以 Google 帳號登入，系統依照角色顯示對應功能，不同角色互相看不到對方的帳號設定。目前為本地模式，Firebase 設定完成後啟用。</div>
-    </div>
-    <div class="table-wrap">
-      <div class="table-header">
-        <div class="table-title">角色權限設定</div>
-        ${isEditing?`<button class="btn btn-sm btn-primary" onclick="openAddRole()">＋ 新增角色</button>`:''}
-      </div>
-      <div style="overflow-x:auto"><table style="min-width:600px">
-        <thead><tr>
-          <th>功能</th>
-          ${roles.map(([id,r])=>`<th style="text-align:center">${r.label}${id!=='admin'&&isEditing?`<br><button class="btn btn-xs" style="margin-top:3px;color:var(--red)" onclick="deleteRole('${id}')">刪除</button>`:''}</th>`).join('')}
-        </tr></thead>
-        <tbody>${allPerms.map(perm=>`<tr>
-          <td><span style="font-size:10px;color:var(--text3)">${perm.group}　</span><span style="font-weight:500">${perm.label}</span></td>
-          ${roles.map(([id,r])=>{
-            const hasAll=r.perms.all;const hasPerm=hasAll||r.perms[perm.id];
-            if(id==='admin') return`<td style="text-align:center;color:#16a34a;font-size:16px">✓</td>`;
-            return`<td style="text-align:center">${isEditing?
-              `<input type="checkbox" ${hasPerm?'checked':''} onchange="toggleRolePerm('${id}','${perm.id}',this.checked)" style="width:16px;height:16px;cursor:pointer">`:
-              hasPerm?`<span style="color:#16a34a;font-size:16px">✓</span>`:`<span style="color:var(--border2);font-size:16px">—</span>`
-            }</td>`;
-          }).join('')}
-        </tr>`).join('')}</tbody>
-      </table></div>
-    </div>
-  `;
-}
-
-// ═══ SETTINGS: 帳戶權限 ═══
-function renderPermissionsPage(){
-  const el=document.getElementById('permissions-content');if(!el)return;
-  const isEditing=!document.getElementById('page-settings-permissions')?.classList.contains('page-locked');
-  const allPerms=[
-    {id:'dashboard',label:'儀錶板',group:'營運'},{id:'summary',label:'總表',group:'營運'},{id:'receivable',label:'應收帳款',group:'營運'},{id:'viewCost',label:'查看成本利潤',group:'營運'},
-    {id:'clients',label:'客戶管理',group:'業務'},{id:'performance',label:'業績管理',group:'業務'},{id:'schedule',label:'工作排程',group:'業務'},
-    {id:'projects',label:'專案進度表',group:'企劃'},{id:'specs',label:'規格統計表',group:'企劃'},{id:'vendor-exec',label:'廠商執行表',group:'企劃'},
-    {id:'settings-catalog',label:'樂法服務報價',group:'設定'},{id:'settings-freelancer',label:'外包人員報價',group:'設定'},{id:'settings-vendor',label:'廠商規格報價',group:'設定'},{id:'settings-theme',label:'顏色風格',group:'設定'},{id:'settings-permissions',label:'帳戶權限',group:'設定'},
-  ];
-  const roles=Object.entries(DB.permissions.roles);
-  el.innerHTML=`
     <div style="padding:20px 24px">
     <div style="background:var(--blue-bg);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:var(--r2);padding:14px 16px;margin-bottom:16px;font-size:13px">
       <div style="font-weight:600;margin-bottom:4px">關於帳戶登入</div>
@@ -6804,7 +6763,6 @@ function toggleSpecDetail(specId){
 }
 
 // keep old settings fns for backward compat
-function renderSettings(tab){ if(tab==='catalog')renderCatalogPage(); }
 
 // ── 測試模式 ──
 
