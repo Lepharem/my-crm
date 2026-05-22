@@ -7747,6 +7747,8 @@ function renderSopFlow(clientId, contractId, ym){
   const ct = DB.contracts.find(c=>c.id===contractId)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
   const specs = DB.specItems.filter(s=>s.contractId===contractId&&(s.category==='口碑'||!s.category));
+  // 開文規格（傳給規劃表使用，純回文不建行）
+  const specsOpen = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name));
   const thisMonthOm = (DB.omRecords||[]).filter(r=>r.contractId===contractId&&(r.month||'').slice(0,7)===ym);
 
   // 更新 sub title
@@ -7808,7 +7810,7 @@ function renderSopFlow(clientId, contractId, ym){
       </div>`;
   } else if(state.line === 'A' && state.step === 1){
     // A 線步驟1：顯示專案規劃表
-    s1Content = _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state);
+    s1Content = _renderSopPlanTable(clientId, contractId, ym, specsOpen, thisMonthOm, state);
   } else if(state.line === 'B' && state.step === 1){
     // B 線步驟1：直接選規格+寫手
     s1Content = _renderSopDirectForm(clientId, contractId, ym, specs, state);
@@ -8092,7 +8094,9 @@ function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state
         }));
       }
 
-      const monthQty = Number(s.monthlyQty) || Math.ceil((s.qty||1)/totalMonths) || 1;
+      // 每月應執行數量：優先用 monthlyQty 欄位，否則 qty/月數（最少1）
+      const rawMonthly = Number(s.monthlyQty) || ((s.qty||1) / totalMonths);
+      const monthQty = Math.max(1, Math.round(rawMonthly));
       return Array.from({length:monthQty},(_,i)=>({
         id:`pi_${s.id}_${i}`, specId:s.id, specType:s.name,
         taskName:`${s.name}#${i+1}`,
@@ -8179,8 +8183,8 @@ function _sopIsGoogle(specType){ return /Google星評|星評/.test(specType||'')
 function _sopIsOpenPost(specType){
   if(!specType) return false;
   if(_sopIsMonitor(specType)||_sopIsGoogle(specType)) return false;
-  // 純回文規格
-  if(/^即時回文|^綁定回文|^監控回文/.test(specType)) return false;
+  // 純回文/贈送/監控/報告型規格不是「開文」
+  if(/回文|監控|報告|季報|月報|按讚|追蹤|投票|KOL|KOC/.test(specType)) return false;
   return true;
 }
 // ── 判斷「回文」規格 ──
@@ -8206,26 +8210,63 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
   const ct = DB.contracts.find(c=>c.id===contractId)||{};
   const cutAngleDocLink = ct.driveLink||'';
   const platformOpts = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
-  const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
-
-  // 直發線：不從規格預填，空白讓企劃自行逐筆新增
+  const writerList = DB.freelancers.filter(f=>f.type==='口碑');
+  const writerOpts = writerList.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
   const rows = state.planItems;
 
+  // 取得某寫手的服務項目（開文類）
+  const getWriterItems = (writerId) => {
+    const fl = writerList.find(f=>f.id===writerId);
+    if(!fl||!fl.items) return [];
+    return fl.items.filter(it=>{
+      const n=it.item||'';
+      // 只列開文類項目
+      return _sopIsOpenPost(n)||/圖文|議題文|長圖文|短圖文/.test(n);
+    });
+  };
+
+  // 渲染單一發文卡片
   const renderRow = (row, idx) => {
-    const isOpen = _sopIsOpenPost(row.specType) || !row.specType;
-    return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:#fff">
+    const fl = writerList.find(f=>f.id===row.writerId);
+    const writerItems = row.writerId ? getWriterItems(row.writerId) : [];
+    const itemOpts = writerItems.length
+      ? writerItems.map(it=>`<option value="${it.item}"${row.specType===it.item?' selected':''}>${it.item}（$${it.price||'—'}）</option>`).join('')
+      : `<option value="${row.specType||''}">${row.specType||'—'}</option>`;
+    return `<div id="direct-row-${row.id}" style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;background:#fff">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <span style="font-size:13px;font-weight:600;color:var(--text)">發文 #${idx+1}</span>
-        <input value="${row.taskName||''}" placeholder="任務名稱" class="form-input"
-          style="font-size:12px;padding:5px 8px;width:120px;font-weight:600"
+        <span style="font-size:12px;font-weight:600;color:var(--text3)">發文 #${idx+1}</span>
+        <input value="${row.taskName||''}" placeholder="任務名稱（選填）" class="form-input"
+          style="font-size:12px;padding:5px 8px;width:130px"
           data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
-        <button onclick="_sopPlanDeleteRow('${clientId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;margin-left:auto">✕ 刪除</button>
+        <button onclick="_sopPlanDeleteRow('${clientId}','${ym}','${row.id}')" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">✕ 刪除</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">指派寫手 *</div>
+          <select class="form-input" style="font-size:12px;width:100%"
+            data-pi="${row.id}" data-f="writerId"
+            onchange="_sopDirectWriterChange('${clientId}','${ym}','${row.id}',this.value)">
+            <option value="">— 選擇寫手 —</option>${writerOpts.replace('value="'+row.writerId+'"','value="'+row.writerId+'" selected')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">服務項目 *</div>
+          ${row.writerId
+            ? `<select class="form-input" style="font-size:12px;width:100%"
+                data-pi="${row.id}" data-f="specType"
+                onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+                <option value="">— 選擇項目 —</option>${itemOpts}
+              </select>`
+            : `<div style="padding:8px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--text3)">請先選寫手</div>`
+          }
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:3px">論壇平台</div>
-          <select class="form-input" style="font-size:12px;width:100%" data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
-            <option value="">— 選擇 —</option>${platformOpts.replace('>'+row.platform+'<',' selected>'+row.platform+'<')}
+          <select class="form-input" style="font-size:12px;width:100%"
+            data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+            <option value="${row.platform||''}">${row.platform||'— 選擇 —'}</option>${platformOpts}
           </select>
         </div>
         <div>
@@ -8233,20 +8274,16 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
           <input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:12px;width:100%"
             data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
         </div>
-        <div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">指派寫手</div>
-          <select class="form-input" style="font-size:12px;width:100%" data-pi="${row.id}" data-f="writerId" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
-            <option value="">— 選擇 —</option>${writerOpts.replace('value="'+row.writerId+'"','value="'+row.writerId+'" selected')}
-          </select>
-        </div>
       </div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;margin-bottom:8px">
         <div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:3px">回文數</div>
           <div style="display:inline-flex;align-items:center;gap:4px">
-            <button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center">−</button>
+            <button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',-1)"
+              style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center">−</button>
             <span id="di-reply-${row.id}" style="font-size:14px;font-weight:700;min-width:28px;text-align:center">${row.replyCount||0}</span>
-            <button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center">＋</button>
+            <button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',1)"
+              style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center">＋</button>
           </div>
         </div>
         <div>
@@ -8267,13 +8304,25 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
   };
 
   return `
-    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">直發線：逐筆新增發文，指派寫手後直接進入撰文流程。</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">直發線：逐筆新增發文，選寫手後服務項目自動帶入，指派後直接進入撰文流程。</div>
     ${rows.map((row,idx) => renderRow(row,idx)).join('')}
-    ${!rows.length ? `<div style="text-align:center;padding:24px;border:2px dashed var(--border);border-radius:8px;color:var(--text3);margin-bottom:12px">點擊「新增發文」開始</div>` : ''}
+    ${!rows.length ? `<div style="text-align:center;padding:24px;border:2px dashed var(--border);border-radius:10px;color:var(--text3);margin-bottom:12px;font-size:13px">點擊「新增發文」開始建立任務</div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="_sopDirectAddRow('${clientId}','${ym}')">＋ 新增發文</button>
-      ${rows.length ? `<button class="btn btn-sm btn-primary" style="background:#0f6e56" onclick="_sopSubmitDirect('${clientId}','${contractId}','${ym}')">⚡ 確認派發寫手</button>` : ''}
+      ${rows.length ? `<button class="btn btn-primary" style="background:#0f6e56" onclick="_sopSubmitDirect('${clientId}','${contractId}','${ym}')">⚡ 確認派發寫手</button>` : ''}
     </div>`;
+}
+
+// 直發線：選寫手後重繪（更新服務項目下拉）
+function _sopDirectWriterChange(clientId, ym, rowId, writerId){
+  const state = getSopState(clientId, ym);
+  const row = state.planItems.find(r=>r.id===rowId);
+  if(row){
+    row.writerId = writerId;
+    row.specType = ''; // 清空服務項目，讓使用者重選
+  }
+  const [,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
+  renderSopFlow(clientId, ctId, ym);
 }
 
 
@@ -8336,11 +8385,12 @@ function _sopSubmitPlan(clientId, contractId, ym){
     const rec = {
       id, contractId, clientId, clientName:cl.name||'',
       month:ym, specType:row.specType,
+      specId:row.specId||'',
       taskName:row.taskName||row.specType||'',
       platform:row.platform||'',
-      section:row.section||'', actionType:row.specType.includes('回文')?'回文':'開文',
+      section:row.section||'', actionType:_sopIsOpenPost(row.specType)?'開文':'回文',
       title:row.taskName||'', content:row.cutAngle||'', driveLink:'',
-      replyCount:row.replyCount||row.replyRatio||_sopDefaultReply(row.specType),
+      replyCount:Number(row.replyCount)||0,
       note:row.note||'',
       writerId:'', writerName:'',
       vendorId:'', vendorName:'',
@@ -8364,8 +8414,13 @@ function _sopSubmitDirect(clientId, contractId, ym){
   const state = getSopState(clientId, ym);
   const ct = DB.contracts.find(c=>c.id===contractId)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
-  const validRows = state.planItems.filter(row=>row.specType);
-  if(!validRows.length){ toast('請至少填寫一行任務（需選擇類型）'); return; }
+  const validRows = state.planItems.filter(row=>row.writerId && row.specType);
+  const missingWriter = state.planItems.filter(row=>!row.writerId);
+  const missingType   = state.planItems.filter(row=>row.writerId && !row.specType);
+  if(!state.planItems.length){ toast('請先新增發文'); return; }
+  if(missingWriter.length){ toast(`發文 #${state.planItems.indexOf(missingWriter[0])+1} 尚未選擇寫手`); return; }
+  if(missingType.length){ toast(`發文 #${state.planItems.indexOf(missingType[0])+1} 尚未選擇服務項目`); return; }
+  if(!validRows.length){ toast('請確認每筆發文都已選擇寫手和服務項目'); return; }
   let created=0;
   validRows.forEach(row=>{
     const fl = DB.freelancers.find(f=>f.id===row.writerId);
@@ -8373,12 +8428,15 @@ function _sopSubmitDirect(clientId, contractId, ym){
     // 每筆主文建一個記錄，回文在 replyCount 欄位存儲
     const rec = {
       id, contractId, clientId, clientName:cl.name||'',
-      month:ym, specType:row.specType, platform:row.platform||'',
-      section:row.section||'', actionType:row.specType.includes('回文')?'回文':'開文',
-      title:'', content:row.cutAngle||'', driveLink:'',
-      replyCount:row.replyCount||_sopDefaultReply(row.specType),
-      writerId:row.writerId||'', writerName:fl?.name||'', writerFee:0,
-      vendorId:'', vendorName:'', vendorFee:0,
+      month:ym, specType:row.specType,
+      taskName:row.taskName||row.specType||'',
+      platform:row.platform||'',
+      section:row.section||'', actionType:_sopIsOpenPost(row.specType)?'開文':'回文',
+      title:row.taskName||row.specType||'', content:row.cutAngle||'', driveLink:'',
+      replyCount:Number(row.replyCount)||0,
+      note:row.note||'',
+      writerId:row.writerId||'', writerName:fl?.name||'',
+      vendorId:'', vendorName:'',
       status: row.writerId ? '撰文中' : '待派寫手',
       clientConfirmStatus:'', clientNote:'',
       sopLine:'B',
