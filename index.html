@@ -473,17 +473,25 @@ body.test-mode .test-mode-fab{display:flex}</style>
 <div class="toast-wrap" id="toast-wrap"></div>
 
 <!-- 寫手介面 -->
-<div id="writer-app" style="display:none;min-height:100vh;background:#f4f3f0;font-family:-apple-system,'PingFang TC',sans-serif">
-  <div style="background:#0f172a;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">
+<div id="writer-app" style="display:none;height:100vh;overflow:hidden;background:#f4f3f0;font-family:-apple-system,'PingFang TC',sans-serif;flex-direction:column">
+  <div style="background:#0f172a;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:100">
+    <button onclick="toggleWriterSidebar()" style="background:none;border:none;color:#fff;cursor:pointer;padding:4px;display:flex;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <div style="font-size:15px;font-weight:600;flex:1">樂法 × 寫手工作台</div>
     <div id="writer-name-badge" style="font-size:12px;color:rgba(255,255,255,.5)"></div>
     <button onclick="logoutUser()" style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">登出</button>
   </div>
-  <div id="writer-content" style="max-width:720px;margin:0 auto;padding:20px 16px"></div>
+  <div style="display:flex;flex:1;overflow:hidden">
+    <nav id="writer-sidebar" style="width:200px;background:#1e293b;flex-shrink:0;overflow-y:auto;transition:width .25s;padding:12px 0">
+      <div id="writer-nav-items"></div>
+    </nav>
+    <div style="flex:1;overflow-y:auto">
+      <div id="writer-content" style="max-width:760px;margin:0 auto;padding:20px 16px"></div>
+    </div>
+  </div>
 </div>
 
 <!-- 帳號商介面 -->
-<div id="vendor-app" style="display:none;min-height:100vh;background:#f4f3f0;font-family:-apple-system,'PingFang TC',sans-serif">
+<div id="vendor-app" style="display:none;height:100vh;overflow-y:auto;background:#f4f3f0;font-family:-apple-system,'PingFang TC',sans-serif">
   <div style="background:#0f172a;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">
     <div style="font-size:15px;font-weight:600;flex:1">樂法 × 帳號商工作台</div>
     <div id="vendor-name-badge" style="font-size:12px;color:rgba(255,255,255,.5)"></div>
@@ -493,13 +501,21 @@ body.test-mode .test-mode-fab{display:flex}</style>
 </div>
 
 <!-- 客戶儀錶板介面 -->
-<div id="client-app" style="display:none;min-height:100vh;background:#f4f3f0;font-family:-apple-system,'PingFang TC',sans-serif">
-  <div style="background:#0f172a;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">
-    <div style="font-size:15px;font-weight:600;flex:1">樂法 × 客戶儀錶板</div>
+<div id="client-app" style="display:none;height:100vh;overflow:hidden;background:#f4f3f0;font-family:-apple-system,'PingFang TC',sans-serif;flex-direction:column">
+  <div style="background:#0f172a;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:100">
+    <button onclick="toggleClientSidebar()" style="background:none;border:none;color:#fff;cursor:pointer;padding:4px;display:flex;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <div style="font-size:15px;font-weight:600;flex:1">樂法 × 客戶專區</div>
     <div id="client-name-badge" style="font-size:12px;color:rgba(255,255,255,.5)"></div>
     <button onclick="logoutUser()" style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">登出</button>
   </div>
-  <div id="client-content" style="max-width:720px;margin:0 auto;padding:20px 16px"></div>
+  <div style="display:flex;flex:1;overflow:hidden">
+    <nav id="client-sidebar" style="width:200px;background:#1e293b;flex-shrink:0;overflow-y:auto;transition:width .25s;padding:12px 0">
+      <div id="client-nav-items"></div>
+    </nav>
+    <div style="flex:1;overflow-y:auto">
+      <div id="client-content" style="max-width:760px;margin:0 auto;padding:20px 16px"></div>
+    </div>
+  </div>
 </div>
 
 <!-- SIDEBAR -->
@@ -1649,7 +1665,9 @@ async function handleCredential(response){
   const device = /Mobi|Android/i.test(ua) ? '手機' : '電腦';
   const browser = /Chrome/i.test(ua)?'Chrome':/Safari/i.test(ua)?'Safari':/Firefox/i.test(ua)?'Firefox':'其他';
   gasApi('logLogin', { email, name: payload.name, device, browser }).catch(()=>{});
-  loadAllData();
+  loadAllData().then(()=>{
+    _applySidebarPermissions();
+  }).catch(()=>{ _applySidebarPermissions(); });
 }
 
 function updateSidebarUser(payload){
@@ -1690,113 +1708,202 @@ window.logoutUser = function(){
 //  寫手介面
 // ══════════════════════════════════════════
 async function showWriterInterface(){
-  document.getElementById('writer-app').style.display = '';
+  const app = document.getElementById('writer-app');
+  if(app){ app.style.display = 'flex'; }
   const badge = document.getElementById('writer-name-badge');
   if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
-  await renderWriterTasks();
+  _renderWriterNav();
+  await _writerNavTo('dashboard');
 }
 
-async function renderWriterTasks(){
-  const el = document.getElementById('writer-content');
+function toggleWriterSidebar(){
+  const nav = document.getElementById('writer-sidebar');
+  if(!nav) return;
+  nav.style.width = nav.style.width === '0px' ? '200px' : '0px';
+}
+
+function _renderWriterNav(){
+  const el = document.getElementById('writer-nav-items');
   if(!el) return;
-  el.innerHTML = `<div style="text-align:center;padding:40px;color:#8a8680">載入中…</div>`;
-  try {
-    let tasks = [];
-    let writerName = _userProfile?.name || _currentUser?.name || '';
+  // 取得寫手相關合約（透過 omRecords 的 writerId / writerName）
+  const fl = _userProfile || DB.freelancers.find(f=>f.name===(_currentUser?.name||''));
+  const myOm = fl ? (DB.omRecords||[]).filter(r=>
+    (r.writerId===fl.id||r.writerName===fl.name) &&
+    ['撰文中','文稿審核','切角審核','待派帳號商'].includes(r.status)
+  ) : [];
+  const contractIds=[...new Set(myOm.map(r=>r.contractId).filter(Boolean))];
+  const myContracts=contractIds.map(cid=>DB.contracts.find(c=>c.id===cid)).filter(Boolean);
 
-    if(window._testMode){
-      // 測試模式：直接從本地 DB 取（用 writerId 或 writerName 匹配）
-      const fl = _userProfile || DB.freelancers.find(f=>
-        (f.email && f.email.toLowerCase()===(_currentUser?.email||'').toLowerCase()) ||
-        f.name === writerName
-      );
-      if(fl){
-        writerName = fl.name;
-        tasks = (DB.omRecords||[])
-          .filter(r=>(r.writerId===fl.id||r.writerName===fl.name) && ['撰文中','文稿審核','切角審核','待派帳號商'].includes(r.status))
-          .map(r=>({
-            id:r.id, clientName:r.clientName||'', month:r.month||'',
-            specType:r.specType||'', title:r.title||'', content:r.content||'',
-            platform:r.platform||'', actionType:r.actionType||'', section:r.section||'',
-            driveLink:r.driveLink||'', draftLink:r.draftLink||'', status:r.status, note:r.note||''
-          }));
-      }
-    } else {
-      const res = await gasApi('getWriterTasks', { email: _currentUser.email });
-      tasks = res.tasks || [];
-      writerName = res.writer || writerName;
-    }
-
-    const badge = document.getElementById('writer-name-badge');
-    if(badge) badge.textContent = writerName;
-
-    const pending = tasks.filter(t => t.status === '撰文中');
-    const reviewing = tasks.filter(t => ['文稿審核','切角審核','待派帳號商'].includes(t.status));
-
-    const taskCard = (t) => {
-      const isPending = t.status === '撰文中';
-      return `<div style="background:#fff;border:1px solid ${isPending?'#fcd34d':'#e8e6e1'};border-radius:12px;padding:16px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:#1a1917">${t.clientName}</div>
-            <div style="font-size:11px;color:#8a8680;margin-top:2px">${t.month} · ${t.specType}</div>
-          </div>
-          <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${isPending?'#fef3c7':'#ede9fe'};color:${isPending?'#92400E':'#5b21b6'}">${t.status}</span>
-        </div>
-        ${t.platform?`<div style="font-size:12px;color:#4a4845;margin-bottom:6px">📍 ${t.platform}${t.actionType?' · '+t.actionType:''}${t.section?' · '+t.section:''}</div>`:''}
-        ${t.title?`<div style="font-size:13px;font-weight:500;margin-bottom:6px;color:#1a1917">${t.title}</div>`:''}
-        ${t.content?`<div style="font-size:12px;color:#4a4845;background:#f8f7f5;border-radius:6px;padding:8px;margin-bottom:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto">${t.content}</div>`:''}
-        ${t.driveLink?`<div style="margin-bottom:8px"><a href="${t.driveLink}" target="_blank" style="font-size:12px;color:#1B4FD8;display:inline-flex;align-items:center;gap:4px">📁 專案資料夾</a></div>`:''}
-        ${isPending?`
-          <div style="margin-top:10px">
-            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Google Doc 稿件連結 *</label>
-            <input id="draft-${t.id}" type="url" placeholder="https://docs.google.com/..." value="${t.draftLink||''}"
-              style="width:100%;padding:8px 10px;border:1px solid #d4d1cb;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px">
-            <button onclick="submitWriterDraft('${t.id}')"
-              style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;width:100%">
-              ✓ 稿件完成，送回審核
-            </button>
-          </div>`
-        :`<div style="font-size:12px;color:#5b21b6;background:#ede9fe;border-radius:6px;padding:8px">
-            ${t.status} · 等待樂法處理
-            ${t.draftLink?`<br><a href="${t.draftLink}" target="_blank" style="color:#5b21b6">${t.draftLink.slice(0,50)}…</a>`:''}
-          </div>`}
+  const navItemStyle=(id)=>{
+    const isActive=window._writerCurrentPage===id;
+    return `display:block;padding:9px 16px;font-size:13px;cursor:pointer;color:${isActive?'#fff':'rgba(255,255,255,.65)'};background:${isActive?'rgba(255,255,255,.12)':'transparent'};border-left:3px solid ${isActive?'#38bdf8':'transparent'};transition:.15s;text-decoration:none`;
+  };
+  el.innerHTML=`
+    <div style="padding:4px 16px 8px;font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.08em;font-weight:600;text-transform:uppercase">導覽</div>
+    <div onclick="_writerNavTo('dashboard')" style="${navItemStyle('dashboard')}">📊 我的儀錶板</div>
+    <div onclick="_writerNavTo('all')" style="${navItemStyle('all')}">📝 全部任務</div>
+    ${myContracts.map(ct=>{
+      const cl=DB.clients.find(c=>c.id===ct.clientId);
+      const count=myOm.filter(r=>r.contractId===ct.id).length;
+      return `<div onclick="_writerNavTo('contract_${ct.id}')" style="${navItemStyle('contract_'+ct.id)}">
+        <div style="font-size:11px;font-weight:600">${ct.contractNo||ct.name}</div>
+        <div style="font-size:10px;opacity:.6;margin-top:1px">${cl?cl.name:''} · ${count}件</div>
       </div>`;
-    };
+    }).join('')}
+  `;
+}
 
-    el.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
-        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-          <div style="font-size:24px;font-weight:700;color:#92400E">${pending.length}</div>
-          <div style="font-size:12px;color:#8a8680;margin-top:2px">待撰文</div>
-        </div>
-        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-          <div style="font-size:24px;font-weight:700;color:#5b21b6">${reviewing.length}</div>
-          <div style="font-size:12px;color:#8a8680;margin-top:2px">審核中</div>
-        </div>
-      </div>
-      ${window._testMode?`<div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#5b21b6">🧪 測試模式：顯示本地DB中指派給「${writerName}」的任務</div>`:''}
-      ${pending.length?`<div style="font-size:11px;font-weight:600;color:#92400E;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">📝 待撰文（${pending.length}）</div>${pending.map(taskCard).join('')}`:''}
-      ${reviewing.length?`<div style="font-size:11px;font-weight:600;color:#5b21b6;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 8px">🔍 審核中（${reviewing.length}）</div>${reviewing.map(taskCard).join('')}`:''}
-      ${!tasks.length?`<div style="text-align:center;padding:40px;color:#8a8680">目前沒有進行中的任務</div>`:''}
-      <div style="text-align:center;margin-top:24px;font-size:11px;color:#c0bdb7">
-        ${window._testMode?'測試模式 · 資料來自本地DB':'資料不會自動更新，請手動重新整理頁面'}
-      </div>`;
-  } catch(e){
-    el.innerHTML = `<div style="text-align:center;padding:40px;color:#991b1b">載入失敗：${e.message}</div>`;
+let _writerCurrentPage='dashboard';
+let _writerAllTasks=[];
+async function _writerNavTo(page){
+  _writerCurrentPage=page;
+  _renderWriterNav();
+  const el=document.getElementById('writer-content');
+  if(!el) return;
+  if(!_writerAllTasks.length) await _writerLoadTasks();
+  if(page==='dashboard') _renderWriterDashboard();
+  else if(page==='all') _renderWriterTaskList(_writerAllTasks);
+  else if(page.startsWith('contract_')){
+    const cid=page.replace('contract_','');
+    _renderWriterTaskList(_writerAllTasks.filter(t=>t.contractId===cid));
   }
 }
 
+async function _writerLoadTasks(){
+  let tasks=[], writerName=_userProfile?.name||_currentUser?.name||'';
+  try {
+    if(window._testMode){
+      const fl=_userProfile||DB.freelancers.find(f=>(f.email&&f.email.toLowerCase()===(_currentUser?.email||'').toLowerCase())||f.name===writerName);
+      if(fl){
+        writerName=fl.name;
+        tasks=(DB.omRecords||[]).filter(r=>(r.writerId===fl.id||r.writerName===fl.name)&&['撰文中','文稿審核','切角審核','待派帳號商'].includes(r.status))
+          .map(r=>({id:r.id,contractId:r.contractId||'',clientName:r.clientName||'',month:r.month||'',
+            specType:r.specType||'',title:r.title||'',content:r.content||'',platform:r.platform||'',
+            actionType:r.actionType||'',section:r.section||'',driveLink:r.driveLink||'',
+            draftLink:r.draftLink||'',status:r.status,note:r.note||''}));
+      }
+    } else {
+      const res=await gasApi('getWriterTasks',{email:_currentUser.email});
+      tasks=res.tasks||[]; writerName=res.writer||writerName;
+    }
+  } catch(e){ console.warn('writer tasks load error:',e); }
+  _writerAllTasks=tasks;
+  const badge=document.getElementById('writer-name-badge');
+  if(badge) badge.textContent=writerName;
+}
+
+function _renderWriterDashboard(){
+  const el=document.getElementById('writer-content');
+  if(!el) return;
+  const tasks=_writerAllTasks;
+  const pending=tasks.filter(t=>t.status==='撰文中');
+  const reviewing=tasks.filter(t=>['文稿審核','切角審核'].includes(t.status));
+  const done=tasks.filter(t=>t.status==='待派帳號商');
+  // 依合約分組
+  const byContract={};
+  tasks.forEach(t=>{const k=t.contractId||'其他';if(!byContract[k])byContract[k]=[];byContract[k].push(t);});
+  el.innerHTML=`
+    <div style="margin-bottom:20px">
+      <div style="font-size:18px;font-weight:700;color:#1a1917">我的工作台</div>
+      <div style="font-size:12px;color:#8a8680;margin-top:2px">${new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'})}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #fcd34d;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#92400E">${pending.length}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">待撰文</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #c4b5fd;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#5b21b6">${reviewing.length}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">審核中</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #bbf7d0;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#166534">${done.length}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">已完稿</div>
+      </div>
+    </div>
+    ${window._testMode?`<div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#5b21b6">🧪 測試模式</div>`:''}
+    ${pending.length?`<div style="font-size:12px;font-weight:600;color:#92400E;margin-bottom:8px">📝 待撰文（${pending.length}）</div>${pending.map(t=>_writerTaskCard(t)).join('')}`:''}
+    ${reviewing.length?`<div style="font-size:12px;font-weight:600;color:#5b21b6;margin:14px 0 8px">🔍 審核中（${reviewing.length}）</div>${reviewing.map(t=>_writerTaskCard(t)).join('')}`:''}
+    ${!tasks.length?`<div style="text-align:center;padding:40px;color:#8a8680">目前沒有進行中的任務</div>`:''}
+  `;
+}
+
+function _renderWriterTaskList(tasks){
+  const el=document.getElementById('writer-content');
+  if(!el) return;
+  const pending=tasks.filter(t=>t.status==='撰文中');
+  const reviewing=tasks.filter(t=>['文稿審核','切角審核','待派帳號商'].includes(t.status));
+  el.innerHTML=`
+    ${pending.length?`<div style="font-size:12px;font-weight:600;color:#92400E;margin-bottom:8px">📝 待撰文（${pending.length}）</div>${pending.map(t=>_writerTaskCard(t)).join('')}`:''}
+    ${reviewing.length?`<div style="font-size:12px;font-weight:600;color:#5b21b6;margin:14px 0 8px">🔍 審核中（${reviewing.length}）</div>${reviewing.map(t=>_writerTaskCard(t)).join('')}`:''}
+    ${!tasks.length?`<div style="text-align:center;padding:40px;color:#8a8680">此合約目前沒有進行中任務</div>`:''}
+  `;
+}
+
+function _writerTaskCard(t){
+  const isPending=t.status==='撰文中';
+  return `<div style="background:#fff;border:1px solid ${isPending?'#fcd34d':'#e8e6e1'};border-radius:12px;padding:16px;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#1a1917">${t.clientName}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">${t.month} · ${t.specType}</div>
+      </div>
+      <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${isPending?'#fef3c7':'#ede9fe'};color:${isPending?'#92400E':'#5b21b6'}">${t.status}</span>
+    </div>
+    ${t.platform?`<div style="font-size:12px;color:#4a4845;margin-bottom:6px">📍 ${t.platform}${t.actionType?' · '+t.actionType:''}${t.section?' · '+t.section:''}</div>`:''}
+    ${t.title?`<div style="font-size:13px;font-weight:500;margin-bottom:6px">${t.title}</div>`:''}
+    ${t.content?`<div style="font-size:12px;color:#4a4845;background:#f8f7f5;border-radius:6px;padding:8px;margin-bottom:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto">${t.content}</div>`:''}
+    ${t.driveLink?`<div style="margin-bottom:8px"><a href="${t.driveLink}" target="_blank" style="font-size:12px;color:#1B4FD8">📁 切角資料夾</a></div>`:''}
+    ${isPending?`<div style="margin-top:10px">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Google Doc 稿件連結 *</label>
+      <input id="draft-${t.id}" type="url" placeholder="https://docs.google.com/..." value="${t.draftLink||''}"
+        style="width:100%;padding:8px 10px;border:1px solid #d4d1cb;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px">
+      <button onclick="submitWriterDraft('${t.id}')"
+        style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;width:100%">
+        ✓ 稿件完成，送回審核
+      </button>
+    </div>`:`<div style="font-size:12px;color:#5b21b6;background:#ede9fe;border-radius:6px;padding:8px">
+        ${t.status} · 等待樂法處理
+        ${t.draftLink?`<br><a href="${t.draftLink}" target="_blank" style="color:#5b21b6">${t.draftLink.slice(0,50)}…</a>`:''}
+      </div>`}
+  </div>`;
+}
+
+// 已保留給原本的renderWriterTasks呼叫
+async function renderWriterTasks(){
+  await _writerLoadTasks();
+  _renderWriterDashboard();
+}
 
 async function submitWriterDraft(taskId){
-  const link = document.getElementById('draft-'+taskId)?.value.trim();
+  const link=document.getElementById('draft-'+taskId)?.value.trim();
   if(!link){ toast('請填寫 Google Doc 連結'); return; }
-  const btn = document.querySelector(`button[onclick="submitWriterDraft('${taskId}')"]`);
+  const btn=document.querySelector(`button[onclick="submitWriterDraft('${taskId}')"]`);
   if(btn){ btn.disabled=true; btn.textContent='送出中…'; }
   try {
-    await gasApi('submitWriterDraft', { id: taskId, email: _currentUser.email, draftLink: link });
+    if(window._testMode){
+      // 測試模式：直接更新本地 DB
+      const rec=(DB.omRecords||[]).find(r=>r.id===taskId);
+      if(rec){
+        rec.status='文稿審核';
+        rec.draftLink=link;
+        rec.draftSubmittedAt=new Date().toISOString();
+      }
+      // 加入通知到 DB.notifications
+      if(!DB.notifications) DB.notifications=[];
+      DB.notifications.push({
+        id:'WR_'+Date.now(),type:'draftSubmitted',
+        msg:`寫手送回稿件：${rec?.clientName||''} · ${rec?.specType||''} · ${rec?.month||''}`,
+        created:new Date().toISOString(),done:false,taskId
+      });
+    } else {
+      await gasApi('submitWriterDraft',{id:taskId,email:_currentUser.email,draftLink:link});
+    }
     toast('✓ 稿件已送出，等待樂法審核','success');
-    setTimeout(renderWriterTasks, 800);
+    // 重新載入並更新畫面
+    await _writerLoadTasks();
+    _writerCurrentPage==='dashboard'?_renderWriterDashboard():_renderWriterTaskList(_writerAllTasks);
+    _renderWriterNav();
   } catch(e){
     toast('送出失敗：'+e.message);
     if(btn){ btn.disabled=false; btn.textContent='✓ 稿件完成，送回審核'; }
@@ -1895,10 +2002,51 @@ async function renderVendorTasks(){
 // ══════════════════════════════════════════
 function showClientInterface(){
   const app = document.getElementById('client-app');
-  if(app) app.style.display = '';
+  if(app){ app.style.display = 'flex'; }
   const badge = document.getElementById('client-name-badge');
   if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
-  renderClientDashboard();
+  _renderClientNav();
+  _clientNavTo('dashboard');
+}
+
+function toggleClientSidebar(){
+  const nav = document.getElementById('client-sidebar');
+  if(!nav) return;
+  nav.style.width = nav.style.width === '0px' ? '200px' : '0px';
+}
+
+function _renderClientNav(){
+  const el = document.getElementById('client-nav-items');
+  if(!el) return;
+  const cl = _userProfile;
+  if(!cl) return;
+  const contracts = DB.contracts.filter(c=>c.clientId===cl.id&&c.status==='進行中');
+  const navItemStyle = (id) => {
+    const isActive = window._clientCurrentPage === id;
+    return `display:block;padding:9px 16px;font-size:13px;cursor:pointer;color:${isActive?'#fff':'rgba(255,255,255,.65)'};background:${isActive?'rgba(255,255,255,.12)':'transparent'};border-left:3px solid ${isActive?'#38bdf8':'transparent'};transition:.15s;text-decoration:none`;
+  };
+  el.innerHTML = `
+    <div style="padding:4px 16px 8px;font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.08em;font-weight:600;text-transform:uppercase">導覽</div>
+    <div onclick="_clientNavTo('dashboard')" style="${navItemStyle('dashboard')}">📊 儀錶板</div>
+    ${contracts.map(ct=>`<div onclick="_clientNavTo('contract_${ct.id}')" style="${navItemStyle('contract_'+ct.id)}">
+      <div style="font-size:12px;font-weight:600">${ct.contractNo||ct.name}</div>
+      <div style="font-size:10px;opacity:.6;margin-top:2px">${ct.name||''}</div>
+    </div>`).join('')}
+  `;
+}
+
+let _clientCurrentPage = 'dashboard';
+function _clientNavTo(page){
+  _clientCurrentPage = page;
+  _renderClientNav(); // 更新 active 狀態
+  const el = document.getElementById('client-content');
+  if(!el) return;
+  if(page === 'dashboard'){
+    renderClientDashboard();
+  } else if(page.startsWith('contract_')){
+    const contractId = page.replace('contract_','');
+    renderClientContractPage(contractId);
+  }
 }
 
 function renderClientDashboard(){
@@ -1909,11 +2057,13 @@ function renderClientDashboard(){
 
   const contracts = DB.contracts.filter(c=>c.clientId===cl.id&&c.status==='進行中');
   const ym = new Date().toISOString().slice(0,7);
+  const allOm = (DB.omRecords||[]).filter(r=>r.clientId===cl.id);
 
-  // SOP 通知：是否有規劃中的任務待確認
-  const pendingConfirm = (DB.omRecords||[]).filter(r=>
-    r.clientId===cl.id && r.clientConfirmStatus==='pending' && (r.month||'').slice(0,7)===ym
-  );
+  // 待確認切角（客戶全合約）
+  const pendingConfirm = allOm.filter(r=>r.clientConfirmStatus==='pending'&&(r.month||'').slice(0,7)===ym);
+  // 本月整體上刊
+  const thisMonthDone = allOm.filter(r=>(r.publishDate||r.date||'').slice(0,7)===ym&&['已上刊','觀察中','完成'].includes(r.status)).length;
+  const thisMonthTotal = allOm.filter(r=>(r.month||'').slice(0,7)===ym).length;
 
   el.innerHTML = `
     <div style="margin-bottom:20px">
@@ -1921,11 +2071,25 @@ function renderClientDashboard(){
       <div style="font-size:12px;color:#8a8680">客戶儀錶板 · ${ym}</div>
     </div>
 
+    <!-- 快速統計 -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#1B4FD8">${contracts.length}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">進行中合約</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#166534">${thisMonthDone}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">本月已上刊</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid ${pendingConfirm.length?'#fcd34d':'#e8e6e1'};text-align:center">
+        <div style="font-size:22px;font-weight:700;color:${pendingConfirm.length?'#92400E':'#1a1917'}">${pendingConfirm.length}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">待確認切角</div>
+      </div>
+    </div>
+
     ${pendingConfirm.length?`
     <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:16px;margin-bottom:16px">
-      <div style="font-size:14px;font-weight:700;color:#92400E;margin-bottom:12px">
-        📋 有 ${pendingConfirm.length} 篇貼文切角待確認
-      </div>
+      <div style="font-size:14px;font-weight:700;color:#92400E;margin-bottom:12px">📋 有 ${pendingConfirm.length} 篇切角待確認</div>
       ${pendingConfirm.map(r=>`
         <div style="border:1px solid ${r.clientConfirmStatus==='confirmed'?'#86efac':r.clientConfirmStatus==='rejected'?'#fca5a5':'#fcd34d'};border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff">
           <div style="display:flex;align-items:flex-start;gap:8px">
@@ -1934,10 +2098,8 @@ function renderClientDashboard(){
               <div style="font-size:11px;color:#4a4845;margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${r.content||r.title||'（尚無內容）'}</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-              <button onclick="_clientConfirmTask('${r.id}','confirmed')"
-                style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ 確認</button>
-              <button onclick="_clientConfirmTask('${r.id}','rejected')"
-                style="padding:6px 14px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✕ 退回</button>
+              <button onclick="_clientConfirmTask('${r.id}','confirmed')" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ 確認</button>
+              <button onclick="_clientConfirmTask('${r.id}','rejected')" style="padding:6px 14px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✕ 退回</button>
             </div>
           </div>
           <div id="client-note-wrap-${r.id}" style="display:${r.clientConfirmStatus==='rejected'?'block':'none'};margin-top:8px">
@@ -1948,12 +2110,17 @@ function renderClientDashboard(){
         </div>`).join('')}
     </div>`:''}
 
+    <!-- 合約摘要卡片 -->
     ${contracts.map(ct=>{
       const omRecs = (DB.omRecords||[]).filter(r=>r.contractId===ct.id&&(r.month||'').slice(0,7)===ym);
       const done   = omRecs.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
       const total  = omRecs.length;
       const pct    = total>0?Math.round(done/total*100):0;
-      return `<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #e8e6e1">
+      const start=ct.start?new Date(ct.start):null, end=ct.end?new Date(ct.end):null;
+      const now=new Date(), totalMs=start&&end?end-start:0;
+      const progress=totalMs>0?Math.min(1,(now-start)/totalMs):0;
+      return `<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #e8e6e1;cursor:pointer"
+        onclick="_clientNavTo('contract_${ct.id}')">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div>
             <div style="font-size:13px;font-weight:600">${ct.name}</div>
@@ -1961,21 +2128,10 @@ function renderClientDashboard(){
           </div>
           <span style="font-size:12px;background:#dcfce7;color:#166534;padding:3px 10px;border-radius:20px">${pct}% 完成</span>
         </div>
-        <div style="background:#f4f3f0;border-radius:6px;overflow:hidden;height:8px;margin-bottom:12px">
-          <div style="background:#16a34a;height:100%;width:${pct}%;transition:.3s"></div>
+        <div style="background:#f4f3f0;border-radius:6px;overflow:hidden;height:6px;margin-bottom:8px">
+          <div style="background:#1B4FD8;height:100%;width:${Math.round(progress*100)}%;transition:.3s"></div>
         </div>
-        ${total?`<div style="font-size:12px;color:#4a4845">${ym} 共 ${total} 篇 ／ 已上刊 ${done} 篇 ／ 進行中 ${total-done} 篇</div>`
-          :`<div style="font-size:12px;color:#8a8680">本月尚無執行記錄</div>`}
-        ${omRecs.filter(r=>['已上刊','觀察中'].includes(r.status)).length?`
-          <div style="margin-top:10px">
-            <div style="font-size:11px;font-weight:600;color:#8a8680;margin-bottom:6px">已上刊文章</div>
-            ${omRecs.filter(r=>['已上刊','觀察中'].includes(r.status)).map(r=>`
-              <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #f4f3f0">
-                <span style="font-size:10px;background:#dcfce7;color:#166534;padding:2px 6px;border-radius:10px">${r.specType}</span>
-                <span style="font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.title||r.platform||'—'}</span>
-                ${r.postLink?`<a href="${r.postLink}" target="_blank" style="font-size:11px;color:#1D4ED8">🔗</a>`:''}
-              </div>`).join('')}
-          </div>`:''}
+        <div style="font-size:11px;color:#8a8680">${(ct.start||'').slice(0,10)} → ${(ct.end||'').slice(0,10)} · 點擊查看詳情 →</div>
       </div>`;
     }).join('')}
 
@@ -1983,6 +2139,138 @@ function renderClientDashboard(){
     <div style="text-align:center;margin-top:16px;font-size:11px;color:#c0bdb7">
       ${window._testMode?'🧪 測試模式 · 資料來自本地DB':''}
     </div>`;
+}
+
+function renderClientContractPage(contractId){
+  const el = document.getElementById('client-content');
+  if(!el) return;
+  const cl = _userProfile;
+  const ct = DB.contracts.find(c=>c.id===contractId);
+  if(!ct){ el.innerHTML='<div style="padding:40px;text-align:center">找不到合約</div>'; return; }
+  const specs = DB.specItems.filter(s=>s.contractId===contractId);
+  const allOm = (DB.omRecords||[]).filter(r=>r.contractId===contractId);
+  const ym = new Date().toISOString().slice(0,7);
+  const now=new Date(), start=ct.start?new Date(ct.start):null, end=ct.end?new Date(ct.end):null;
+  const totalMs=start&&end?end-start:0;
+  const progress=totalMs>0?Math.min(1,(now-start)/totalMs):0;
+  const daysLeft=end?Math.max(0,Math.round((end-now)/86400000)):null;
+
+  // 規格執行統計
+  const specStats = specs.map(s=>{
+    const done=allOm.filter(r=>r.specId===s.id&&['已上刊','觀察中','完成'].includes(r.status)).length;
+    return {...s, done, pct:s.qty>0?done/s.qty:0};
+  });
+
+  // 本月上刊
+  const published=allOm.filter(r=>['已上刊','觀察中','完成'].includes(r.status));
+  const thisMonthPub=published.filter(r=>(r.publishDate||r.date||'').slice(0,7)===ym);
+  const months=[...new Set(published.map(r=>(r.publishDate||r.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+
+  // 待確認切角
+  const pendingConfirm=allOm.filter(r=>r.clientConfirmStatus==='pending');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button onclick="_clientNavTo('dashboard')" style="background:none;border:none;color:#8a8680;cursor:pointer;font-size:13px">← 返回</button>
+      <div>
+        <div style="font-size:18px;font-weight:700">${ct.name}</div>
+        <div style="font-size:11px;color:#8a8680;font-family:monospace">${ct.contractNo||''}</div>
+      </div>
+    </div>
+
+    <!-- 合約概覽 -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#1B4FD8">${Math.round(progress*100)}%</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">合約進度</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#166534">${thisMonthPub.length}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">本月已上刊</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${daysLeft!==null&&daysLeft<=30?'#92400E':'#1a1917'}">${daysLeft??'—'}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">剩餘天數</div>
+      </div>
+    </div>
+
+    <!-- 走期進度條 -->
+    <div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">合約走期</div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#4a4845;margin-bottom:6px">
+        <span>${(ct.start||'').slice(0,10)}</span><span>${(ct.end||'').slice(0,10)}</span>
+      </div>
+      <div style="background:#f4f3f0;border-radius:4px;overflow:hidden;height:8px">
+        <div style="background:#1B4FD8;height:100%;width:${Math.round(progress*100)}%;transition:.6s"></div>
+      </div>
+    </div>
+
+    <!-- 規格執行進度 -->
+    ${specStats.length?`<div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:12px">規格執行進度</div>
+      ${specStats.map(s=>`<div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:12px;font-weight:500">${s.name}</span>
+          <span style="font-size:12px;font-weight:600;color:${s.pct>=1?'#166534':'#4a4845'}">${s.done}/${s.qty||0}</span>
+        </div>
+        <div style="background:#f4f3f0;border-radius:4px;overflow:hidden;height:6px">
+          <div style="background:${s.pct>=1?'#16a34a':s.pct>=0.5?'#1B4FD8':'#d97706'};height:100%;width:${Math.round((s.pct||0)*100)}%;transition:.6s"></div>
+        </div>
+      </div>`).join('')}
+    </div>`:''}
+
+    <!-- 待確認切角 -->
+    ${pendingConfirm.length?`<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:10px">📋 ${pendingConfirm.length} 篇切角待確認</div>
+      ${pendingConfirm.map(r=>`<div style="border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:500">${r.specType} ／ ${r.platform||'—'}</div>
+            <div style="font-size:11px;color:#4a4845;margin-top:4px;white-space:pre-wrap">${(r.content||r.title||'').slice(0,120)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+            <button onclick="_clientConfirmTask('${r.id}','confirmed')" style="padding:5px 12px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">✓ OK</button>
+            <button onclick="_clientConfirmTask('${r.id}','rejected')" style="padding:5px 12px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">✕ 退回</button>
+          </div>
+        </div>
+        <div id="client-note-wrap-${r.id}" style="display:none;margin-top:8px">
+          <input id="client-note-${r.id}" placeholder="退回原因…" value="${r.clientNote||''}"
+            style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px"
+            onblur="_clientSaveNote('${r.id}',this.value)">
+        </div>
+      </div>`).join('')}
+    </div>`:''}
+
+    <!-- 已上刊記錄 -->
+    ${published.length?`<div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1">
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px">已執行記錄（共 ${published.length} 篇）</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button onclick="_filterClientRecords('',this)" style="padding:3px 10px;border-radius:20px;border:1px solid #1a1917;background:#1a1917;color:#fff;font-size:11px;cursor:pointer">全部</button>
+        ${months.map(m=>`<button onclick="_filterClientRecords('${m}',this)" style="padding:3px 10px;border-radius:20px;border:1px solid #d4d1cb;background:#fff;color:#4a4845;font-size:11px;cursor:pointer">${m}</button>`).join('')}
+      </div>
+      <div id="client-records-list">
+        ${published.map(r=>`<div class="client-rec" data-month="${(r.publishDate||r.date||'').slice(0,7)}" style="padding:8px 0;border-bottom:1px solid #f0efe9;display:flex;gap:8px;align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+              <span style="background:#EEF2FF;color:#1B4FD8;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:500">${r.specType||'—'}</span>
+              <span style="font-size:10px;color:#8a8680">${r.platform||''} ${r.section?'· '+r.section:''}</span>
+              ${r.publishDate||r.date?`<span style="font-size:10px;color:#8a8680;margin-left:auto">${(r.publishDate||r.date||'').slice(0,10)}</span>`:''}
+            </div>
+            ${r.title?`<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.title}</div>`:''}
+          </div>
+          ${r.postLink?`<a href="${r.postLink}" target="_blank" style="flex-shrink:0;background:#EEF2FF;color:#1B4FD8;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none">查看 →</a>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`:''}
+  `;
+}
+
+function _filterClientRecords(month, btn){
+  document.querySelectorAll('.client-records-filter-btn').forEach(b=>{b.style.background='#fff';b.style.color='#4a4845';b.style.borderColor='#d4d1cb';});
+  if(btn){btn.style.background='#1a1917';btn.style.color='#fff';btn.style.borderColor='#1a1917';}
+  document.querySelectorAll('.client-rec').forEach(r=>{
+    r.style.display=(!month||r.dataset.month===month)?'':'none';
+  });
 }
 
 function _clientConfirmTask(taskId, status){
@@ -2022,7 +2310,18 @@ async function submitVendorPost(taskId){
   try {
     await gasApi('submitVendorPostByEmail', data);
     toast('✓ 已成功回報！','success');
-    setTimeout(renderVendorTasks, 800);
+    // 測試模式：gasApi 已更新本地 DB，重渲帳號商頁和 SOP 頁
+    setTimeout(async ()=>{
+      await renderVendorTasks();
+      // 若 SOP 頁面正在顯示，同步刷新
+      const sopEl = document.getElementById('page-sop-om');
+      if(sopEl && sopEl.classList.contains('active')){
+        const cId = document.getElementById('sop-client')?.value?.split('::')?.[0];
+        const ctId = document.getElementById('sop-client')?.value?.split('::')?.[1];
+        const ym   = document.getElementById('sop-ym')?.value;
+        if(cId && ctId && ym) renderSopFlow(cId,ctId,ym);
+      }
+    }, 400);
   } catch(e){
     toast('送出失敗：'+e.message);
     if(btn){ btn.disabled=false; btn.textContent='✓ 已上刊，回報樂法'; }
@@ -2032,6 +2331,22 @@ async function gasApi(action, body={}){
   // 測試模式：攔截所有寫入，只放行 getAll
   if(window._testMode && action !== 'getAll'){
     console.log(`%c[🧪 TEST] 攔截 GAS: ${action}`, 'color:#7c3aed;font-weight:bold', body);
+    // 帳號商送稿：本地更新狀態
+    if(action === 'submitVendorPostByEmail' || action === 'submitVendorResult'){
+      const rec = (DB.omRecords||[]).find(r=>r.id===body.id);
+      if(rec){
+        rec.status = '待確認';
+        rec.postLink = body.postLink||'';
+        rec.account  = body.account||'';
+        rec.publishDate = body.publishDate||new Date().toISOString().slice(0,10);
+        if(!DB.notifications) DB.notifications=[];
+        DB.notifications.push({
+          id:'VA_'+Date.now(), type:'vendorReported', taskId:body.id,
+          msg:`帳號商回報上刊：${rec.clientName||''} · ${rec.taskName||rec.specType||''} · ${rec.month||''}`,
+          created:new Date().toISOString(), done:false
+        });
+      }
+    }
     return { ok: true, id: 'TEST_' + Date.now().toString(36) };
   }
   const res = await fetch(GAS_URL + '?action=' + action, {
@@ -2223,6 +2538,15 @@ window.loadAllData = async function(){
       D.holidays       = data.holidays       || data.hr_holidays       || [];
       if(typeof _currentUser !== 'undefined' && _currentUser) {
         myMember = D.members.find(m => m.email === _currentUser.email) || null;
+        // 補上 taskName（若 GAS 回傳的記錄沒有此欄位）
+        const specCount = {};
+        (DB.omRecords||[]).forEach(r=>{
+          if(!r.taskName){
+            const k = (r.contractId||'') + '_' + (r.specType||'');
+            specCount[k] = (specCount[k]||0) + 1;
+            r.taskName = (r.specType||'任務') + '#' + specCount[k];
+          }
+        });
         if(typeof hrApplyPermissions === 'function') hrApplyPermissions();
         if(typeof hrStartClock === 'function') hrStartClock();
       }
@@ -2411,12 +2735,14 @@ function disableTestMode(){
 
 // ── 角色切換：套用介面 ──
 function _applyRoleInterface(role){
-  // 隱藏所有外部介面
+  // 先全部隱藏
   const wi = document.getElementById('writer-app');
   const vi = document.getElementById('vendor-app');
+  const ci = document.getElementById('client-app');
   const app = document.getElementById('app');
   if(wi) wi.style.display = 'none';
   if(vi) vi.style.display = 'none';
+  if(ci) ci.style.display = 'none';
   if(app) app.style.display = 'none';
 
   if(role === 'writer'){
@@ -2426,15 +2752,17 @@ function _applyRoleInterface(role){
   } else if(role === 'client'){
     showClientInterface();
   } else {
-    // staff
+    // staff — 顯示主 CRM
     if(app) app.style.display = '';
-    // 更新 sidebar 顯示
+    // 更新 sidebar 使用者資訊
     const uname = document.getElementById('sidebar-uname');
     const urole = document.getElementById('sidebar-urole');
     const avatar = document.getElementById('sidebar-avatar');
     if(uname) uname.textContent = _currentUser?.name || '測試用戶';
     if(urole) urole.textContent = `${_currentUser?.name||''}（測試）`;
     if(avatar){ avatar.textContent = (_currentUser?.name||'T').charAt(0); avatar.style.backgroundImage = ''; }
+    // 套用 sidebar 權限管制
+    _applySidebarPermissions();
     // 重新渲染首頁
     if(typeof renderHome === 'function') renderHome();
     navTo('home');
@@ -2588,7 +2916,7 @@ function switchTestRole(roleConfig){
   const { role, name, email, hrRole, flId, vcId, color } = roleConfig;
 
   // 更新 _currentUser
-  _currentUser = { email, name };
+  _currentUser = { email, name, hrRole };
   _userRole = role;
 
   if(role === 'staff'){
@@ -2736,13 +3064,37 @@ const DB = {
   ],
   permissions:{
     roles:{
-      admin:{label:'管理者',perms:{all:true}},
-      ops:{label:'營運',perms:{dashboard:true,summary:true,receivable:true,viewCost:true}},
-      sales:{label:'業務',perms:{clients:true,performance:true,'biz-schedule':true}},
-      plan:{label:'企劃',perms:{projects:true,specs:true,'vendor-exec':true,'plan-schedule':true}},
+      admin:   {label:'管理者', perms:{all:true}},
+      owner:   {label:'老闆',   perms:{all:true}},
+      manager: {label:'主管',   perms:{
+        dashboard:true, summary:true, receivable:true, viewCost:true,
+        clients:true, performance:true, 'biz-schedule':true,
+        projects:true, specs:true, 'vendor-exec':true, 'plan-schedule':true, 'sop-om':true,
+        hr:true, 'monthly-checkup':true, settings:true, accounts:true
+      }},
+      employee:{label:'企劃員工',perms:{
+        dashboard:true,
+        clients:true, performance:true, 'biz-schedule':true,
+        projects:true, specs:true, 'vendor-exec':true, 'plan-schedule':true, 'sop-om':true,
+      }},
+      ops:  {label:'營運', perms:{dashboard:true,summary:true,receivable:true,viewCost:true}},
+      sales:{label:'業務', perms:{clients:true,performance:true,'biz-schedule':true}},
+      plan: {label:'企劃', perms:{projects:true,specs:true,'vendor-exec':true,'plan-schedule':true,'sop-om':true}},
     }
   }
 };
+
+// 靜態測試資料補 taskName
+(()=>{
+  const specCount = {};
+  (DB.omRecords||[]).forEach(r=>{
+    if(!r.taskName){
+      const k = (r.contractId||'') + '_' + (r.specType||'');
+      specCount[k] = (specCount[k]||0) + 1;
+      r.taskName = (r.specType||'任務') + '#' + specCount[k];
+    }
+  });
+})();
 
 // ═══ HELPERS ═══
 const fmt=(n)=>n?'$'+Number(n).toLocaleString():'$0';
@@ -2812,6 +3164,112 @@ function contractInYM(ct, y, m){
   const filterStart = ym + '-01';
   const filterEnd = ym + '-31';
   return (!e || e >= filterStart) && (!s || s <= filterEnd);
+}
+
+// ══════════════════════════════════════════
+//  Sidebar 權限管制 & 通知輔助
+// ══════════════════════════════════════════
+
+// 頁面 ID → sidebar nav item ID 對照
+const PAGE_NAV_MAP = {
+  'home':              'nav-home',
+  'clients':           'nav-clients',
+  'performance':       'nav-performance',
+  'biz-schedule':      'nav-biz-schedule',
+  'exec-om':           'nav-exec-om',
+  'exec-social':       'nav-exec-social',
+  'exec-ad':           'nav-exec-ad',
+  'vendor-exec':       'nav-vendor-exec',
+  'projects':          'nav-projects',
+  'sop-om':            'nav-sop-om',
+  'specs':             'nav-specs',
+  'freelancer-stats':  'nav-freelancer-stats',
+  'plan-schedule':     'nav-plan-schedule',
+  'summary':           'nav-summary',
+  'receivable':        'nav-receivable',
+  'receivable-overview':'nav-receivable-overview',
+  'monthly-checkup':   'nav-monthly-checkup',
+  'fb-tax':            'nav-fb-tax',
+  'clock':             'nav-clock',
+  'hr':                'nav-hr',
+  'logs':              'nav-logs',
+  'settings-catalog':  'nav-settings-catalog',
+  'settings-freelancer':'nav-settings-freelancer',
+  'settings-vendor':   'nav-settings-vendor',
+  'settings-theme':    'nav-settings-theme',
+  'settings-permissions':'nav-settings-permissions',
+};
+
+// 每個 nav ID 對應的所需權限（undefined = 全員可見）
+const NAV_PERM_MAP = {
+  // 財務群組（需權限）
+  'nav-summary':              'summary',
+  'nav-receivable':           'receivable',
+  'nav-receivable-overview':  'receivable',
+  'nav-monthly-checkup':      'receivable',
+  'nav-fb-tax':               'receivable',
+  // HR 群組（需權限）
+  'nav-hr':                   'hr',
+  'nav-clock':                'hr',
+  'nav-logs':                 'hr',
+  // 設定群組（需權限）
+  'nav-settings-catalog':     'settings',
+  'nav-settings-freelancer':  'settings',
+  'nav-settings-vendor':      'settings',
+  'nav-settings-theme':       'settings',
+  'nav-settings-permissions': 'settings',
+  // 管理群組（部分需權限）
+  'nav-projects':             'projects',
+  'nav-plan-schedule':        'plan-schedule',
+  'nav-specs':                'specs',
+  'nav-freelancer-stats':     'specs',
+  'nav-vendor-exec':          'vendor-exec',
+  'nav-sop-om':               'sop-om',
+};
+
+function _getCurrentRole(){
+  if(typeof myMember !== 'undefined' && myMember) return myMember.role;
+  return _currentUser?.hrRole || 'employee';
+}
+
+function _hasPermission(permId){
+  const role = _getCurrentRole();
+  if(role === 'owner') return true;                    // 管理者全開
+  const rolePerms = DB.permissions?.roles?.[role]?.perms || {};
+  if(rolePerms.all) return true;
+  return !!rolePerms[permId];
+}
+
+function _applySidebarPermissions(){
+  // 依權限顯示/隱藏各 nav item
+  Object.entries(NAV_PERM_MAP).forEach(([navId, permId]) => {
+    const el = document.getElementById(navId);
+    if(!el) return;
+    const visible = _hasPermission(permId);
+    el.style.display = visible ? '' : 'none';
+  });
+  // 若整個群組的子項都隱藏，也隱藏群組 header
+  ['biz','ops','mgmt','fin','hr','settings'].forEach(grp => {
+    const sub = document.getElementById('nav-sub-'+grp);
+    if(!sub) return;
+    const visible = [...sub.querySelectorAll('.nav-sub-item')].some(el => el.style.display !== 'none');
+    const header = document.getElementById('nav-group-'+grp);
+    if(header) header.style.display = visible ? '' : 'none';
+    if(sub) sub.style.display = visible ? '' : 'none';
+  });
+}
+
+function _clearAllNotices(){
+  if(!DB.notifications) return;
+  DB.notifications.forEach(n => n.done = true);
+  renderHome();
+}
+
+function _dismissNotice(id){
+  if(!DB.notifications) return;
+  const n = DB.notifications.find(n => n.id === id);
+  if(n) n.done = true;
+  renderHome();
 }
 
 // ═══ NAVIGATION ═══
@@ -2964,6 +3422,10 @@ function renderHome(){
   const el=document.getElementById('home-content');
   const d=new Date();
   document.getElementById('today-date').textContent=d.toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  // 依角色顯示對應的儀錶板通知區
+  const hrRole = (typeof myMember !== 'undefined' && myMember) ? myMember.role : (_currentUser?.hrRole || 'employee');
+  const isOwner   = hrRole==='owner';
+  const isManager = hrRole==='manager';
 
   const totalContract=DB.contracts.reduce((a,c)=>a+c.total,0);
   const totalReceived=DB.receivables.reduce((a,r)=>a+r.payments.filter(p=>p.status==='已入款').reduce((b,p)=>b+p.amount,0),0);
@@ -3148,6 +3610,47 @@ function renderHome(){
 
     ${noticeHtml}
 
+    ${(()=>{
+      // ── 角色專屬通知區 ──
+      const hrRole2=(typeof myMember!=='undefined'&&myMember)?myMember.role:(_currentUser?.hrRole||'employee');
+      let roleHtml='';
+      // 企劃/staff：我的待辦、我有參與的合約
+      if(hrRole2==='employee'||hrRole2==='staff'){
+        const myName=_currentUser?.name||'';
+        const myContracts=DB.contracts.filter(c=>c.status==='進行中'&&(DB.specItems||[]).some(s=>s.contractId===c.id&&(s.owner===myName||s.assignee===myName)));
+        const draftWaiting=(DB.omRecords||[]).filter(r=>r.status==='文稿審核');
+        if(draftWaiting.length||myContracts.length){
+          roleHtml+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">🧑‍💻 我的待辦</div>
+            ${draftWaiting.length?`<div style="padding:8px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;margin-bottom:8px;font-size:13px;cursor:pointer" onclick="navTo('sop-om')">
+              ✍️ 有 <strong>${draftWaiting.length}</strong> 份稿件待審核
+            </div>`:''}
+            ${(DB.notifications||[]).filter(n=>!n.done&&n.type==='draftSubmitted').map(n=>`
+              <div style="padding:8px 12px;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;margin-bottom:6px;font-size:12px;cursor:pointer" onclick="navTo('sop-om')">
+                📄 ${n.msg}
+              </div>`).join('')}
+          </div>`;
+        }
+      }
+      // 主管：組員通知（唯讀）
+      if(hrRole2==='manager'||hrRole2==='owner'){
+        const draftNotices=(DB.notifications||[]).filter(n=>!n.done&&(n.type==='draftSubmitted'||n.type==='writersWorking'||n.type==='sopPendingClient'||n.type==='vendorReported'));
+        if(draftNotices.length){
+          roleHtml+=`<div style="background:var(--surface);border:1px solid #c4b5fd;border-radius:var(--r2);padding:14px 18px;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;color:#5b21b6;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">
+              👔 組員動態 ${hrRole2==='owner'?'（全公司）':''}
+              ${hrRole2==='owner'?`<span style="float:right;font-weight:400;font-size:10px;cursor:pointer" onclick="_clearAllNotices()">全部標記已讀</span>`:'（唯讀）'}
+            </div>
+            ${draftNotices.slice(0,8).map(n=>`<div style="padding:7px 12px;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;margin-bottom:6px;font-size:12px;display:flex;align-items:center;gap:8px">
+              <span style="flex:1">${n.type==='draftSubmitted'?'📄':n.type==='sopPendingClient'?'📋':n.type==='vendorReported'?'📣':'✍️'} ${n.msg}</span>
+              ${hrRole2==='owner'?`<button onclick="_dismissNotice('${n.id}')" style="background:none;border:none;color:#8a8680;cursor:pointer;font-size:11px">✕</button>`:''}
+            </div>`).join('')}
+          </div>`;
+        }
+      }
+      return roleHtml;
+    })()}
+
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px">
       <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">本月執行摘要 · ${thisMonth}</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" class="home-exec-grid">
@@ -3183,6 +3686,45 @@ function renderHome(){
         </div>`;
       }).join('')}
     </div>
+
+    ${(()=>{
+      // ── 進行中合約方框（依角色顯示）──
+      const hrRole3=(typeof myMember!=='undefined'&&myMember)?myMember.role:(_currentUser?.hrRole||'employee');
+      const activeContracts = DB.contracts.filter(c=>c.status==='進行中');
+      if(!activeContracts.length) return '';
+      // owner/manager 全看，employee 看有口碑記錄的
+      const visibleContracts = (hrRole3==='owner'||hrRole3==='manager') ? activeContracts :
+        activeContracts.filter(ct=>(DB.omRecords||[]).some(r=>r.contractId===ct.id));
+      if(!visibleContracts.length) return '';
+      return `<div style="margin-top:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">進行中合約</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+          ${visibleContracts.map(ct=>{
+            const cl=DB.clients.find(c=>c.id===ct.clientId)||{};
+            const omRecs=(DB.omRecords||[]).filter(r=>r.contractId===ct.id);
+            const thisMonthOm=omRecs.filter(r=>(r.month||'').slice(0,7)===thisMonth);
+            const done=thisMonthOm.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
+            const total=thisMonthOm.length;
+            const pct=total>0?Math.round(done/total*100):0;
+            const draftWaiting=thisMonthOm.filter(r=>r.status==='文稿審核').length;
+            const pendingVendor=thisMonthOm.filter(r=>r.status==='待確認').length;
+            return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:12px 14px;cursor:pointer" onclick="navTo('sop-om')">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+                <div>
+                  <div style="font-size:13px;font-weight:600">${cl.name||'—'}</div>
+                  <div style="font-size:10px;color:var(--text3);font-family:monospace">${ct.contractNo||''}</div>
+                </div>
+                <span style="font-size:11px;background:${pct>=100?'#dcfce7':pct>=50?'#eff6ff':'#fef3c7'};color:${pct>=100?'#166534':pct>=50?'#1B4FD8':'#92400E'};padding:2px 8px;border-radius:20px">${pct}%</span>
+              </div>
+              <div style="background:var(--border);border-radius:3px;overflow:hidden;height:4px;margin-bottom:8px">
+                <div style="background:${pct>=100?'#16a34a':pct>=50?'#1B4FD8':'#d97706'};height:100%;width:${pct}%;transition:.4s"></div>
+              </div>
+              <div style="font-size:11px;color:var(--text3)">${thisMonth} · ${done}/${total} 篇${draftWaiting?` · <span style="color:#5b21b6">${draftWaiting} 待審稿</span>`:''}${pendingVendor?` · <span style="color:#92400E">${pendingVendor} 待確認</span>`:''}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    })()}
   `;
 }
 
@@ -5651,7 +6193,25 @@ function omAdvanceStatus(id, nextStatus){
   const r=DB.omRecords.find(x=>x.id===id);if(!r)return;
   r.status=nextStatus;
   syncToGAS('omRecords',r).catch(e=>console.error(e));
-  renderOmPage();
+  // 加入通知（企劃儀錶板用）
+  if(nextStatus==='文稿審核'){
+    if(!DB.notifications) DB.notifications=[];
+    DB.notifications.push({
+      id:'OMA_'+Date.now(), type:'draftSubmitted', taskId:id,
+      msg:`稿件進入文稿審核：${r.clientName||''} · ${r.taskName||r.specType||''} · ${r.month||''}`,
+      created:new Date().toISOString(), done:false
+    });
+  }
+  // 若 SOP 頁面正在顯示，同步刷新
+  const sopEl = document.getElementById('page-sop-om');
+  if(sopEl && sopEl.classList.contains('active')){
+    const cId = document.getElementById('sop-client')?.value?.split('::')?.[0];
+    const ctId = document.getElementById('sop-client')?.value?.split('::')?.[1];
+    const ym   = document.getElementById('sop-ym')?.value;
+    if(cId && ctId && ym) setTimeout(()=>renderSopFlow(cId,ctId,ym),150);
+  } else {
+    if(typeof renderOmPage==='function') renderOmPage();
+  }
   toast(`→ ${nextStatus}`,'success');
 }
 
@@ -5668,8 +6228,26 @@ async function confirmOmTask(id){
     const res=await gasApi('confirmTask',{id,confirmedBy:_currentUser?.email||''});
     if(res.ok){
       const r=DB.omRecords.find(x=>x.id===id);
-      if(r){ r.status='已上刊'; r.confirmedAt=new Date().toISOString(); }
-      renderOmPage();toast('已確認上刊','success');
+      if(r){
+        r.status='已上刊'; r.confirmedAt=new Date().toISOString();
+        // 加確認通知
+        if(!DB.notifications) DB.notifications=[];
+        DB.notifications.push({
+          id:'CONF_'+Date.now(), type:'confirmed', taskId:id,
+          msg:`已確認上刊：${r.clientName||''} · ${r.taskName||r.specType||''} · ${r.platform||''}`,
+          created:new Date().toISOString(), done:false
+        });
+      }
+      renderOmPage();
+      // 同步刷新 SOP 頁（若正在顯示）
+      const sopEl=document.getElementById('page-sop-om');
+      if(sopEl&&sopEl.classList.contains('active')){
+        const cId=document.getElementById('sop-client')?.value?.split('::')?.[0];
+        const ctId=document.getElementById('sop-client')?.value?.split('::')?.[1];
+        const ym=document.getElementById('sop-ym')?.value;
+        if(cId&&ctId&&ym) setTimeout(()=>renderSopFlow(cId,ctId,ym),150);
+      }
+      toast('已確認上刊','success');
     } else { toast('確認失敗：'+(res.error||''), 'error'); }
   } catch(e){ toast('網路錯誤','error'); }
 }
@@ -7229,10 +7807,16 @@ function renderSopFlow(clientId, contractId, ym){
             ${cs==='rejected'?`<div style="margin-top:8px"><input id="client-note-${r.id}" value="${r.clientNote||''}" placeholder="填寫退回原因或修改建議…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px" onblur="_sopSaveClientNote('${r.id}',this.value)"></div>`:''}
           </div>`;
         }).join('')}
-        ${thisMonthOm.length&&thisMonthOm.every(r=>r.clientConfirmStatus==='confirmed'||r.clientConfirmStatus==='rejected')?`
-          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="_sopStep2Complete('${clientId}','${ym}')">
-            ✓ 全部確認完成，進行下一步
-          </button>`:''}`;
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          ${thisMonthOm.length&&thisMonthOm.every(r=>r.clientConfirmStatus==='confirmed'||r.clientConfirmStatus==='rejected')?`
+            <button class="btn btn-primary" style="flex:1" onclick="_sopStep2Complete('${clientId}','${ym}')">
+              ✓ 全部確認完成，進行步驟3
+            </button>`:''}
+          ${confirmed.length>0&&thisMonthOm.some(r=>r.clientConfirmStatus==='pending')?`
+            <button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep2PartialContinue('${clientId}','${ym}')">
+              ⚡ 已確認部分（${confirmed.length}/${thisMonthOm.length}），先進行步驟3
+            </button>`:''}
+        </div>`;
     }
   }
 
@@ -7244,31 +7828,53 @@ function renderSopFlow(clientId, contractId, ym){
   if(writerDone) swStatus = 'done';
   else if(writerActive) swStatus = 'active';
   if(writerActive || writerDone){
-    const needWriter = thisMonthOm.filter(r=>!r.writerId&&['待規劃','切角確認','待派寫手'].includes(r.status));
+    const needWriter = thisMonthOm.filter(r=>!r.writerId&&(r.clientConfirmStatus==='confirmed'||!r.clientConfirmStatus)&&['待規劃','切角確認','待派寫手'].includes(r.status));
     const hasWriter  = thisMonthOm.filter(r=>r.writerId);
     const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+    const ct3 = DB.contracts.find(c=>c.id===contractId)||{};
+    const cutDocLink3 = ct3.driveLink||'';
+    // 依規格分組任務，用於批次指派
+    const specGroups3 = {};
+    needWriter.forEach(r=>{ const k=r.specType||'其他'; if(!specGroups3[k]) specGroups3[k]=[]; specGroups3[k].push(r); });
     swContent = `
-      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">為每筆任務指派寫手，指派後狀態推進至「撰文中」。</div>
-      ${needWriter.map(r=>`
-        <div style="border:1px solid #c4b5fd;border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:#f5f3ff">
-          <div style="font-size:12px;font-weight:500;margin-bottom:8px">${r.specType} ／ ${r.platform||'—'} ${r.section?'· '+r.section:''}</div>
-          <div style="display:flex;gap:8px">
-            <select id="sw-writer-${r.id}" class="form-input"style="flex:1;font-size:12px">
-              <option value="">— 選擇寫手 —</option>${writerOpts}
-            </select>
-            <input id="sw-fee-${r.id}" type="number" placeholder="稿費" style="width:80px;padding:7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px">
-            <button class="btn btn-sm btn-primary" onclick="_sopAssignWriter('${r.id}')">指派</button>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">為每筆任務指派寫手，指派後狀態推進至「撰文中」。可同規格批次指派。</div>
+      ${cutDocLink3?`<div style="margin-bottom:10px"><a href="${cutDocLink3}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 14px;text-decoration:none;font-weight:500">📄 開啟切角 DOC 資料夾</a></div>`:''}
+      ${Object.entries(specGroups3).map(([specType,tasks])=>`
+        <div style="border:1px solid #c4b5fd;border-radius:var(--r);padding:12px;margin-bottom:10px;background:#f5f3ff">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <div style="font-size:13px;font-weight:600;color:#5b21b6">${specType} <span style="font-size:11px;font-weight:400;color:var(--text3)">(${tasks.length} 筆)</span></div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <select id="sw-batch-writer-${specType.replace(/\s/g,'_')}" class="form-input" style="font-size:12px;width:auto">
+                <option value="">— 批次選寫手 —</option>${writerOpts}
+              </select>
+              <input id="sw-batch-platform-${specType.replace(/\s/g,'_')}" placeholder="論壇平台" class="form-input" style="font-size:11px;padding:4px;width:90px">
+              <input id="sw-batch-section-${specType.replace(/\s/g,'_')}" placeholder="版塊" class="form-input" style="font-size:11px;padding:4px;width:70px">
+              <button class="btn btn-sm btn-primary" onclick="_sopBatchAssignWriter('${specType}','${clientId}','${ym}')">批次指派</button>
+            </div>
           </div>
+          ${tasks.map(r=>`
+            <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #e0d9f9;border-radius:6px;margin-bottom:6px;flex-wrap:wrap">
+              <span style="font-size:12px;font-weight:500;min-width:100px">${r.taskName||r.specType}</span>
+              <span style="font-size:11px;color:var(--text3)">${r.platform?'📍'+r.platform:''} ${r.section?'· '+r.section:''}</span>
+              <select id="sw-writer-${r.id}" class="form-input" style="flex:1;min-width:100px;font-size:12px">
+                <option value="">— 寫手 —</option>${writerOpts}
+              </select>
+              <input id="sw-platform-${r.id}" value="${r.platform||''}" placeholder="平台" class="form-input" style="font-size:11px;padding:4px;width:80px">
+              <input id="sw-section-${r.id}" value="${r.section||''}" placeholder="版塊" class="form-input" style="font-size:11px;padding:4px;width:60px">
+              <input id="sw-note-${r.id}" value="${r.note||''}" placeholder="備註" class="form-input" style="font-size:11px;padding:4px;width:80px">
+              <button class="btn btn-xs btn-primary" onclick="_sopAssignWriter('${r.id}')">指派</button>
+            </div>`).join('')}
         </div>`).join('')}
       ${hasWriter.map(r=>{
         const fl = DB.freelancers.find(f=>f.id===r.writerId);
-        return `<div style="border:1px solid #bbf7d0;border-radius:var(--r);padding:8px 12px;margin-bottom:8px;background:#f0fdf4;display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;flex:1">${r.specType} ／ ${r.platform||'—'}</span>
-          <span class="tag tag-green"style="font-size:10px">✓ ${fl?.name||r.writerName}</span>
-          <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}"style="font-size:10px">${r.status}</span>
+        return `<div style="border:1px solid #bbf7d0;border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:#f0fdf4;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:500;flex:1">${r.taskName||r.specType}</span>
+          <span style="font-size:11px;color:#4a4845">${r.platform||''} ${r.section?'· '+r.section:''}</span>
+          <span class="tag tag-green" style="font-size:10px">✓ ${fl?.name||r.writerName}</span>
+          <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:10px">${r.status}</span>
         </div>`;
       }).join('')}
-      ${!needWriter.length&&hasWriter.length?`<button class="btn btn-primary"style="width:100%;margin-top:4px" onclick="_sopStepNext('${clientId}','${ym}')">✓ 全部指派完成，進行下一步</button>`:''}`;
+      ${!needWriter.length&&hasWriter.length?`<button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="_sopStepNext('${clientId}','${ym}')">✓ 全部指派完成，進行下一步</button>`:''}`;
   }
 
   // ── 文稿審核步驟（A線步4，B線步3）──
@@ -7283,10 +7889,11 @@ function renderSopFlow(clientId, contractId, ym){
       <div style="font-size:12px;color:var(--text2);margin-bottom:12px">確認寫手回傳的稿件，可送客戶審核或直接通過。</div>
       ${reviewing.map(r=>`
         <div style="border:1px solid #93c5fd;border-radius:var(--r);padding:10px 12px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}"style="font-size:10px">${r.status}</span>
-            <span style="font-size:12px;flex:1">${r.writerName||'—'} ／ ${r.specType}</span>
-            ${r.draftLink?`<a href="${r.draftLink}"target="_blank"class="btn btn-xs">📄 稿件</a>`:''}
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+            <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:10px">${r.status}</span>
+            <span style="font-size:12px;font-weight:600;flex:1">${r.taskName||r.specType}</span>
+            <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}${r.platform?' · '+r.platform:''}${r.section?' · '+r.section:''}</span>
+            ${r.draftLink?`<a href="${r.draftLink}" target="_blank" class="btn btn-xs">📄 稿件</a>`:''}
           </div>
           ${r.status==='文稿審核'?`<div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm" onclick="omAdvanceStatus('${r.id}','切角審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}'),200)">→ 送客戶審核</button>
@@ -7297,8 +7904,9 @@ function renderSopFlow(clientId, contractId, ym){
         </div>`).join('')}
       ${reviewed.map(r=>`
         <div style="border:1px solid #bbf7d0;border-radius:var(--r);padding:8px 12px;margin-bottom:8px;background:#f0fdf4;display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;flex:1">${r.writerName||'—'} ／ ${r.specType}</span>
-          <span class="tag tag-green"style="font-size:10px">✓ 文稿通過</span>
+          <span style="font-size:12px;font-weight:500;flex:1">${r.taskName||r.specType}</span>
+          <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}</span>
+          <span class="tag tag-green" style="font-size:10px">✓ 文稿通過</span>
         </div>`).join('')}
       ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary"style="width:100%;margin-top:4px" onclick="_sopStepNext('${clientId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}`;
   }
@@ -7312,25 +7920,39 @@ function renderSopFlow(clientId, contractId, ym){
     const needVendor = thisMonthOm.filter(r=>r.status==='待派帳號商');
     const hasVendor  = thisMonthOm.filter(r=>['待上刊','待確認','已上刊','觀察中','完成'].includes(r.status));
     const vendorOpts = (DB.vendorCompanies||[]).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+    // 依規格分組批次指派
+    const specGroupsV = {};
+    needVendor.forEach(r=>{ const k=r.specType||'其他'; if(!specGroupsV[k]) specGroupsV[k]=[]; specGroupsV[k].push(r); });
     svContent = `
-      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">選擇帳號商後推進至「待上刊」，帳號商登入 CRM 即可看到任務。</div>
-      ${needVendor.map(r=>`
-        <div style="border:1px solid #fcd34d;border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:#fffbeb">
-          <div style="font-size:12px;font-weight:500;margin-bottom:8px">${r.specType} ／ 寫手：${r.writerName||'—'}</div>
-          <div style="display:flex;gap:8px">
-            <select id="sv-vendor-${r.id}" class="form-input"style="flex:1;font-size:12px">
-              <option value="">— 選擇帳號商 —</option>${vendorOpts}
-            </select>
-            <input id="sv-fee-${r.id}" type="number" placeholder="帳號費" style="width:80px;padding:7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px">
-            <button class="btn btn-sm btn-primary" onclick="_sopAssignVendor('${r.id}','${contractId}','${ym}')">指派</button>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">選擇帳號商後推進至「待上刊」，可同規格批次指派。</div>
+      ${Object.entries(specGroupsV).map(([specType,tasks])=>`
+        <div style="border:1px solid #fcd34d;border-radius:var(--r);padding:12px;margin-bottom:10px;background:#fffbeb">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <div style="font-size:13px;font-weight:600;color:#92400E">${specType} <span style="font-size:11px;font-weight:400;color:var(--text3)">(${tasks.length} 筆)</span></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="sv-batch-vendor-${specType.replace(/[^a-zA-Z0-9]/g,'_')}" class="form-input" style="font-size:12px;width:auto">
+                <option value="">— 批次選帳號商 —</option>${vendorOpts}
+              </select>
+              <button class="btn btn-sm btn-primary" onclick="_sopBatchAssignVendor('${specType}','${clientId}','${ym}','${contractId}')">批次指派</button>
+            </div>
           </div>
+          ${tasks.map(r=>`
+            <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #fef08a;border-radius:6px;margin-bottom:6px;flex-wrap:wrap">
+              <span style="font-size:12px;font-weight:500;min-width:100px">${r.taskName||r.specType}</span>
+              <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}</span>
+              <select id="sv-vendor-${r.id}" class="form-input" style="flex:1;min-width:100px;font-size:12px">
+                <option value="">— 帳號商 —</option>${vendorOpts}
+              </select>
+              <button class="btn btn-xs btn-primary" onclick="_sopAssignVendor('${r.id}','${contractId}','${ym}')">指派</button>
+            </div>`).join('')}
         </div>`).join('')}
       ${hasVendor.map(r=>{
         const vc = (DB.vendorCompanies||[]).find(v=>v.id===r.vendorId);
-        return `<div style="border:1px solid #bbf7d0;border-radius:var(--r);padding:8px 12px;margin-bottom:8px;background:#f0fdf4;display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;flex:1">${r.specType} ／ ${r.writerName||'—'}</span>
-          <span class="tag tag-green"style="font-size:10px">✓ ${vc?.name||r.vendorName}</span>
-          <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}"style="font-size:10px">${r.status}</span>
+        return `<div style="border:1px solid #bbf7d0;border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:#f0fdf4;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:500;flex:1">${r.taskName||r.specType}</span>
+          <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}</span>
+          <span class="tag tag-green" style="font-size:10px">✓ ${vc?.name||r.vendorName}</span>
+          <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:10px">${r.status}</span>
         </div>`;
       }).join('')}
       ${!needVendor.length?`<div style="font-size:12px;color:#16a34a;margin-top:4px">✓ 所有任務均已指派帳號商</div>`:''}`;
@@ -7379,161 +8001,6 @@ function renderSopFlow(clientId, contractId, ym){
 }
 
 // ── 專案規劃表渲染（A 線步驟1）──
-function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state){
-  const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
-  const platformOpts = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評','Instagram','媽咪拜'].map(p=>`<option>${p}</option>`).join('');
-  const typeOpts = ['短議題文','短圖文','長圖文','監控回文','綁定回文','即時回文'].map(t=>`<option>${t}</option>`).join('');
-
-  // 計算規格統計
-  const specStats = specs.map(s=>{
-    const done = thisMonthOm.filter(r=>r.specId===s.id&&['已上刊','觀察中','完成'].includes(r.status)).length;
-    return { ...s, done, remain: (s.qty||0)-done };
-  });
-
-  const rows = state.planItems.length ? state.planItems :
-    // 預填：依規格生成建議行數
-    specs.flatMap(s=>{
-      const monthQty = Math.ceil((s.qty||1)/6); // 假設6個月平均
-      return Array.from({length:monthQty},(_,i)=>({
-        id: 'pi_'+s.id+'_'+i, specId:s.id, specType:s.name,
-        date:'', platform:'', section:'', actionType:s.name.includes('回文')?'回文':'開文',
-        replyRatio:5, cutAngle:'', productLink:'', imgLink:'', note:''
-      }));
-    });
-  if(!state.planItems.length) state.planItems = rows;
-
-  return `
-    <div style="margin-bottom:12px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">依合約規格預填本月執行任務，企劃填寫切角方向後送交客戶確認。</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-        ${specStats.map(s=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px">
-          <span style="font-weight:600">${s.name}</span> 合約共 ${s.qty} 篇 ／ 已完成 ${s.done} ／ 剩餘 ${s.remain}
-        </div>`).join('')}
-      </div>
-    </div>
-    <div style="overflow-x:auto;margin-bottom:14px">
-      <table style="width:100%;min-width:900px;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:var(--navy);color:#fff">
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">類型</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">預定日期</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">論壇平台</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">版塊</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">回文配比</th>
-          <th style="padding:8px 10px;text-align:left;min-width:200px">議題切角（含產品連結/回文策略）</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">圖片/素材連結</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">備註</th>
-          <th style="padding:8px 4px"></th>
-        </tr></thead>
-        <tbody id="sop-plan-tbody">
-          ${rows.map((row,idx)=>`<tr style="border-bottom:1px solid var(--border);background:${idx%2?'var(--surface2)':'#fff'}">
-            <td style="padding:6px 8px"><select class="form-input"style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="specType" onchange="_sopPlanEdit('${clientId}','${ym}',this)"><option></option>${typeOpts.replace('value="'+row.specType+'"','value="'+row.specType+'" selected')}</select></td>
-            <td style="padding:6px 8px"><input type="date" value="${row.date||''}" class="form-input"style="font-size:11px;padding:4px;width:130px" data-pi="${row.id}" data-f="date" onchange="_sopPlanEdit('${clientId}','${ym}',this)"></td>
-            <td style="padding:6px 8px"><select class="form-input"style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${ym}',this)"><option></option>${platformOpts}</select></td>
-            <td style="padding:6px 8px"><input value="${row.section||''}" placeholder="版塊" class="form-input"style="font-size:11px;padding:4px;width:90px" data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${ym}',this)"></td>
-            <td style="padding:6px 8px"><input type="number" value="${row.replyRatio||5}" min="0" class="form-input"style="font-size:11px;padding:4px;width:55px" data-pi="${row.id}" data-f="replyRatio" onchange="_sopPlanEdit('${clientId}','${ym}',this)"></td>
-            <td style="padding:6px 8px"><textarea rows="2" placeholder="議題切角、產品連結、回文策略…" class="form-input"style="font-size:11px;padding:4px;width:100%;min-width:200px;resize:vertical" data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${ym}',this)">${row.cutAngle||''}</textarea></td>
-            <td style="padding:6px 8px"><input value="${row.imgLink||''}" placeholder="https://…" class="form-input"style="font-size:11px;padding:4px;width:120px" data-pi="${row.id}" data-f="imgLink" onchange="_sopPlanEdit('${clientId}','${ym}',this)"></td>
-            <td style="padding:6px 8px"><input value="${row.note||''}" placeholder="備註" class="form-input"style="font-size:11px;padding:4px;width:90px" data-pi="${row.id}" data-f="note" onchange="_sopPlanEdit('${clientId}','${ym}',this)"></td>
-            <td style="padding:6px 4px"><button onclick="_sopPlanDeleteRow('${clientId}','${ym}','${row.id}')"style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">✕</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="_sopPlanAddRow('${clientId}','${ym}','${contractId}')">＋ 新增一行</button>
-      <button class="btn btn-sm btn-primary" onclick="_sopSubmitPlan('${clientId}','${contractId}','${ym}')">
-        📨 送交客戶確認（暫停等待回覆）
-      </button>
-    </div>`;
-}
-
-// ── B 線直發表單 ──
-// ── 回文數量默認值 ──
-function _sopDefaultReply(specType){
-  if(specType==='長圖文') return 10;
-  if(specType==='短議題文'||specType==='短圖文') return 5;
-  return 1;
-}
-
-// ── 判斷是否為特殊規格（隱藏欄位）──
-function _sopIsMonitor(specType){ return /監控|週監控/.test(specType); }
-function _sopIsGoogle(specType){ return /Google星評|星評/.test(specType); }
-
-function _renderSopDirectForm(clientId, contractId, ym, specs, state){
-  const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
-  const typeOpts = ['短議題文','短圖文','長圖文','監控回文','綁定回文','即時回文','Google星評','週監控'].map(t=>`<option>${t}</option>`).join('');
-  const platformOpts = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
-  // 合約的切角 DOC 連結（從 contract.driveLink 取得）
-  const ct = DB.contracts.find(c=>c.id===contractId)||{};
-  const cutAngleDocLink = ct.driveLink||'';
-
-  // 初次進入：依規格預填，每篇規格一行
-  if(!state.planItems.length){
-    state.planItems = specs.map((s,i)=>({
-      id:'di_'+s.id+'_0',
-      specType:s.name,
-      platform:'',section:'',
-      writerId:'',
-      replyCount:_sopDefaultReply(s.name),
-      cutAngle:''
-    }));
-  }
-
-  const rows = state.planItems;
-
-  return `
-    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">選擇規格與寫手，確認後直接進入撰文流程。</div>
-    <div style="overflow-x:auto;margin-bottom:14px">
-      <table style="width:100%;min-width:600px;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:#0f6e56;color:#fff">
-          <th style="padding:8px 10px;text-align:left">類型</th>
-          <th style="padding:8px 10px;text-align:left">論壇平台</th>
-          <th style="padding:8px 10px;text-align:left">版塊</th>
-          <th style="padding:8px 10px;text-align:left">回文數</th>
-          <th style="padding:8px 10px;text-align:left;min-width:140px">指定寫手</th>
-          <th style="padding:8px 10px;text-align:left">切角方向</th>
-          <th style="padding:8px 4px"></th>
-        </tr></thead>
-        <tbody>
-          ${rows.map((row,idx)=>{
-            const isMon = _sopIsMonitor(row.specType);
-            const isG   = _sopIsGoogle(row.specType);
-            return `<tr style="border-bottom:1px solid var(--border);background:${idx%2?'var(--surface2)':'#fff'}">
-              <td style="padding:6px 8px"><select class="form-input" style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="specType" onchange="_sopPlanEdit('${clientId}','${ym}',this);_sopUpdateRowDefaults('${clientId}','${ym}','${row.id}',this.value)"><option></option>${typeOpts.replace(`>${row.specType}<`,` selected>${row.specType}<`)}</select></td>
-              <td style="padding:6px 8px">${isMon?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<select class="form-input" style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${ym}',this)"><option></option>${platformOpts}</select>`}</td>
-              <td style="padding:6px 8px">${isMon?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:11px;padding:4px;width:80px" data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${ym}',this)">`}</td>
-              <td style="padding:6px 8px">${isMon?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<div style="display:flex;align-items:center;gap:4px"><button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center">−</button><span id="di-reply-${row.id}" style="font-size:13px;font-weight:600;min-width:22px;text-align:center">${row.replyCount??_sopDefaultReply(row.specType)}</span><button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center">＋</button></div>`}</td>
-              <td style="padding:6px 8px"><select class="form-input" style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="writerId" onchange="_sopPlanEdit('${clientId}','${ym}',this)"><option value="">— 選擇 —</option>${writerOpts.replace(`value="${row.writerId}"`,`value="${row.writerId}" selected`)}</select></td>
-              <td style="padding:6px 8px">${cutAngleDocLink?`<a href="${cutAngleDocLink}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;white-space:nowrap;text-decoration:none">📄 切角DOC</a>`:`<input value="${row.cutAngle||''}" placeholder="切角方向（選填）" class="form-input" style="font-size:11px;padding:4px;width:140px" data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${ym}',this)">`}</td>
-              <td style="padding:6px 4px"><button onclick="_sopPlanDeleteRow('${clientId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">✕</button></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="_sopDirectAddRow('${clientId}','${ym}','${contractId}')">＋ 新增一行</button>
-      <button class="btn btn-sm btn-primary" style="background:#0f6e56;border-color:#0f6e56" onclick="_sopSubmitDirect('${clientId}','${contractId}','${ym}')">
-        ⚡ 確認派發寫手（進入撰文）
-      </button>
-    </div>`;
-}
-
-// ── 回文數量調整 ──
-function _sopReplyAdj(clientId, ym, rowId, delta){
-  const state = getSopState(clientId, ym);
-  const row = state.planItems.find(r=>r.id===rowId);
-  if(!row) return;
-  row.replyCount = Math.max(0, (row.replyCount??_sopDefaultReply(row.specType)) + delta);
-  const el = document.getElementById('di-reply-'+rowId);
-  if(el) el.textContent = row.replyCount;
-}
-
-function _sopUpdateRowDefaults(clientId, ym, rowId, newType){
-  const state = getSopState(clientId, ym);
-  const row = state.planItems.find(r=>r.id===rowId);
-  if(row){ row.replyCount = _sopDefaultReply(newType); }
-}
 
 function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state){
   // 計算當月週數（用於週監控）
@@ -7554,30 +8021,41 @@ function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state
     return { ...s, done, remain:(s.qty||0)-done };
   });
 
-  // 初次進入：依規格自動預填（按月份分配）
+  // 初次進入：依規格自動預填（按當月規格實際數量逐篇預填，並加入任務編碼）
   if(!state.planItems.length){
-    const [cyr, cmo] = ym.split('-').map(Number);
-    const contractStart = new Date(ct.start||ym+'-01');
-    const contractEnd   = new Date(ct.end||(cyr+'-12-31'));
-    const totalMonths   = Math.max(1, Math.round((contractEnd-contractStart)/(1000*60*60*24*30)));
-
     state.planItems = specs.flatMap(s=>{
       const isMonitor = _sopIsMonitor(s.name);
       const isGoogle  = _sopIsGoogle(s.name);
+      const isDailyMon = /日監控/.test(s.name);
+      const isBiWeekMon = /雙週監控/.test(s.name);
 
       if(isMonitor){
-        // 週監控：按實際週數建立行
-        return Array.from({length:weeks},(_,i)=>({
-          id:`pi_${s.id}_w${i}`, specId:s.id, specType:s.name,
+        // 監控類型：按實際週期數建行
+        let count = weeks; // 預設週監控 = 本月週數
+        if(isDailyMon){
+          // 日監控 = 本月天數
+          count = new Date(yr, mo, 0).getDate();
+        } else if(isBiWeekMon){
+          // 雙週監控 = Math.ceil(週數/2)
+          count = Math.ceil(weeks/2);
+        }
+        return Array.from({length:count},(_,i)=>({
+          id:`pi_${s.id}_m${i}`, specId:s.id, specType:s.name,
+          taskName:`${s.name}#${i+1}`,
           weekNum:i+1, qty:1, replyCount:0,
           date:'', platform:'', section:'', replyRatio:0, cutAngle:'', imgLink:'', note:''
         }));
       }
 
-      // 月份分配數量
-      const monthQty = Math.round((s.qty||1)/totalMonths) || 1;
+      // 一般規格：按當月應執行數量（= s.monthlyQty 或計算值）逐篇預填
+      const contractStart = new Date(ct.start||ym+'-01');
+      const contractEnd   = new Date(ct.end||(yr+'-12-31'));
+      const totalMonths   = Math.max(1, Math.round((contractEnd-contractStart)/(1000*60*60*24*30)));
+      const monthQty = Number(s.monthlyQty) || Math.ceil((s.qty||1)/totalMonths) || 1;
+
       return Array.from({length:monthQty},(_,i)=>({
         id:`pi_${s.id}_${i}`, specId:s.id, specType:s.name,
+        taskName:`${s.name}#${i+1}`,  // 任務編碼
         qty:1, replyCount:isGoogle?1:_sopDefaultReply(s.name),
         date:'', platform:'', section:'', replyRatio:isGoogle?0:_sopDefaultReply(s.name), cutAngle:'', imgLink:'', note:''
       }));
@@ -7601,13 +8079,13 @@ function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state
     <div style="overflow-x:auto;margin-bottom:14px">
       <table style="width:100%;min-width:750px;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--navy);color:#fff">
+          <th style="padding:8px 10px;text-align:left;white-space:nowrap">任務名稱</th>
           <th style="padding:8px 10px;text-align:left;white-space:nowrap">類型</th>
           <th style="padding:8px 10px;text-align:left;white-space:nowrap">預定日期</th>
           <th style="padding:8px 10px;text-align:left;white-space:nowrap">論壇平台</th>
           <th style="padding:8px 10px;text-align:left;white-space:nowrap">版塊</th>
           <th style="padding:8px 10px;text-align:left;white-space:nowrap">回文數</th>
-          <th style="padding:8px 10px;text-align:left;min-width:180px">議題切角</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">圖片/素材</th>
+          <th style="padding:8px 10px;text-align:left;min-width:180px">切角方向</th>
           <th style="padding:8px 10px;text-align:left;white-space:nowrap">備註</th>
           <th style="padding:8px 4px"></th>
         </tr></thead>
@@ -7616,6 +8094,9 @@ function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state
             const isMon = _sopIsMonitor(row.specType);
             const isG   = _sopIsGoogle(row.specType);
             return `<tr style="border-bottom:1px solid var(--border);background:${idx%2?'var(--surface2)':'#fff'}">
+              <td style="padding:6px 8px">
+                <input value="${row.taskName||''}" placeholder="${row.specType||''}#${idx+1}" class="form-input" style="font-size:11px;padding:4px;width:90px;font-weight:600" data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+              </td>
               <td style="padding:6px 8px">
                 ${isMon
                   ? `<span style="font-size:11px;font-weight:600">${row.specType}</span><br><span style="font-size:10px;color:var(--text3)">第${row.weekNum??'?'}週</span>`
@@ -7626,7 +8107,6 @@ function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state
               <td style="padding:6px 8px">${(isMon||isG)?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:11px;padding:4px;width:80px" data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${ym}',this)">`}</td>
               <td style="padding:6px 8px">${(isMon||isG)?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<div style="display:flex;align-items:center;gap:4px"><button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center">−</button><span id="pi-reply-${row.id}" style="font-size:13px;font-weight:600;min-width:22px;text-align:center">${row.replyCount??_sopDefaultReply(row.specType)}</span><button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center">＋</button></div>`}</td>
               <td style="padding:6px 8px">${cutAngleDocLink?`<a href="${cutAngleDocLink}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;white-space:nowrap;text-decoration:none">📄 切角DOC</a>`:`<textarea rows="2" placeholder="議題切角、產品連結…" class="form-input" style="font-size:11px;padding:4px;width:100%;min-width:180px;resize:vertical" data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${ym}',this)">${row.cutAngle||''}</textarea>`}</td>
-              <td style="padding:6px 8px">${isG?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<input value="${row.imgLink||''}" placeholder="https://…" class="form-input" style="font-size:11px;padding:4px;width:100px" data-pi="${row.id}" data-f="imgLink" onchange="_sopPlanEdit('${clientId}','${ym}',this)">`}</td>
               <td style="padding:6px 8px"><input value="${row.note||''}" placeholder="備註" class="form-input" style="font-size:11px;padding:4px;width:80px" data-pi="${row.id}" data-f="note" onchange="_sopPlanEdit('${clientId}','${ym}',this)"></td>
               <td style="padding:6px 4px"><button onclick="_sopPlanDeleteRow('${clientId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">✕</button></td>
             </tr>`;
@@ -7641,6 +8121,123 @@ function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state
       </button>
     </div>`;
 }
+// ── 回文數量默認值 ──
+function _sopDefaultReply(specType){
+  if(!specType) return 1;
+  if(specType==='長圖文') return 10;
+  if(specType==='短議題文'||specType==='短圖文') return 5;
+  if(/回文|監控/.test(specType)) return 5;
+  return 1;
+}
+
+// ── 判斷特殊規格 ──
+function _sopIsMonitor(specType){ return /監控|週監控/.test(specType||''); }
+function _sopIsGoogle(specType){ return /Google星評|星評/.test(specType||''); }
+
+// ── 回文數調整按鈕 ──
+function _sopReplyAdj(clientId, ym, rowId, delta){
+  const state = getSopState(clientId, ym);
+  const row = state.planItems.find(r=>r.id===rowId);
+  if(!row) return;
+  row.replyCount = Math.max(0, (row.replyCount||0)+delta);
+  // 同時嘗試 pi- 和 di- 前綴
+  ['pi-reply-','di-reply-'].forEach(pfx=>{
+    const el = document.getElementById(pfx+rowId);
+    if(el) el.textContent = row.replyCount;
+  });
+}
+
+// ── B 線直發表單 ──
+function _renderSopDirectForm(clientId, contractId, ym, specs, state){
+  const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+  const platformOpts = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
+  const ct = DB.contracts.find(c=>c.id===contractId)||{};
+  const cutAngleDocLink = ct.driveLink||'';
+
+  // 計算本月週數
+  const [yr, mo] = ym.split('-').map(Number);
+  const firstDay = new Date(yr, mo-1, 1);
+  const lastDay  = new Date(yr, mo, 0);
+  const weeks = Math.ceil((lastDay.getDate() + firstDay.getDay()) / 7);
+
+  // 初次進入：依規格預填，按當月應執行數量逐篇
+  if(!state.planItems.length){
+    const contractStart = new Date(ct.start||ym+'-01');
+    const contractEnd   = new Date(ct.end||(yr+'-12-31'));
+    const totalMonths   = Math.max(1, Math.round((contractEnd-contractStart)/(1000*60*60*24*30)));
+    state.planItems = specs.flatMap(s=>{
+      const isMonitor = _sopIsMonitor(s.name);
+      const isGoogle  = _sopIsGoogle(s.name);
+      if(isMonitor){
+        const isDailyMon = /日監控/.test(s.name);
+        const isBiWeekMon = /雙週監控/.test(s.name);
+        let count = isDailyMon ? lastDay.getDate() : isBiWeekMon ? Math.ceil(weeks/2) : weeks;
+        return Array.from({length:count},(_,i)=>({
+          id:`di_${s.id}_m${i}`, specId:s.id, specType:s.name,
+          taskName:`${s.name}#${i+1}`, weekNum:i+1,
+          platform:'', section:'', writerId:'', replyCount:0, cutAngle:''
+        }));
+      }
+      const monthQty = Number(s.monthlyQty) || Math.ceil((s.qty||1)/totalMonths) || 1;
+      return Array.from({length:monthQty},(_,i)=>({
+        id:`di_${s.id}_${i}`, specId:s.id, specType:s.name,
+        taskName:`${s.name}#${i+1}`,
+        platform:'', section:'', writerId:'',
+        replyCount:isGoogle?1:_sopDefaultReply(s.name), cutAngle:''
+      }));
+    });
+  }
+
+  const rows = state.planItems;
+  const typeOpts = ['短議題文','短圖文','長圖文','監控回文','綁定回文','即時回文','Google星評','週監控'].map(t=>`<option>${t}</option>`).join('');
+
+  return `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">選擇規格與寫手，確認後直接進入撰文流程。</div>
+    ${cutAngleDocLink?`<div style="margin-bottom:10px"><a href="${cutAngleDocLink}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 14px;text-decoration:none;font-weight:500">📄 開啟切角 DOC 資料夾</a></div>`:''}
+    <div style="overflow-x:auto;margin-bottom:14px">
+      <table style="width:100%;min-width:700px;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#0f6e56;color:#fff">
+          <th style="padding:8px 10px;text-align:left">任務名稱</th>
+          <th style="padding:8px 10px;text-align:left">類型</th>
+          <th style="padding:8px 10px;text-align:left">論壇平台</th>
+          <th style="padding:8px 10px;text-align:left">版塊</th>
+          <th style="padding:8px 10px;text-align:left">回文數</th>
+          <th style="padding:8px 10px;text-align:left;min-width:140px">指定寫手</th>
+          <th style="padding:8px 10px;text-align:left">切角方向</th>
+          <th style="padding:8px 4px"></th>
+        </tr></thead>
+        <tbody>
+          ${rows.map((row,idx)=>{
+            const isMon = _sopIsMonitor(row.specType);
+            const isG   = _sopIsGoogle(row.specType);
+            return `<tr style="border-bottom:1px solid var(--border);background:${idx%2?'var(--surface2)':'#fff'}">
+              <td style="padding:6px 8px">
+                <input value="${row.taskName||''}" placeholder="${row.specType}#${idx+1}" class="form-input" style="font-size:11px;padding:4px;width:90px;font-weight:600" data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+              </td>
+              <td style="padding:6px 8px">
+                ${isMon?`<span style="font-size:11px;font-weight:500">${row.specType}</span>`:
+                `<select class="form-input" style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="specType" onchange="_sopPlanEdit('${clientId}','${ym}',this)"><option></option>${typeOpts.replace('>'+row.specType+'<',' selected>'+row.specType+'<')}</select>`}
+              </td>
+              <td style="padding:6px 8px">${(isMon||isG)?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<select class="form-input" style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${ym}',this)"><option></option>${platformOpts}</select>`}</td>
+              <td style="padding:6px 8px">${(isMon||isG)?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:11px;padding:4px;width:70px" data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${ym}',this)">`}</td>
+              <td style="padding:6px 8px">${(isMon||isG)?`<span style="font-size:11px;color:var(--text3)">—</span>`:`<div style="display:flex;align-items:center;gap:3px"><button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center">−</button><span id="di-reply-${row.id}" style="font-size:12px;font-weight:600;min-width:20px;text-align:center">${row.replyCount??_sopDefaultReply(row.specType)}</span><button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center">＋</button></div>`}</td>
+              <td style="padding:6px 8px"><select class="form-input" style="font-size:12px" data-pi="${row.id}" data-f="writerId" onchange="_sopPlanEdit('${clientId}','${ym}',this)"><option value="">— 選寫手 —</option>${DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}"${row.writerId===f.id?' selected':''}>${f.name}</option>`).join('')}</select></td>
+              <td style="padding:6px 8px">${cutAngleDocLink?`<a href="${cutAngleDocLink}" target="_blank" style="font-size:11px;color:#1D4ED8;white-space:nowrap">📄 DOC</a>`:`<input value="${row.cutAngle||''}" placeholder="切角方向…" class="form-input" style="font-size:11px;padding:4px;width:120px" data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${ym}',this)">`}</td>
+              <td style="padding:6px 4px"><button onclick="_sopPlanDeleteRow('${clientId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">✕</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="_sopDirectAddRow('${clientId}','${ym}')">＋ 新增一行</button>
+      <button class="btn btn-sm btn-primary" onclick="_sopSubmitDirect('${clientId}','${contractId}','${ym}')">
+        ⚡ 確認派發寫手
+      </button>
+    </div>`;
+}
+
+
 function _sopSelectLine(clientId, contractId, ym, line){
   const state = getSopState(clientId, ym);
   state.line = line; state.step = 1;
@@ -7678,7 +8275,12 @@ function _sopPlanAddRow(clientId, ym, contractId){
 function _sopDirectAddRow(clientId, ym){
   const state = getSopState(clientId, ym);
   const [,contractId] = (document.getElementById('sop-client')?.value||'::').split('::');
-  state.planItems.push({id:'di_'+Date.now(),specType:'',platform:'',section:'',writerId:'',replyCount:5,cutAngle:''});
+  const newIdx = state.planItems.length + 1;
+  state.planItems.push({
+    id:'di_'+Date.now(), specType:'', platform:'', section:'',
+    writerId:'', replyCount:5, cutAngle:'',
+    taskName:'新任務#'+newIdx
+  });
   renderSopFlow(clientId,contractId,ym);
 }
 
@@ -7694,12 +8296,15 @@ function _sopSubmitPlan(clientId, contractId, ym){
     const id = genOmId(cl.name);
     const rec = {
       id, contractId, clientId, clientName:cl.name||'',
-      month:ym, specType:row.specType, platform:row.platform||'',
+      month:ym, specType:row.specType,
+      taskName:row.taskName||row.specType||'',
+      platform:row.platform||'',
       section:row.section||'', actionType:row.specType.includes('回文')?'回文':'開文',
-      title:'', content:row.cutAngle||'', driveLink:row.imgLink||'',
-      replyRatio:row.replyRatio||5, note:row.note||'',
-      writerId:'', writerName:'', writerFee:0,
-      vendorId:'', vendorName:'', vendorFee:0,
+      title:row.taskName||'', content:row.cutAngle||'', driveLink:'',
+      replyCount:row.replyCount||row.replyRatio||_sopDefaultReply(row.specType),
+      note:row.note||'',
+      writerId:'', writerName:'',
+      vendorId:'', vendorName:'',
       status:'待規劃', clientConfirmStatus:'pending', clientNote:'',
       publishDate:row.date||'', created_at:new Date().toISOString()
     };
@@ -7785,11 +8390,14 @@ function _sopStepNext(clientId, ym){
 
 function _sopAssignWriter(taskId){
   const writerId = document.getElementById('sw-writer-'+taskId)?.value;
-  const fee = Number(document.getElementById('sw-fee-'+taskId)?.value)||0;
   if(!writerId){ toast('請選擇寫手'); return; }
-  const r=(DB.omRecords||[]).find(x=>x.id===taskId);if(!r)return;
+  const r=(DB.omRecords||[]).find(x=>x.id===taskId); if(!r) return;
   const fl=DB.freelancers.find(f=>f.id===writerId);
-  r.writerId=writerId; r.writerName=fl?.name||''; r.writerFee=fee; r.status='撰文中';
+  r.writerId=writerId; r.writerName=fl?.name||''; r.status='撰文中';
+  // 讀取個別欄位
+  const platform=document.getElementById('sw-platform-'+taskId)?.value; if(platform) r.platform=platform;
+  const section=document.getElementById('sw-section-'+taskId)?.value; if(section) r.section=section;
+  const note=document.getElementById('sw-note-'+taskId)?.value; if(note) r.note=note;
   syncToGAS('omRecords',r).catch(()=>{});
   toast(`✓ 已指派 ${fl?.name||''}`,'success');
   const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
@@ -7797,15 +8405,65 @@ function _sopAssignWriter(taskId){
   setTimeout(()=>renderSopFlow(cId,ctId,ym),200);
 }
 
+function _sopBatchAssignWriter(specType, clientId, ym){
+  const key = specType.replace(/\s/g,'_');
+  const writerId = document.getElementById('sw-batch-writer-'+key)?.value;
+  const platform = document.getElementById('sw-batch-platform-'+key)?.value||'';
+  const section  = document.getElementById('sw-batch-section-'+key)?.value||'';
+  if(!writerId){ toast('請先選擇批次寫手'); return; }
+  const fl = DB.freelancers.find(f=>f.id===writerId);
+  const targets = (DB.omRecords||[]).filter(r=>
+    r.clientId===clientId && (r.month||'').slice(0,7)===ym &&
+    r.specType===specType && !r.writerId && ['待規劃','切角確認','待派寫手'].includes(r.status)
+  );
+  if(!targets.length){ toast('此規格無待指派任務'); return; }
+  targets.forEach(r=>{
+    r.writerId=writerId; r.writerName=fl?.name||''; r.status='撰文中';
+    if(platform) r.platform=platform;
+    if(section)  r.section=section;
+    syncToGAS('omRecords',r).catch(()=>{});
+  });
+  toast(`✓ 已批次指派 ${targets.length} 筆給 ${fl?.name||''}`,'success');
+  const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
+  setTimeout(()=>renderSopFlow(cId,ctId,ym),200);
+}
+
+function _sopStep2PartialContinue(clientId, ym){
+  if(!confirm('確定先以已確認的部分繼續進行步驟3？未確認的任務狀態不變。')) return;
+  const state = getSopState(clientId, ym);
+  state.step = 3;
+  const [,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
+  renderSopFlow(clientId,ctId,ym);
+}
+
 function _sopAssignVendor(taskId, contractId, ym){
   const vendorId=document.getElementById('sv-vendor-'+taskId)?.value;
-  const fee=Number(document.getElementById('sv-fee-'+taskId)?.value)||0;
   if(!vendorId){ toast('請選擇帳號商'); return; }
-  const r=(DB.omRecords||[]).find(x=>x.id===taskId);if(!r)return;
+  const r=(DB.omRecords||[]).find(x=>x.id===taskId); if(!r) return;
   const vc=(DB.vendorCompanies||[]).find(v=>v.id===vendorId);
-  r.vendorId=vendorId; r.vendorName=vc?.name||''; r.vendorFee=fee; r.status='待上刊';
+  r.vendorId=vendorId; r.vendorName=vc?.name||''; r.status='待上刊';
   syncToGAS('omRecords',r).catch(()=>{});
   toast(`✓ 已指派 ${vc?.name||''}`,'success');
+  const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
+  const ymv=document.getElementById('sop-ym')?.value||ym;
+  setTimeout(()=>renderSopFlow(cId,ctId||contractId,ymv),200);
+}
+
+function _sopBatchAssignVendor(specType, clientId, ym, contractId){
+  const key = specType.replace(/[^a-zA-Z0-9]/g,'_');
+  const vendorId = document.getElementById('sv-batch-vendor-'+key)?.value;
+  if(!vendorId){ toast('請先選擇批次帳號商'); return; }
+  const vc = (DB.vendorCompanies||[]).find(v=>v.id===vendorId);
+  const targets = (DB.omRecords||[]).filter(r=>
+    r.clientId===clientId && (r.month||'').slice(0,7)===ym &&
+    r.specType===specType && r.status==='待派帳號商'
+  );
+  if(!targets.length){ toast('此規格無待指派帳號商的任務'); return; }
+  targets.forEach(r=>{
+    r.vendorId=vendorId; r.vendorName=vc?.name||''; r.status='待上刊';
+    syncToGAS('omRecords',r).catch(()=>{});
+  });
+  toast(`✓ 已批次指派 ${targets.length} 筆給 ${vc?.name||''}`,'success');
   const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
   const ymv=document.getElementById('sop-ym')?.value||ym;
   setTimeout(()=>renderSopFlow(cId,ctId||contractId,ymv),200);
