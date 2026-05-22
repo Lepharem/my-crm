@@ -5792,7 +5792,7 @@ function renderCheckupResult(res,ym){
               <div style="text-align:center">
                 <div style="font-size:10px;color:var(--text3);margin-bottom:2px">毛利</div>
                 <div style="font-size:14px;font-weight:700;color:${gross>=0?'#16a34a':'var(--red)'}">${fmt(gross)}</div>
-                <div style="font-size:10px;color:var(--text3)">${margin!==null?Math.round(margin*100)+'%':\'—\'}</div>
+                <div style="font-size:10px;color:var(--text3)">${margin!==null?Math.round(margin*100)+'%':'—'}</div>
               </div>
             </div>
             ${cost.total>0?`<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text3)">
