@@ -442,7 +442,7 @@ body.test-mode #test-mode-banner{display:block}
 #test-mode-indicator{display:none;align-items:center;gap:6px;background:rgba(124,58,237,.12);border:1px solid #a855f7;color:#7c3aed;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;transition:.2s}
 #test-mode-indicator:hover{background:#7c3aed;color:#fff}
 body.test-mode #test-mode-indicator{display:flex}
-.test-mode-fab{display:none;position:fixed;bottom:80px;right:20px;z-index:500;background:#7c3aed;color:#fff;border:none;border-radius:50%;width:48px;height:48px;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(124,58,237,.5);align-items:center;justify-content:center}
+.test-mode-fab{display:none;position:fixed;bottom:80px;right:20px;z-index:9998;background:#7c3aed;color:#fff;border:none;border-radius:50%;width:48px;height:48px;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(124,58,237,.5);align-items:center;justify-content:center}
 body.test-mode .test-mode-fab{display:flex}</style>
 </head>
 <body>
@@ -452,7 +452,7 @@ body.test-mode .test-mode-fab{display:flex}</style>
 
 <!-- 測試模式全域提示 -->
 <div id="test-mode-banner">🧪 測試模式 — 所有操作不會寫入資料庫　｜　點選右上角「退出測試」恢復正常</div>
-<button class="test-mode-fab" onclick="disableTestMode()" title="退出測試模式">🧪</button>
+<button class="test-mode-fab" onclick="document.getElementById('test-role-panel')?document.getElementById('test-role-panel').style.display=document.getElementById('test-role-panel').style.display==='none'?'flex':'none':showTestRolePanel()" title="角色切換控制台">🧪</button>
   <div class="login-card">
     <div class="login-logo">樂法 <span>CRM</span></div>
     <div class="login-sub">請使用公司 Google 帳號登入</div>
@@ -574,7 +574,11 @@ body.test-mode .test-mode-fab{display:flex}</style>
       管理
       <svg class="nav-group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
-    <div class="nav-sub" id="nav-sub-mgmt">
+    <div class="nav-sub open" id="nav-sub-mgmt">
+      <div class="nav-sub-item" onclick="navTo('sop-om',this)" id="nav-sop-om" style="color:rgba(255,255,255,.7);font-weight:500">
+        <svg style="width:13px;height:13px;flex-shrink:0;opacity:.9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><circle cx="12" cy="12" r="10"/></svg>
+        口碑月度作業
+      </div>
       <div class="nav-sub-item" onclick="navTo('projects',this)" id="nav-projects">
         <svg style="width:13px;height:13px;flex-shrink:0;opacity:.7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
         專案進度
@@ -1243,7 +1247,7 @@ body.test-mode .test-mode-fab{display:flex}</style>
     <!-- ══ 月結盤點 ══ -->
     <div id="page-monthly-checkup" class="page page-locked">
       <div class="topbar">
-        <div class="topbar-left"><div class="topbar-title">月結盤點</div><div class="topbar-sub">各合約規格執行率 × 請款狀態</div></div>
+        <div class="topbar-left"><div class="topbar-title">月結盤點</div><div class="topbar-sub">合約執行率 × 外包結算</div></div>
         <div class="topbar-actions">
           <input type="month" class="filter-input" id="checkup-ym" style="width:140px" value="">
           <button class="btn btn-primary" onclick="runMonthlyCheckup()">
@@ -1251,12 +1255,37 @@ body.test-mode .test-mode-fab{display:flex}</style>
           </button>
         </div>
       </div>
-      <div style="flex:1;overflow-y:auto" id="checkup-content">
-        <div class="empty-state" style="padding:60px 24px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;margin:0 auto 12px;opacity:.3;display:block"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-          <p>選擇月份後按「執行盤點」</p>
-          <p style="font-size:12px;margin-top:4px;color:var(--text3)">將從 GAS 即時計算各合約本月規格完成率與請款狀況</p>
+      <div class="drawer-tabs" style="flex-shrink:0">
+        <div class="dtab active" onclick="switchCheckupTab(this,'checkup-contracts')">合約執行</div>
+        <div class="dtab" onclick="switchCheckupTab(this,'checkup-payment')">外包結算</div>
+      </div>
+      <div style="flex:1;overflow-y:auto">
+        <div id="checkup-contracts">
+          <div class="empty-state" style="padding:60px 24px">
+            <p>選擇月份後按「執行盤點」</p>
+            <p style="font-size:12px;margin-top:4px;color:var(--text3)">從 GAS 即時計算各合約本月規格完成率與請款狀況</p>
+          </div>
         </div>
+        <div id="checkup-payment" style="display:none;padding:20px 24px">
+          <div class="empty-state"><p>選擇月份後按「執行盤點」</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 口碑月度作業 SOP ══ -->
+    <div id="page-sop-om" class="page page-locked">
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="topbar-title">口碑月度作業</div>
+          <div class="topbar-sub">SOP 引導流程</div>
+        </div>
+        <div class="topbar-actions">
+          <input type="month" id="sop-ym" class="filter-input" style="width:140px">
+          <button class="btn btn-primary" onclick="runSopOm()">開始作業</button>
+        </div>
+      </div>
+      <div class="content" id="sop-om-content">
+        <div class="empty-state" style="padding:60px"><p>選擇月份後按「開始作業」</p></div>
       </div>
     </div>
 
@@ -1987,10 +2016,8 @@ window.loadAllData = async function(){
     if(scRaw.length) DB.serviceCatalog = scRaw.filter(r => r.id && r.id !== 'id');
 
     // ref_freelancer_pricing（外包人員報價設定，有資料才覆蓋靜態）
-    // 注意：fin_freelancer_records 是執行記錄，這裡是「定價」表，兩者不同
     const flRaw = data.freelancer_pricing || data.ref_freelancer_pricing || [];
     if(flRaw.length) {
-      // Sheet 欄位：id, name, type, payMethod, items(JSON：[{item,price,note}])
       DB.freelancers = flRaw.filter(r => r.id && r.id !== 'id').map(r => {
         let items = r.items;
         if(typeof items === 'string') {
@@ -2002,6 +2029,12 @@ window.loadAllData = async function(){
           price: it.price != null ? Number(it.price) : 0,
           note:  it.note  || ''
         }));
+        // 補讀新欄位
+        r.email          = r.email          || '';
+        r.idNo           = r.idNo           || '';
+        r.phone          = r.phone          || '';
+        r.address        = r.address        || '';
+        r.incomeCategory = r.incomeCategory || '50';
         return r;
       });
     }
@@ -2173,34 +2206,250 @@ window.syncUpdateGAS = window.syncToGAS;
 //  🧪 測試模式
 // ══════════════════════════════════════════
 window._testMode = false;
+window._testOriginalRole = null;
+window._testOriginalUser = null;
+window._testOriginalProfile = null;
 
 function enableTestMode(){
   window._testMode = true;
   document.body.classList.add('test-mode');
-  // 儲存原始 DB snapshot 供退出時還原
   window._testModeDbSnapshot = JSON.stringify(DB);
+  // 儲存原始身份
+  window._testOriginalRole    = _userRole;
+  window._testOriginalUser    = _currentUser ? {..._currentUser} : null;
+  window._testOriginalProfile = _userProfile ? {..._userProfile} : null;
   toast('🧪 測試模式已開啟 — 所有操作不會寫入資料庫', 'info');
-  console.log('%c[🧪 TEST MODE ON] 所有 GAS 寫入已被攔截', 'background:#7c3aed;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold');
+  console.log('%c[🧪 TEST MODE ON]', 'background:#7c3aed;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold');
+  // 立即顯示角色切換控制台
+  showTestRolePanel();
 }
 
 function disableTestMode(){
-  const restore = confirm('退出測試模式？\n\n點「確定」：還原測試前資料（丟棄測試期間的所有變更）\n點「取消」：保留測試資料繼續使用（但仍不寫入資料庫）');
+  const restore = confirm('退出測試模式？\n\n確定 → 還原測試前資料與身份\n取消 → 保留測試資料（不寫入資料庫）');
   window._testMode = false;
   document.body.classList.remove('test-mode');
+  // 移除控制台
+  const panel = document.getElementById('test-role-panel');
+  if(panel) panel.remove();
   if(restore && window._testModeDbSnapshot){
     try{
       const snap = JSON.parse(window._testModeDbSnapshot);
       Object.assign(DB, snap);
       window._testModeDbSnapshot = null;
-      toast('✅ 已還原測試前資料');
-      // 重新渲染當前頁面
+      // 還原身份
+      if(window._testOriginalRole){
+        _userRole    = window._testOriginalRole;
+        _currentUser = window._testOriginalUser;
+        _userProfile = window._testOriginalProfile;
+        // 還原介面
+        _applyRoleInterface(_userRole);
+      }
+      toast('✅ 已還原測試前資料與身份');
       const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
       if(activePage && typeof renders !== 'undefined' && renders[activePage]) renders[activePage]();
-    } catch(e){ toast('還原失敗，請手動重新載入資料'); }
+    } catch(e){ toast('還原失敗，請重新載入頁面'); }
   } else {
     toast('已退出測試模式');
   }
   console.log('%c[🧪 TEST MODE OFF]', 'background:#16a34a;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold');
+}
+
+// ── 角色切換：套用介面 ──
+function _applyRoleInterface(role){
+  // 隱藏所有外部介面
+  const wi = document.getElementById('writer-app');
+  const vi = document.getElementById('vendor-app');
+  const app = document.getElementById('app');
+  if(wi) wi.style.display = 'none';
+  if(vi) vi.style.display = 'none';
+  if(app) app.style.display = 'none';
+
+  if(role === 'writer'){
+    showWriterInterface();
+  } else if(role === 'vendor'){
+    showVendorInterface();
+  } else {
+    // staff
+    if(app) app.style.display = '';
+    // 更新 sidebar 顯示
+    const uname = document.getElementById('sidebar-uname');
+    const urole = document.getElementById('sidebar-urole');
+    const avatar = document.getElementById('sidebar-avatar');
+    if(uname) uname.textContent = _currentUser?.name || '測試用戶';
+    if(urole) urole.textContent = `${_currentUser?.name||''}（測試）`;
+    if(avatar){ avatar.textContent = (_currentUser?.name||'T').charAt(0); avatar.style.backgroundImage = ''; }
+    // 重新渲染首頁
+    if(typeof renderHome === 'function') renderHome();
+    navTo('home');
+  }
+}
+
+// ── 角色切換控制台 ──
+function showTestRolePanel(){
+  // 移除舊的
+  const old = document.getElementById('test-role-panel');
+  if(old) old.remove();
+
+  // 蒐集可切換的身份
+  const staffRoles = [
+    { role:'staff', label:'👑 老闆', name:'老闆', email:'boss@lepharem.com', hrRole:'owner', color:'#dc2626' },
+    { role:'staff', label:'👩‍💼 主管', name:'主管', email:'manager@lepharem.com', hrRole:'manager', color:'#d97706' },
+    { role:'staff', label:'🧑‍💻 企劃', name:'企劃同仁', email:'staff@lepharem.com', hrRole:'employee', color:'#1D4ED8' },
+  ];
+  // 從 DB 取寫手
+  const writers = DB.freelancers.map(f=>({
+    role:'writer', label:`✍️ ${f.name}`, name:f.name,
+    email: f.email||`${f.id}@writer.test`,
+    flId: f.id, color:'#5b21b6'
+  }));
+  // 從 DB 取帳號商
+  const vendors = (DB.vendorCompanies||[]).map(v=>({
+    role:'vendor', label:`📣 ${v.name}`, name:v.name,
+    email: v.email||`${v.id}@vendor.test`,
+    vcId: v.id, color:'#0f6e56'
+  }));
+
+  const allRoles = [...staffRoles, ...writers, ...vendors];
+
+  const panel = document.createElement('div');
+  panel.id = 'test-role-panel';
+  panel.style.cssText = `
+    position:fixed;bottom:80px;right:16px;z-index:9998;
+    background:#1e1b4b;border:2px solid #7c3aed;border-radius:14px;
+    padding:14px;min-width:240px;max-width:280px;
+    box-shadow:0 8px 32px rgba(124,58,237,.4);
+    font-family:-apple-system,'PingFang TC',sans-serif;
+    max-height:70vh;display:flex;flex-direction:column;gap:0;
+  `;
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0';
+  header.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:#a5b4fc;letter-spacing:.06em">🧪 身份切換控制台</div>
+    <button onclick="document.getElementById('test-role-panel').style.display='none'"
+      style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:16px;padding:0;line-height:1">✕</button>`;
+  panel.appendChild(header);
+
+  // 搜尋框
+  const search = document.createElement('input');
+  search.placeholder = '搜尋身份…';
+  search.style.cssText = 'width:100%;box-sizing:border-box;padding:6px 10px;border-radius:8px;border:1px solid #4c1d95;background:#2e1065;color:#e9d5ff;font-size:12px;margin-bottom:8px;outline:none;flex-shrink:0';
+  panel.appendChild(search);
+
+  const list = document.createElement('div');
+  list.style.cssText = 'overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:4px;padding-right:2px';
+
+  const renderList = (filter='') => {
+    list.innerHTML = '';
+    const filtered = allRoles.filter(r =>
+      r.label.toLowerCase().includes(filter.toLowerCase()) ||
+      r.name.toLowerCase().includes(filter.toLowerCase())
+    );
+    // 分群顯示
+    const groups = [
+      { key:'staff',  label:'內部員工', icon:'🏢' },
+      { key:'writer', label:'寫手',     icon:'✍️' },
+      { key:'vendor', label:'帳號商',   icon:'📣' },
+    ];
+    groups.forEach(g=>{
+      const items = filtered.filter(r=>r.role===g.key);
+      if(!items.length) return;
+      const groupLabel = document.createElement('div');
+      groupLabel.style.cssText = 'font-size:10px;font-weight:600;color:#6b7280;letter-spacing:.06em;padding:4px 4px 2px;text-transform:uppercase;flex-shrink:0';
+      groupLabel.textContent = `${g.icon} ${g.label}`;
+      list.appendChild(groupLabel);
+      items.forEach(r=>{
+        const isActive = _currentUser?.name === r.name && _userRole === r.role;
+        const btn = document.createElement('button');
+        btn.style.cssText = `
+          display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;
+          background:${isActive?r.color+'33':'rgba(255,255,255,.05)'};
+          border:1px solid ${isActive?r.color:'transparent'};
+          border-radius:8px;cursor:pointer;text-align:left;transition:.15s;
+          color:${isActive?'#fff':'#c4b5fd'};font-size:12px;
+        `;
+        btn.innerHTML = `
+          <span style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0"></span>
+          <span style="flex:1;font-weight:${isActive?'600':'400'}">${r.label}</span>
+          ${isActive?'<span style="font-size:10px;opacity:.7">目前</span>':''}
+        `;
+        btn.onclick = () => switchTestRole(r);
+        btn.onmouseover = () => { if(!isActive) btn.style.background = 'rgba(255,255,255,.1)'; };
+        btn.onmouseout  = () => { if(!isActive) btn.style.background = 'rgba(255,255,255,.05)'; };
+        list.appendChild(btn);
+      });
+    });
+    if(!filtered.length){
+      list.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:12px;text-align:center">無符合身份</div>';
+    }
+  };
+
+  renderList();
+  search.addEventListener('input', e => renderList(e.target.value));
+  panel.appendChild(list);
+
+  // 底部：還原按鈕
+  const footer = document.createElement('div');
+  footer.style.cssText = 'border-top:1px solid #4c1d95;margin-top:10px;padding-top:10px;flex-shrink:0';
+  footer.innerHTML = `
+    <button onclick="disableTestMode()"
+      style="width:100%;padding:7px;background:rgba(124,58,237,.3);border:1px solid #7c3aed;border-radius:8px;color:#a5b4fc;font-size:12px;cursor:pointer;font-weight:600">
+      🚪 退出測試模式
+    </button>`;
+  panel.appendChild(footer);
+
+  document.body.appendChild(panel);
+
+  // 拖曳功能
+  let dragging=false, ox=0, oy=0;
+  header.style.cursor='grab';
+  header.addEventListener('mousedown',e=>{
+    dragging=true; ox=e.clientX-panel.offsetLeft; oy=e.clientY-panel.offsetTop;
+    header.style.cursor='grabbing';
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    panel.style.left=Math.max(0,e.clientX-ox)+'px';
+    panel.style.top=Math.max(0,e.clientY-oy)+'px';
+    panel.style.right='auto'; panel.style.bottom='auto';
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;header.style.cursor='grab';});
+
+  // 讓 FAB 也能呼叫
+  window._refreshTestPanel = ()=>renderList(search.value);
+}
+
+// ── 實際切換身份 ──
+function switchTestRole(roleConfig){
+  const { role, name, email, hrRole, flId, vcId, color } = roleConfig;
+
+  // 更新 _currentUser
+  _currentUser = { email, name };
+  _userRole = role;
+
+  if(role === 'staff'){
+    // 設定 HR myMember
+    _userProfile = { name, role: hrRole, email };
+    myMember = { id:'TEST_'+hrRole, name_zh:name, email, role:hrRole, active:true };
+    if(typeof hrApplyPermissions === 'function') hrApplyPermissions();
+  } else if(role === 'writer'){
+    const fl = DB.freelancers.find(f=>f.id===flId);
+    _userProfile = fl || { id:flId, name, email };
+  } else if(role === 'vendor'){
+    const vc = (DB.vendorCompanies||[]).find(v=>v.id===vcId);
+    _userProfile = vc || { id:vcId, name, email };
+  }
+
+  // 套用介面
+  _applyRoleInterface(role);
+
+  toast(`🧪 已切換為：${name}（${role==='staff'?'內部員工':role==='writer'?'寫手':'帳號商'}）`, 'info');
+  console.log(`%c[🧪 ROLE] → ${name} (${role})`, `background:${color};color:#fff;padding:2px 8px;border-radius:4px`);
+
+  // 重整控制台
+  setTimeout(()=>{
+    if(window._refreshTestPanel) window._refreshTestPanel();
+  }, 100);
 }
 
 window.syncDeleteGAS = async function(collection, id){
@@ -2413,7 +2662,7 @@ function navTo(id, btn){
   closeDrawer();
   closeSidebar();
   // render
-  const renders={home:renderHome,clients:renderClients,receivable:renderReceivable,'receivable-overview':renderReceivableOverview,'settings-catalog':renderCatalogPage,'settings-freelancer':renderFreelancerPage,'settings-vendor':renderVendorPricePage,'settings-theme':renderThemePage,'settings-permissions':renderPermissionsPage,summary:renderSummary,performance:renderPerformance,'biz-schedule':renderSchedule,'plan-schedule':renderSchedule2,projects:renderProjects,specs:renderSpecsPage,'vendor-exec':renderVendorExec,'freelancer-stats':renderFreelancerStats,'exec-om':renderOmPage,'exec-social':renderExecSocial,'exec-ad':renderExecAd,'monthly-checkup':()=>{},clock:function(){hrStartClock();hrLoadAttendanceStatus();},hr:hrRenderPage,logs:hrLoadLogs,'fb-tax':renderFbTax};
+  const renders={home:renderHome,clients:renderClients,receivable:renderReceivable,'receivable-overview':renderReceivableOverview,'settings-catalog':renderCatalogPage,'settings-freelancer':renderFreelancerPage,'settings-vendor':renderVendorPricePage,'settings-theme':renderThemePage,'settings-permissions':renderPermissionsPage,summary:renderSummary,performance:renderPerformance,'biz-schedule':renderSchedule,'plan-schedule':renderSchedule2,projects:renderProjects,specs:renderSpecsPage,'vendor-exec':renderVendorExec,'freelancer-stats':renderFreelancerStats,'exec-om':renderOmPage,'exec-social':renderExecSocial,'exec-ad':renderExecAd,'monthly-checkup':()=>{},'sop-om':renderSopOmPage,clock:function(){hrStartClock();hrLoadAttendanceStatus();},hr:hrRenderPage,logs:hrLoadLogs,'fb-tax':renderFbTax};
   if(renders[id])renders[id]();
 }
 function goHome(){navTo('home',document.getElementById('nav-home'));}
@@ -6082,21 +6331,33 @@ function deleteAdRecord(id){
 }
 
 // ════════════════════════════════════════
+//  月結盤點 Tab 切換
+// ════════════════════════════════════════
+function switchCheckupTab(el, tabId){
+  document.querySelectorAll('#page-monthly-checkup .drawer-tabs .dtab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('checkup-contracts').style.display = tabId==='checkup-contracts'?'':'none';
+  document.getElementById('checkup-payment').style.display   = tabId==='checkup-payment'?'':'none';
+}
+
+// ════════════════════════════════════════
 //  B1 — 月結盤點
 // ════════════════════════════════════════
 async function runMonthlyCheckup(){
   const ymEl=document.getElementById('checkup-ym');
   const ym=ymEl?.value||new Date().toISOString().slice(0,7);
   if(ymEl&&!ymEl.value) ymEl.value=ym;
-  const el=document.getElementById('checkup-content');
-  el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text3)">盤點中…</div>`;
+  const contractEl=document.getElementById('checkup-contracts');
+  const paymentEl =document.getElementById('checkup-payment');
+  if(contractEl) contractEl.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text3)">盤點中…</div>`;
+  if(paymentEl)  paymentEl.innerHTML =`<div style="padding:40px;text-align:center;color:var(--text3)">計算中…</div>`;
   try{
     const res=await gasApi('getMonthlyCheckup',{ym});
     renderCheckupResult(res,ym);
   }catch(e){
-    // GAS 未部署時，用本地資料計算
     renderCheckupLocal(ym);
   }
+  renderPaymentCheckup(ym);
 }
 
 function renderCheckupLocal(ym){
@@ -6122,7 +6383,7 @@ function renderCheckupLocal(ym){
 }
 
 function renderCheckupResult(res,ym){
-  const el=document.getElementById('checkup-content');
+  const el=document.getElementById('checkup-contracts');
   const results=res.results||[];
   if(!results.length){el.innerHTML=`<div class="empty-state" style="padding:60px"><p>本月無進行中合約</p></div>`;return;}
   const catColor={'口碑':'tag-blue','社群':'tag-green','廣告':'tag-amber','其他':'tag-gray'};
@@ -6236,6 +6497,594 @@ function renderCheckupResult(res,ym){
       </div>`;
     }).join('')}
   </div>`;
+}
+
+// ════════════════════════════════════════
+//  外包結算（月結盤點第二 Tab）
+// ════════════════════════════════════════
+function renderPaymentCheckup(ym){
+  const el = document.getElementById('checkup-payment');
+  if(!el) return;
+
+  // 收集本月有執行任務的寫手和帳號商
+  const omRecs = (DB.omRecords||[]).filter(r=>(r.month||'').slice(0,7)===ym);
+
+  // 寫手（writerId/writerName）
+  const writerMap = {};
+  omRecs.forEach(r=>{
+    if(!r.writerId && !r.writerName) return;
+    const key = r.writerId || r.writerName;
+    if(!writerMap[key]) writerMap[key]={
+      id: r.writerId||'', name: r.writerName||r.writerId||'未知',
+      tasks:[], totalFee:0
+    };
+    writerMap[key].tasks.push(r);
+    writerMap[key].totalFee += Number(r.writerFee)||0;
+  });
+  // 補完整資料從主檔
+  Object.values(writerMap).forEach(w=>{
+    const fl = DB.freelancers.find(f=>f.id===w.id||f.name===w.name);
+    if(fl){ w.payMethod=fl.payMethod||'勞報'; w.incomeCategory=fl.incomeCategory||'50'; w.idNo=fl.idNo||''; w.address=fl.address||''; w.phone=fl.phone||''; w.email=fl.email||''; w.flObj=fl; }
+    else { w.payMethod='勞報'; w.incomeCategory='50'; }
+  });
+
+  // 帳號商（vendorId/vendorName）
+  const vendorMap = {};
+  omRecs.forEach(r=>{
+    if(!r.vendorId && !r.vendorName) return;
+    const key = r.vendorId || r.vendorName;
+    if(!vendorMap[key]) vendorMap[key]={
+      id: r.vendorId||'', name: r.vendorName||r.vendorId||'未知',
+      tasks:[], totalFee:0
+    };
+    vendorMap[key].tasks.push(r);
+    vendorMap[key].totalFee += Number(r.vendorFee)||0;
+  });
+  Object.values(vendorMap).forEach(v=>{
+    const vc = (DB.vendorCompanies||[]).find(c=>c.id===v.id||c.name===v.name);
+    v.payMethod = vc?.payMethod||'發票';
+  });
+
+  const writers = Object.values(writerMap);
+  const vendors = Object.values(vendorMap);
+
+  if(!writers.length && !vendors.length){
+    el.innerHTML=`<div class="empty-state"><p>本月尚無外包執行記錄</p></div>`;
+    return;
+  }
+
+  // 讀取/儲存結算狀態（存在 DB.checkupStatus[ym][id] 裡）
+  if(!DB.checkupStatus) DB.checkupStatus={};
+  if(!DB.checkupStatus[ym]) DB.checkupStatus[ym]={};
+  const getStatus = (id) => DB.checkupStatus[ym][id] || {};
+  const setStatus = (id, key, val) => {
+    if(!DB.checkupStatus[ym][id]) DB.checkupStatus[ym][id]={};
+    DB.checkupStatus[ym][id][key] = val;
+    DB.checkupStatus[ym][id][key+'_at'] = new Date().toISOString().slice(0,16).replace('T',' ');
+    renderPaymentCheckup(ym);
+  };
+
+  const statusBtn = (id, key, label, color) => {
+    const st = getStatus(id);
+    const done = !!st[key];
+    return `<button onclick="window._setCheckupStatus('${ym}','${id}','${key}')" style="padding:5px 10px;border-radius:6px;border:1px solid ${done?color:'var(--border)'};background:${done?color+'22':'var(--surface2)'};color:${done?color:'var(--text3)'};font-size:11px;cursor:pointer;font-weight:${done?'600':'400'}">
+      ${done?'✓ ':''} ${label} ${st[key+'_at']?`<span style="opacity:.6;font-size:10px">${st[key+'_at'].slice(5,16)}</span>`:''}
+    </button>`;
+  };
+
+  // 掛到 window 讓 onclick 能用
+  window._setCheckupStatus = setStatus;
+
+  const personCard = (p, type) => {
+    const isLabor = p.payMethod==='勞報';
+    const st = getStatus(p.id||p.name);
+    // 明細任務
+    const taskRows = p.tasks.map(t=>`
+      <tr style="border-top:1px solid var(--border)">
+        <td style="padding:5px 8px;font-size:11px">${t.clientName||'—'}</td>
+        <td style="padding:5px 8px;font-size:11px">${t.specType||'—'}</td>
+        <td style="padding:5px 8px;font-size:11px">${t.platform||'—'}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right">${fmt(type==='writer'?Number(t.writerFee)||0:Number(t.vendorFee)||0)}</td>
+      </tr>`).join('');
+
+    return `<div class="card" style="margin-bottom:14px">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:600">${p.name}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">
+            ${type==='writer'?'寫手':'帳號商'} &nbsp;·&nbsp;
+            <span class="tag ${isLabor?'tag-purple':'tag-green'}" style="font-size:10px">${isLabor?'勞報單':'發票'}</span>
+            ${p.email?`&nbsp;·&nbsp; ${p.email}`:''}
+          </div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:18px;font-weight:700;color:var(--accent)">${fmt(p.totalFee)}</div>
+          <div style="font-size:11px;color:var(--text3)">${p.tasks.length} 筆</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- 任務明細 -->
+        <details style="margin-bottom:12px">
+          <summary style="font-size:12px;cursor:pointer;color:var(--text3);padding:4px 0">
+            查看明細（${p.tasks.length} 筆）
+          </summary>
+          <div class="table-wrap" style="margin-top:8px">
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr style="background:var(--surface2)">
+                <th style="padding:5px 8px;text-align:left;font-size:11px;color:var(--text3)">客戶</th>
+                <th style="padding:5px 8px;text-align:left;font-size:11px;color:var(--text3)">規格</th>
+                <th style="padding:5px 8px;text-align:left;font-size:11px;color:var(--text3)">平台</th>
+                <th style="padding:5px 8px;text-align:right;font-size:11px;color:var(--text3)">金額</th>
+              </tr></thead>
+              <tbody>${taskRows}</tbody>
+              <tfoot><tr><td colspan="3" style="padding:5px 8px;font-size:11px;font-weight:600">合計</td><td style="padding:5px 8px;text-align:right;font-size:12px;font-weight:700">${fmt(p.totalFee)}</td></tr></tfoot>
+            </table>
+          </div>
+        </details>
+
+        <!-- 狀態流程 -->
+        ${isLabor?`
+        <div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:var(--r);padding:12px">
+          <div style="font-size:11px;font-weight:600;color:#5b21b6;margin-bottom:8px">📋 勞報單流程</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+            ${statusBtn(p.id||p.name,'confirmed','金額確認','#5b21b6')}
+            ${statusBtn(p.id||p.name,'provided','已提供勞報單','#0f6e56')}
+            ${statusBtn(p.id||p.name,'signed','勞報單已簽回','#16a34a')}
+          </div>
+          ${st.confirmed?`<button onclick="openLaborPDF('${p.id||p.name}','${ym}')"
+            style="width:100%;padding:8px;background:#5b21b6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+            📄 一鍵產製勞報單 PDF
+          </button>`:`<div style="font-size:11px;color:var(--text3)">請先確認金額後才能產製勞報單</div>`}
+        </div>`:`
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:var(--r);padding:12px">
+          <div style="font-size:11px;font-weight:600;color:#166534;margin-bottom:8px">🧾 發票流程</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${statusBtn(p.id||p.name,'confirmed','已確認金額','#166534')}
+            ${statusBtn(p.id||p.name,'invoiceSent','發票寄出','#0f6e56')}
+            ${statusBtn(p.id||p.name,'invoiceReceived','已收到發票','#16a34a')}
+          </div>
+        </div>`}
+      </div>
+    </div>`;
+  };
+
+  el.innerHTML = `
+    ${writers.length?`
+      <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">
+        ✍️ 寫手（${writers.length} 人）&nbsp;
+        <span style="font-weight:400;font-size:11px">合計 ${fmt(writers.reduce((a,w)=>a+w.totalFee,0))}</span>
+      </div>
+      ${writers.map(w=>personCard(w,'writer')).join('')}
+    `:''}
+    ${vendors.length?`
+      <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:${writers.length?'20px':0} 0 10px">
+        📣 帳號商（${vendors.length} 人）&nbsp;
+        <span style="font-weight:400;font-size:11px">合計 ${fmt(vendors.reduce((a,v)=>a+v.totalFee,0))}</span>
+      </div>
+      ${vendors.map(v=>personCard(v,'vendor')).join('')}
+    `:''}`;
+}
+
+// ════════════════════════════════════════
+//  勞報單 PDF 產製
+// ════════════════════════════════════════
+function openLaborPDF(personId, ym){
+  const fl = DB.freelancers.find(f=>f.id===personId||f.name===personId);
+  if(!fl){ toast('找不到外包人員資料'); return; }
+
+  // 計算金額
+  const omRecs = (DB.omRecords||[]).filter(r=>(r.month||'').slice(0,7)===ym && (r.writerId===fl.id||r.writerName===fl.name));
+  const totalFee = omRecs.reduce((a,r)=>a+(Number(r.writerFee)||0),0);
+
+  // 二代健保：2.11%，起扣 29500
+  const nhi2    = totalFee >= 29500 ? Math.round(totalFee * 0.0211) : 0;
+  // 所得稅：5%，起扣 90501
+  const withTax = totalFee >= 90501 ? Math.round(totalFee * 0.05) : 0;
+  const netPay  = totalFee - nhi2 - withTax;
+
+  // 月份轉換（民國年）
+  const [yr, mo] = ym.split('-').map(Number);
+  const rocYr = yr - 1911;
+
+  // 單號：ROC年月 + 人員縮寫
+  const sn = `${rocYr}${String(mo).padStart(2,'0')}-${(fl.name||'').slice(0,2)}`;
+
+  // 跳出可編輯確認頁
+  openModal(`產製勞報單 — ${fl.name}（${ym}）`,`
+    <div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:#5b21b6">
+      ⚠ 請確認以下資料後按「產製 PDF」。所有欄位均可調整。
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">領款人姓名</label><input class="form-input" id="lp-name" value="${fl.name||''}"></div>
+      <div class="form-group"><label class="form-label">身分證字號</label><input class="form-input" id="lp-idno" value="${fl.idNo||''}"></div>
+    </div>
+    <div class="form-group"><label class="form-label">聯絡地址</label><input class="form-input" id="lp-addr" value="${fl.address||''}"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">聯絡電話</label><input class="form-input" id="lp-phone" value="${fl.phone||''}"></div>
+      <div class="form-group"><label class="form-label">所得類別</label>
+        <select class="form-input" id="lp-income">
+          <option value="50" ${(fl.incomeCategory||'50')==='50'?'selected':''}>兼職薪資（50）</option>
+          <option value="9A" ${fl.incomeCategory==='9A'?'selected':''}>稿費（9A）</option>
+        </select>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:12px">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">專案名稱</label><input class="form-input" id="lp-proj" value="${rocYr} 年 ${String(mo).padStart(2,'0')} 月口碑輿情專案"></div>
+        <div class="form-group"><label class="form-label">勞務內容</label><input class="form-input" id="lp-work" value="口碑內容產出"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">勞報金額</label><input class="form-input" type="number" id="lp-fee" value="${totalFee}" oninput="calcLaborPDF()"></div>
+        <div class="form-group"><label class="form-label">單號</label><input class="form-input" id="lp-sn" value="${sn}"></div>
+      </div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;font-size:12px">
+      <div style="font-weight:600;margin-bottom:8px;color:var(--text)">自動計算結果</div>
+      <div id="lp-calc" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        ${renderLaborCalc(totalFee)}
+      </div>
+    </div>
+  `,()=>{ generateLaborPDF(); },false);
+}
+
+function renderLaborCalc(fee){
+  const nhi2    = fee >= 29500 ? Math.round(fee * 0.0211) : 0;
+  const withTax = fee >= 90501 ? Math.round(fee * 0.05) : 0;
+  const net     = fee - nhi2 - withTax;
+  return `
+    <div style="color:var(--text3)">報酬總額</div><div style="font-weight:600;text-align:right">${fmt(fee)}</div>
+    <div style="color:var(--text3)">二代健保（2.11%）</div><div style="text-align:right;color:${nhi2?'var(--amber)':'var(--text3)'}">${nhi2?fmt(nhi2):'未達起扣點'}</div>
+    <div style="color:var(--text3)">代扣所得稅（5%）</div><div style="text-align:right;color:${withTax?'var(--red)':'var(--text3)'}">${withTax?fmt(withTax):'未達起扣點'}</div>
+    <div style="font-weight:700;border-top:1px solid var(--border);padding-top:4px">實領金額</div>
+    <div style="font-weight:700;color:#16a34a;text-align:right;border-top:1px solid var(--border);padding-top:4px">${fmt(net)}</div>`;
+}
+
+function calcLaborPDF(){
+  const fee = Number(document.getElementById('lp-fee')?.value)||0;
+  const el  = document.getElementById('lp-calc');
+  if(el) el.innerHTML = renderLaborCalc(fee);
+}
+
+function numToChinese(n){
+  const units=['','拾','佰','仟'];
+  const bigUnits=['','萬','億'];
+  const digits=['零','壹','貳','參','肆','伍','陸','柒','捌','玖'];
+  if(n===0)return'零元整';
+  let str='';
+  const s=String(Math.floor(n));
+  for(let i=0;i<s.length;i++){
+    const d=parseInt(s[i]);
+    const pos=s.length-1-i;
+    if(d!==0) str+=digits[d]+units[pos%4];
+    else if(str&&str[str.length-1]!=='零') str+='零';
+  }
+  str=str.replace(/零+$/,'');
+  return str+'元整';
+}
+
+function generateLaborPDF(){
+  const name   = document.getElementById('lp-name')?.value.trim()||'';
+  const idno   = document.getElementById('lp-idno')?.value.trim()||'';
+  const addr   = document.getElementById('lp-addr')?.value.trim()||'';
+  const phone  = document.getElementById('lp-phone')?.value.trim()||'';
+  const proj   = document.getElementById('lp-proj')?.value.trim()||'';
+  const work   = document.getElementById('lp-work')?.value.trim()||'口碑內容產出';
+  const income = document.getElementById('lp-income')?.value||'50';
+  const sn     = document.getElementById('lp-sn')?.value.trim()||'';
+  const fee    = Number(document.getElementById('lp-fee')?.value)||0;
+  const nhi2   = fee >= 29500 ? Math.round(fee * 0.0211) : 0;
+  const withTax= fee >= 90501 ? Math.round(fee * 0.05) : 0;
+  const net    = fee - nhi2 - withTax;
+
+  const today  = new Date();
+  const rocYr  = today.getFullYear()-1911;
+  const dateStr= `${rocYr} 年 ${today.getMonth()+1} 月 ${today.getDate()} 日`;
+
+  const incomeLabel = income==='50'?'兼職薪資（50）':'稿費（9A）';
+
+  // 產製 HTML → 新視窗列印成 PDF
+  const html=`<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8">
+<title>樂法行銷-領據-${name}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'微軟正黑體','Microsoft JhengHei','PingFang TC',sans-serif;font-size:13px;padding:20px;color:#000;max-width:700px;margin:0 auto}
+h2{font-size:18px;font-weight:bold;margin-bottom:4px}
+.subtitle{font-size:13px;margin-bottom:16px}
+.section{border:1px solid #000;margin-bottom:12px}
+.section-title{background:#d9d9d9;padding:4px 10px;font-weight:bold;font-size:13px;border-bottom:1px solid #000}
+.row{display:grid;padding:6px 10px;border-bottom:1px solid #ccc}
+.row:last-child{border-bottom:none}
+.row-2{grid-template-columns:1fr 1fr}
+.row-4{grid-template-columns:1fr 1fr 1fr 1fr}
+.label{color:#666;font-size:11px;margin-bottom:2px}
+.value{font-size:13px;font-weight:500}
+.bold-line{font-weight:bold;font-size:14px;border-top:2px solid #000;padding-top:6px;margin-top:4px}
+.deduct-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #000}
+.deduct-cell{padding:8px;border-right:1px solid #000;border-bottom:1px solid #000}
+.deduct-cell:nth-child(2n){border-right:none}
+.deduct-cell:last-child,.deduct-cell:nth-last-child(2){border-bottom:none}
+.amount-big{font-size:15px;font-weight:bold}
+.sign-row{display:flex;justify-content:space-between;margin-top:16px;font-size:13px}
+.sign-line{display:inline-block;width:200px;border-bottom:1px solid #000}
+@media print{body{padding:10px}button{display:none}}
+</style></head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+  <div>
+    <h2>樂法行銷-領據</h2>
+    <div class="subtitle">茲收到「<strong>樂法網路行銷有限公司</strong>」（統編：60675799）</div>
+    <div class="subtitle">支付執行 <u>&nbsp;&nbsp;&nbsp;${proj}&nbsp;&nbsp;&nbsp;</u> 專案之勞務報酬，明細如下</div>
+  </div>
+  <button onclick="window.print()" style="padding:8px 16px;background:#5b21b6;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">🖨 列印 / 儲存 PDF</button>
+</div>
+
+<div class="section" style="margin-top:12px">
+  <div class="section-title">金額明細</div>
+  <table style="width:100%;border-collapse:collapse">
+    <tr><td style="padding:6px 10px;border-bottom:1px solid #ccc">項目</td><td style="padding:6px 10px;border-bottom:1px solid #ccc;text-align:right;font-weight:600">金額（新台幣）</td></tr>
+    <tr><td style="padding:6px 10px;border-bottom:1px solid #ccc">報酬總額</td><td style="padding:6px 10px;border-bottom:1px solid #ccc;text-align:right">${fee.toLocaleString()}</td></tr>
+    ${nhi2?`<tr><td style="padding:6px 10px;border-bottom:1px solid #ccc">二代健保補充保險費</td><td style="padding:6px 10px;border-bottom:1px solid #ccc;text-align:right">${nhi2.toLocaleString()}</td></tr>`:''}
+    ${withTax?`<tr><td style="padding:6px 10px;border-bottom:1px solid #ccc">代扣所得稅</td><td style="padding:6px 10px;border-bottom:1px solid #ccc;text-align:right">${withTax.toLocaleString()}</td></tr>`:''}
+    <tr><td style="padding:6px 10px;font-weight:bold">實領金額</td><td style="padding:6px 10px;text-align:right;font-weight:bold">${net.toLocaleString()}</td></tr>
+  </table>
+</div>
+<div style="font-size:13px;padding:6px 0"><strong>實領金額：新台幣 ${numToChinese(net)}（NT$ ${net.toLocaleString()}），確實無訛。</strong></div>
+
+<div class="section" style="margin-top:10px">
+  <div class="section-title">領款人資訊</div>
+  <div class="row"><div class="label">領款人姓名</div><div class="value">${name}</div></div>
+  <div class="row"><div class="label">身分證字號</div><div class="value">${idno}</div></div>
+  <div class="row"><div class="label">聯絡地址</div><div class="value">${addr}</div></div>
+  <div class="row"><div class="label">聯絡電話</div><div class="value">${phone}</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">勞務資訊</div>
+  <div class="row row-2">
+    <div><div class="label">專案名稱</div><div class="value">${proj}</div></div>
+    <div><div class="label">勞務內容</div><div class="value">${work}</div></div>
+  </div>
+  <div class="row row-2">
+    <div><div class="label">所得類別</div><div class="value">${incomeLabel}</div></div>
+    <div><div class="label">勞報金額</div><div class="value">NT${fee.toLocaleString()}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">扣繳項目</div>
+  <div class="deduct-grid">
+    <div class="deduct-cell">
+      <div style="font-weight:600;margin-bottom:4px">二代健保補充保費（2.11%）</div>
+      <div style="font-size:11px;color:#666">（起扣金額：29,500）</div>
+      <div style="margin-top:6px">
+        ${nhi2?`<span style="font-weight:600">☑</span> 扣繳　<span style="font-size:11px">未達 □</span>`:`<span>未達起扣點 ☑</span>&nbsp;&nbsp;<span style="font-size:11px">扣繳 □</span>`}
+      </div>
+      <div class="amount-big" style="margin-top:4px">扣繳金額：NT$ ${nhi2.toLocaleString()} 元整</div>
+    </div>
+    <div class="deduct-cell">
+      <div style="font-weight:600;margin-bottom:4px">代扣所得稅（5%）</div>
+      <div style="font-size:11px;color:#666">（起扣金額：90,501）</div>
+      <div style="margin-top:6px">
+        ${withTax?`<span style="font-weight:600">☑</span> 扣繳　<span style="font-size:11px">未達 □</span>`:`<span>未達起扣點 ☑</span>&nbsp;&nbsp;<span style="font-size:11px">扣繳 □</span>`}
+      </div>
+      <div class="amount-big" style="margin-top:4px">扣繳金額：NT$ ${withTax.toLocaleString()} 元整</div>
+    </div>
+  </div>
+</div>
+
+<div class="sign-row">
+  <div>領款人簽名：<span class="sign-line"></span></div>
+  <div>單號：${sn}</div>
+</div>
+<div style="margin-top:10px;text-align:center;font-size:13px">日期：${dateStr}</div>
+</body></html>`;
+
+  const w=window.open('','_blank','width=760,height:900');
+  if(w){ w.document.write(html); w.document.close(); }
+  else { toast('請允許彈出視窗以產製 PDF'); }
+  closeModal();
+}
+
+// ════════════════════════════════════════
+//  口碑月度作業 SOP 引導頁
+// ════════════════════════════════════════
+function renderSopOmPage(){
+  const ymEl = document.getElementById('sop-ym');
+  if(ymEl && !ymEl.value) ymEl.value = new Date().toISOString().slice(0,7);
+}
+
+function runSopOm(){
+  const ym = document.getElementById('sop-ym')?.value || new Date().toISOString().slice(0,7);
+  const el = document.getElementById('sop-om-content');
+  if(!el) return;
+
+  const activeContracts = DB.contracts.filter(c=>c.status==='進行中');
+  const thisMonthOm = (DB.omRecords||[]).filter(r=>(r.month||'').slice(0,7)===ym);
+
+  // 各步驟完成偵測
+  const step1Done = activeContracts.length>0 && activeContracts.every(ct=>thisMonthOm.some(r=>r.contractId===ct.id));
+  const step2Done = step1Done && thisMonthOm.filter(r=>r.status==='待規劃').length===0;
+  const step3Done = step2Done && thisMonthOm.filter(r=>r.status==='切角確認').length===0;
+  const step4Done = step3Done && thisMonthOm.filter(r=>r.status==='待派寫手'||r.status==='撰文中').length===0;
+  const step5Done = step4Done && thisMonthOm.filter(r=>r.status==='文稿審核'||r.status==='切角審核').length===0;
+  const step6Done = step5Done && thisMonthOm.filter(r=>r.status==='待派帳號商').length===0;
+  const step7Done = step6Done && thisMonthOm.filter(r=>r.status==='待上刊'||r.status==='待確認').length===0;
+
+  const stepIcon = (done, active) => done
+    ? `<span style="width:28px;height:28px;border-radius:50%;background:#16a34a;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">✓</span>`
+    : active
+    ? `<span style="width:28px;height:28px;border-radius:50%;background:#1B4FD8;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;animation:sop-pulse 2s infinite">▶</span>`
+    : `<span style="width:28px;height:28px;border-radius:50%;background:var(--border);color:var(--text3);display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">—</span>`;
+
+  const stepCard = (num, title, isDone, isActive, content) => `
+    <div style="border:1px solid ${isDone?'#86efac':isActive?'#93c5fd':'var(--border)'};border-radius:var(--r);margin-bottom:14px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:${isDone?'#f0fdf4':isActive?'#eff6ff':'var(--surface2)'}">
+        ${stepIcon(isDone,isActive)}
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:${isDone?'#166534':isActive?'#1D4ED8':'var(--text3)'}">步驟 ${num}　${title}</div>
+          <div style="font-size:11px;margin-top:2px;color:${isDone?'#16a34a':isActive?'#1D4ED8':'var(--text3)'}">
+            ${isDone?'✓ 已完成':isActive?'← 目前步驟，點擊展開':'等待前序步驟完成'}
+          </div>
+        </div>
+      </div>
+      ${(isActive||isDone)?`<div style="padding:14px 16px;border-top:1px solid ${isDone?'#bbf7d0':'#bfdbfe'};background:#fff">${content}</div>`:''}
+    </div>`;
+
+  const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+  const vendorOpts = (DB.vendorCompanies||[]).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+
+  // ── 步驟1：建立本月任務 ──
+  const s1 = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">點擊「產生本月任務」，系統依規格自動建立口碑記錄。</div>
+    ${activeContracts.length?activeContracts.map(ct=>{
+      const cl=DB.clients.find(c=>c.id===ct.clientId)||{};
+      const has=thisMonthOm.some(r=>r.contractId===ct.id);
+      const specs=DB.specItems.filter(s=>s.contractId===ct.id&&(s.category==='口碑'||!s.category));
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;background:${has?'#f0fdf4':'var(--surface2)'}">
+        <div style="flex:1"><div style="font-size:13px;font-weight:500">${cl.name}</div>
+        <div style="font-size:11px;color:var(--text3)">${ct.contractNo||''} · ${specs.length} 項口碑規格</div></div>
+        ${has?`<span class="tag tag-green" style="font-size:11px">✓ 已建立 ${thisMonthOm.filter(r=>r.contractId===ct.id).length} 筆</span>`
+          :`<button class="btn btn-sm btn-primary" onclick="genOmTasksFromSpec('${ct.id}','${ym}');setTimeout(runSopOm,300)">＋ 產生本月任務</button>`}
+      </div>`;
+    }).join(''):`<div style="font-size:12px;color:var(--text3)">目前無進行中合約</div>`}`;
+
+  // ── 步驟2：切角確認 ──
+  const plan = thisMonthOm.filter(r=>r.status==='待規劃');
+  const s2 = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">與客戶確認切角方向、回文方向、資料夾路徑，確認後推進。</div>
+    ${plan.length?plan.map(r=>{
+      const cl=DB.clients.find(c=>c.id===r.clientId)||{};
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #fcd34d;border-radius:var(--r);margin-bottom:8px;background:#fffbeb">
+        <div style="flex:1"><div style="font-size:12px;font-weight:500">${cl.name||r.clientName} · ${r.specType||'—'}</div>
+        <div style="font-size:11px;color:var(--text3)">${r.title||'（尚無標題）'}</div></div>
+        <button class="btn btn-xs" onclick="openOmDrawer('${r.id}')">編輯</button>
+        <button class="btn btn-xs btn-primary" onclick="omAdvanceStatus('${r.id}','切角確認');setTimeout(runSopOm,200)">→ 切角確認</button>
+      </div>`;
+    }).join(''):`<div style="font-size:12px;color:#16a34a">✓ 所有任務均已完成切角確認</div>`}`;
+
+  // ── 步驟3：指派寫手 ──
+  const cutAngle = thisMonthOm.filter(r=>r.status==='切角確認');
+  const s3 = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">切角方向確認後，為每個任務選擇寫手，推進至撰文中。</div>
+    ${cutAngle.length?cutAngle.map(r=>{
+      const cl=DB.clients.find(c=>c.id===r.clientId)||{};
+      return `<div style="padding:10px;border:1px solid #c4b5fd;border-radius:var(--r);margin-bottom:8px;background:#f5f3ff">
+        <div style="font-size:12px;font-weight:500;margin-bottom:8px">${cl.name||r.clientName} · ${r.specType}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <select id="sop-writer-${r.id}" class="form-input" style="flex:1;font-size:12px">
+            <option value="">— 選擇寫手 —</option>${writerOpts}
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="sopAssignWriter('${r.id}')">指派</button>
+          <button class="btn btn-xs" onclick="openOmDrawer('${r.id}')">編輯</button>
+        </div>
+      </div>`;
+    }).join(''):`<div style="font-size:12px;color:#16a34a">✓ 所有任務均已指派寫手</div>`}`;
+
+  // ── 步驟4：撰文中（寫手作業）──
+  const writing = thisMonthOm.filter(r=>r.status==='待派寫手'||r.status==='撰文中');
+  const s4 = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">寫手登入 CRM 後即可看到任務，填寫 Google Doc 連結後狀態自動變「文稿審核」。</div>
+    ${writing.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      ${writing.map(r=>`<div style="background:${r.status==='撰文中'?'#fef3c7':'#ede9fe'};border-radius:20px;padding:4px 10px;font-size:11px">
+        ${r.writerName||'未指派'} — ${r.specType} <span style="opacity:.6">${r.status}</span>
+        ${r.draftLink?`<a href="${r.draftLink}" target="_blank" style="color:#5b21b6">📄</a>`:''}
+      </div>`).join('')}</div>
+      <div style="font-size:11px;color:var(--text3)">共 ${writing.length} 筆等待寫手完稿</div>`
+    :`<div style="font-size:12px;color:#16a34a">✓ 所有任務均已完成撰文</div>`}`;
+
+  // ── 步驟5：文稿審核 ──
+  const reviewing = thisMonthOm.filter(r=>r.status==='文稿審核'||r.status==='切角審核');
+  const s5 = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">審查稿件，需要客戶確認切角可推「客戶審核」，通過後推「待派帳號商」。</div>
+    ${reviewing.length?reviewing.map(r=>{
+      const cl=DB.clients.find(c=>c.id===r.clientId)||{};
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #93c5fd;border-radius:var(--r);margin-bottom:8px">
+        <span class="tag ${OM_STATUS_COLOR[r.status]}" style="font-size:10px;flex-shrink:0">${r.status}</span>
+        <div style="flex:1;font-size:12px">${cl.name||r.clientName} · ${r.specType}</div>
+        ${r.draftLink?`<a href="${r.draftLink}" target="_blank" class="btn btn-xs">📄 稿件</a>`:''}
+        ${r.status==='文稿審核'?`
+          <button class="btn btn-xs" onclick="omAdvanceStatus('${r.id}','切角審核');setTimeout(runSopOm,200)">→ 客戶審核</button>
+          <button class="btn btn-xs btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(runSopOm,200)">✓ 通過</button>`
+        :`<button class="btn btn-xs btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(runSopOm,200)">✓ 客戶通過</button>`}
+      </div>`;
+    }).join(''):`<div style="font-size:12px;color:#16a34a">✓ 所有文稿均已通過審核</div>`}`;
+
+  // ── 步驟6：指派帳號商 ──
+  const pendingVendor = thisMonthOm.filter(r=>r.status==='待派帳號商');
+  const s6 = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">選擇帳號商後推進至「待上刊」，帳號商登入 CRM 即可看到任務。</div>
+    ${pendingVendor.length?pendingVendor.map(r=>{
+      const cl=DB.clients.find(c=>c.id===r.clientId)||{};
+      return `<div style="padding:10px;border:1px solid #fcd34d;border-radius:var(--r);margin-bottom:8px;background:#fffbeb">
+        <div style="font-size:12px;font-weight:500;margin-bottom:8px">${cl.name||r.clientName} · ${r.specType} · 寫手：${r.writerName||'—'}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <select id="sop-vendor-${r.id}" class="form-input" style="flex:1;font-size:12px">
+            <option value="">— 選擇帳號商 —</option>${vendorOpts}
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="sopAssignVendor('${r.id}')">指派</button>
+        </div>
+      </div>`;
+    }).join(''):`<div style="font-size:12px;color:#16a34a">✓ 所有任務均已指派帳號商</div>`}`;
+
+  // ── 步驟7：上刊確認 ──
+  const pending7 = thisMonthOm.filter(r=>r.status==='待上刊'||r.status==='待確認');
+  const s7 = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">帳號商登入後回報上刊結果（狀態→待確認），由樂法確認完成。</div>
+    ${pending7.length?pending7.map(r=>{
+      const cl=DB.clients.find(c=>c.id===r.clientId)||{};
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px">
+        <span class="tag ${OM_STATUS_COLOR[r.status]}" style="font-size:10px;flex-shrink:0">${r.status}</span>
+        <div style="flex:1;font-size:12px">${cl.name||r.clientName} · ${r.vendorName||'—'}</div>
+        ${r.status==='待確認'?`
+          <button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="confirmOmTask('${r.id}')">✓ 確認</button>
+          <button class="btn btn-xs" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="rejectOmTask('${r.id}')">↩ 退回</button>`
+        :`<span style="font-size:11px;color:var(--text3)">等待帳號商上刊</span>`}
+      </div>`;
+    }).join(''):`<div style="font-size:12px;color:#16a34a">✓ 所有任務均已確認上刊</div>`}`;
+
+  const doneCount = thisMonthOm.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
+
+  el.innerHTML = `
+    <style>@keyframes sop-pulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.4)}70%{box-shadow:0 0 0 6px rgba(29,78,216,0)}}</style>
+    <div style="background:var(--surface2);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:600">${ym} 口碑月度作業</div>
+      <div style="font-size:12px;color:var(--text3)">共 ${thisMonthOm.length} 筆任務</div>
+      <div style="margin-left:auto;font-size:12px;color:#16a34a;font-weight:600">已完成上刊 ${doneCount} 筆</div>
+      <button class="btn btn-sm" onclick="runSopOm()" style="font-size:11px">🔄 重新整理</button>
+    </div>
+    ${stepCard(1,'建立本月任務', step1Done, !step1Done, s1)}
+    ${stepCard(2,'切角確認', step2Done, step1Done&&!step2Done, s2)}
+    ${stepCard(3,'指派寫手', step3Done, step2Done&&!step3Done, s3)}
+    ${stepCard(4,'寫手撰文中', step4Done, step3Done&&!step4Done, s4)}
+    ${stepCard(5,'文稿審核', step5Done, step4Done&&!step5Done, s5)}
+    ${stepCard(6,'指派帳號商', step6Done, step5Done&&!step6Done, s6)}
+    ${stepCard(7,'上刊確認', step7Done, step6Done&&!step7Done, s7)}
+    ${step7Done&&thisMonthOm.length?`<div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:var(--r);padding:20px;text-align:center">
+      <div style="font-size:28px;margin-bottom:8px">🎉</div>
+      <div style="font-size:15px;font-weight:600;color:#166534">${ym} 口碑月度作業全部完成！</div>
+      <div style="font-size:12px;color:#16a34a;margin-top:4px">共完成 ${doneCount} 筆任務</div>
+    </div>`:''}`;
+}
+
+function sopAssignWriter(taskId){
+  const writerId = document.getElementById('sop-writer-'+taskId)?.value;
+  if(!writerId){ toast('請選擇寫手'); return; }
+  const r=(DB.omRecords||[]).find(x=>x.id===taskId);if(!r)return;
+  const fl=DB.freelancers.find(f=>f.id===writerId);
+  r.writerId=writerId; r.writerName=fl?.name||''; r.status='撰文中';
+  syncToGAS('omRecords',r).catch(()=>{});
+  toast(`✓ 已指派 ${fl?.name||''}`,'success');
+  setTimeout(runSopOm,200);
+}
+
+function sopAssignVendor(taskId){
+  const vendorId=document.getElementById('sop-vendor-'+taskId)?.value;
+  if(!vendorId){ toast('請選擇帳號商'); return; }
+  const r=(DB.omRecords||[]).find(x=>x.id===taskId);if(!r)return;
+  const vc=(DB.vendorCompanies||[]).find(v=>v.id===vendorId);
+  r.vendorId=vendorId; r.vendorName=vc?.name||''; r.status='待上刊';
+  syncToGAS('omRecords',r).catch(()=>{});
+  toast(`✓ 已指派 ${vc?.name||''}`,'success');
+  setTimeout(runSopOm,200);
 }
 
 // ════════════════════════════════════════
