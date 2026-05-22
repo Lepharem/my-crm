@@ -464,13 +464,33 @@ body.test-mode .test-mode-fab{display:flex}</style>
     <div style="display:flex;justify-content:center;margin-bottom:4px">
       <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="signin_with" data-locale="zh-TW"></div>
     </div>
-    <div class="login-hint">僅限 @lepharem 網域帳號登入</div>
-    <div class="login-err" id="login-err">此帳號不在授權網域內，請使用公司帳號</div>
+    <div class="login-hint">樂法員工、合作寫手及帳號商均可登入</div>
+    <div class="login-err" id="login-err">此帳號不在授權名單內，請聯繫管理員</div>
   </div>
 </div>
 
 <!-- TOAST -->
 <div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- 寫手介面 -->
+<div id="writer-app" style="display:none;min-height:100vh;background:#f4f3f0;font-family:-apple-system,'PingFang TC',sans-serif">
+  <div style="background:#0f172a;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">
+    <div style="font-size:15px;font-weight:600;flex:1">樂法 × 寫手工作台</div>
+    <div id="writer-name-badge" style="font-size:12px;color:rgba(255,255,255,.5)"></div>
+    <button onclick="logoutUser()" style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">登出</button>
+  </div>
+  <div id="writer-content" style="max-width:720px;margin:0 auto;padding:20px 16px"></div>
+</div>
+
+<!-- 帳號商介面 -->
+<div id="vendor-app" style="display:none;min-height:100vh;background:#f4f3f0;font-family:-apple-system,'PingFang TC',sans-serif">
+  <div style="background:#0f172a;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">
+    <div style="font-size:15px;font-weight:600;flex:1">樂法 × 帳號商工作台</div>
+    <div id="vendor-name-badge" style="font-size:12px;color:rgba(255,255,255,.5)"></div>
+    <button onclick="logoutUser()" style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">登出</button>
+  </div>
+  <div id="vendor-content" style="max-width:720px;margin:0 auto;padding:20px 16px"></div>
+</div>
 
 <!-- SIDEBAR -->
 <div class="app" id="app" style="display:none">
@@ -1526,29 +1546,77 @@ body.test-mode .test-mode-fab{display:flex}</style>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXaeXM8YJD8qenB64lXlekWXgv6L4_bbJkZq1988i0URk9_LeiCWv9VF6AbtCvrgrT/exec';
 const ALLOWED_DOMAIN = 'lepharem';
 
-// ── 登入 ──
+// ── 角色狀態 ──
 let _currentUser = null;
+let _userRole = null; // 'staff' | 'writer' | 'vendor'
+let _userProfile = null; // 對應的 DB 物件
 
 function parseJwt(token){
   const b = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
   return JSON.parse(decodeURIComponent(atob(b).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));
 }
 
-function handleCredential(response){
+async function handleCredential(response){
   const payload = parseJwt(response.credential);
   const email = payload.email || '';
   const domain = (email.split('@')[1] || '').split('.')[0];
-  if(domain !== ALLOWED_DOMAIN){
-    document.getElementById('login-err').style.display = 'block';
+
+  _currentUser = { email, name: payload.name, picture: payload.picture };
+
+  // 先顯示載入中
+  const errEl = document.getElementById('login-err');
+  if(errEl){ errEl.style.display='none'; errEl.textContent=''; }
+
+  try {
+    // 呼叫 GAS 判斷角色
+    const roleRes = await gasApi('getMyRole', { email });
+    if(!roleRes || !roleRes.role){
+      if(errEl){ errEl.textContent='此帳號無使用權限，請聯繫管理員'; errEl.style.display='block'; }
+      _currentUser = null;
+      return;
+    }
+    _userRole = roleRes.role;
+    _userProfile = roleRes.member || roleRes.writer || roleRes.vendor || null;
+  } catch(e){
+    // GAS 無法呼叫時，fallback：@lepharem 網域視為 staff
+    if(domain === ALLOWED_DOMAIN){
+      _userRole = 'staff';
+    } else {
+      if(errEl){ errEl.textContent='無法驗證身份，請確認網路連線後重試'; errEl.style.display='block'; }
+      _currentUser = null;
+      return;
+    }
+  }
+
+  // 隱藏登入畫面
+  document.getElementById('login-screen').style.display = 'none';
+
+  // 依角色顯示不同介面
+  if(_userRole === 'writer'){
+    showWriterInterface();
     return;
   }
-  _currentUser = { email, name: payload.name, picture: payload.picture };
-  document.getElementById('login-screen').style.display = 'none';
+  if(_userRole === 'vendor'){
+    showVendorInterface();
+    return;
+  }
+
+  // staff：顯示完整 CRM
   document.getElementById('app').style.display = '';
-  // 更新 sidebar 顯示
+  updateSidebarUser(payload);
+  const ua = navigator.userAgent;
+  const device = /Mobi|Android/i.test(ua) ? '手機' : '電腦';
+  const browser = /Chrome/i.test(ua)?'Chrome':/Safari/i.test(ua)?'Safari':/Firefox/i.test(ua)?'Firefox':'其他';
+  gasApi('logLogin', { email, name: payload.name, device, browser }).catch(()=>{});
+  loadAllData();
+}
+
+function updateSidebarUser(payload){
   const uname = document.getElementById('sidebar-uname');
   const avatar = document.getElementById('sidebar-avatar');
-  if(uname) uname.textContent = payload.name;
+  const urole  = document.getElementById('sidebar-urole');
+  if(uname) uname.textContent = payload.name || _currentUser?.name || '';
+  if(urole) urole.textContent = _userRole==='staff'?'內部員工':_userRole==='writer'?'寫手':'帳號商';
   if(avatar){
     if(payload.picture){
       avatar.style.backgroundImage = `url(${payload.picture})`;
@@ -1558,24 +1626,224 @@ function handleCredential(response){
       avatar.textContent = (payload.name||'U').charAt(0).toUpperCase();
     }
   }
-  // 記錄登入
-  const ua = navigator.userAgent;
-  const device = /Mobi|Android/i.test(ua) ? '手機' : '電腦';
-  const browser = /Chrome/i.test(ua)?'Chrome':/Safari/i.test(ua)?'Safari':/Firefox/i.test(ua)?'Firefox':'其他';
-  gasApi('logLogin', { email, name: payload.name, device, browser }).catch(()=>{});
-  loadAllData();
 }
 
 window.loginWithGoogle = function(){};
 
 window.logoutUser = function(){
   if(!confirm('確定要登出嗎？')) return;
-  _currentUser = null;
+  _currentUser = null; _userRole = null; _userProfile = null;
   document.getElementById('login-screen').style.display = 'flex';
+  // 清除寫手/帳號商介面
+  const wi = document.getElementById('writer-app');
+  const vi = document.getElementById('vendor-app');
+  if(wi) wi.style.display = 'none';
+  if(vi) vi.style.display = 'none';
+  document.getElementById('app').style.display = 'none';
   if(typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
 };
 
-// ── GAS API ──
+// ══════════════════════════════════════════
+//  寫手介面
+// ══════════════════════════════════════════
+async function showWriterInterface(){
+  document.getElementById('writer-app').style.display = '';
+  const badge = document.getElementById('writer-name-badge');
+  if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
+  await renderWriterTasks();
+}
+
+async function renderWriterTasks(){
+  const el = document.getElementById('writer-content');
+  if(!el) return;
+  el.innerHTML = `<div style="text-align:center;padding:40px;color:#8a8680">載入中…</div>`;
+  try {
+    const res = await gasApi('getWriterTasks', { email: _currentUser.email });
+    const tasks = res.tasks || [];
+    const pending = tasks.filter(t => t.status === '撰文中');
+    const reviewing = tasks.filter(t => ['文稿審核','切角審核','待派帳號商'].includes(t.status));
+
+    const taskCard = (t) => {
+      const isPending = t.status === '撰文中';
+      return `<div style="background:#fff;border:1px solid ${isPending?'#fcd34d':'#e8e6e1'};border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#1a1917">${t.clientName}</div>
+            <div style="font-size:11px;color:#8a8680;margin-top:2px">${t.month} · ${t.specType}</div>
+          </div>
+          <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${isPending?'#fef3c7':'#ede9fe'};color:${isPending?'#92400E':'#5b21b6'}">${t.status}</span>
+        </div>
+        ${t.platform?`<div style="font-size:12px;color:#4a4845;margin-bottom:6px">📍 ${t.platform}${t.actionType?' · '+t.actionType:''}${t.section?' · '+t.section:''}</div>`:''}
+        ${t.title?`<div style="font-size:13px;font-weight:500;margin-bottom:6px;color:#1a1917">${t.title}</div>`:''}
+        ${t.content?`<div style="font-size:12px;color:#4a4845;background:#f8f7f5;border-radius:6px;padding:8px;margin-bottom:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto">${t.content}</div>`:''}
+        ${t.driveLink?`<div style="margin-bottom:8px"><a href="${t.driveLink}" target="_blank" style="font-size:12px;color:#1B4FD8;display:inline-flex;align-items:center;gap:4px">📁 專案資料夾</a></div>`:''}
+        ${isPending?`
+          <div style="margin-top:10px">
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Google Doc 稿件連結 *</label>
+            <input id="draft-${t.id}" type="url" placeholder="https://docs.google.com/..." value="${t.draftLink||''}"
+              style="width:100%;padding:8px 10px;border:1px solid #d4d1cb;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px">
+            <button onclick="submitWriterDraft('${t.id}')"
+              style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;width:100%">
+              ✓ 稿件完成，送回審核
+            </button>
+          </div>`
+        :`<div style="font-size:12px;color:#5b21b6;background:#ede9fe;border-radius:6px;padding:8px">
+            ${t.status} · 等待樂法處理
+            ${t.draftLink?`<br><a href="${t.draftLink}" target="_blank" style="color:#5b21b6">${t.draftLink.slice(0,50)}…</a>`:''}
+          </div>`}
+      </div>`;
+    };
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#92400E">${pending.length}</div>
+          <div style="font-size:12px;color:#8a8680;margin-top:2px">待撰文</div>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#5b21b6">${reviewing.length}</div>
+          <div style="font-size:12px;color:#8a8680;margin-top:2px">審核中</div>
+        </div>
+      </div>
+      ${pending.length?`<div style="font-size:11px;font-weight:600;color:#92400E;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">📝 待撰文（${pending.length}）</div>${pending.map(taskCard).join('')}`:''}
+      ${reviewing.length?`<div style="font-size:11px;font-weight:600;color:#5b21b6;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 8px">🔍 審核中（${reviewing.length}）</div>${reviewing.map(taskCard).join('')}`:''}
+      ${!tasks.length?`<div style="text-align:center;padding:40px;color:#8a8680">目前沒有進行中的任務</div>`:''}
+      <div style="text-align:center;margin-top:24px;font-size:11px;color:#c0bdb7">
+        資料不會自動更新，請手動重新整理頁面
+      </div>`;
+  } catch(e){
+    el.innerHTML = `<div style="text-align:center;padding:40px;color:#991b1b">載入失敗：${e.message}</div>`;
+  }
+}
+
+async function submitWriterDraft(taskId){
+  const link = document.getElementById('draft-'+taskId)?.value.trim();
+  if(!link){ toast('請填寫 Google Doc 連結'); return; }
+  const btn = document.querySelector(`button[onclick="submitWriterDraft('${taskId}')"]`);
+  if(btn){ btn.disabled=true; btn.textContent='送出中…'; }
+  try {
+    await gasApi('submitWriterDraft', { id: taskId, email: _currentUser.email, draftLink: link });
+    toast('✓ 稿件已送出，等待樂法審核','success');
+    setTimeout(renderWriterTasks, 800);
+  } catch(e){
+    toast('送出失敗：'+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='✓ 稿件完成，送回審核'; }
+  }
+}
+
+// ══════════════════════════════════════════
+//  帳號商介面
+// ══════════════════════════════════════════
+async function showVendorInterface(){
+  document.getElementById('vendor-app').style.display = '';
+  const badge = document.getElementById('vendor-name-badge');
+  if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
+  await renderVendorTasks();
+}
+
+async function renderVendorTasks(){
+  const el = document.getElementById('vendor-content');
+  if(!el) return;
+  el.innerHTML = `<div style="text-align:center;padding:40px;color:#8a8680">載入中…</div>`;
+  try {
+    const res = await gasApi('getVendorTasksByEmail', { email: _currentUser.email });
+    const tasks = res.tasks || [];
+    const vendorName = res.vendor || _userProfile?.name || '';
+    const pending  = tasks.filter(t => t.status === '待上刊');
+    const reported = tasks.filter(t => t.status === '待確認');
+
+    const taskCard = (t) => {
+      const isPending = t.status === '待上刊';
+      return `<div style="background:#fff;border:1px solid ${isPending?'#fcd34d':'#bbf7d0'};border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#1a1917">${t.clientName}</div>
+            <div style="font-size:11px;color:#8a8680;margin-top:2px">${t.month} · ${t.specType}</div>
+          </div>
+          <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${isPending?'#fef3c7':'#dcfce7'};color:${isPending?'#92400E':'#166534'}">${t.status}</span>
+        </div>
+        ${t.platform?`<div style="font-size:12px;color:#4a4845;margin-bottom:6px">📍 ${t.platform}${t.actionType?' · '+t.actionType:''}${t.section?' · '+t.section:''}</div>`:''}
+        ${t.title?`<div style="font-size:13px;font-weight:500;margin-bottom:6px">${t.title}</div>`:''}
+        ${t.content?`<div style="font-size:12px;color:#4a4845;background:#f8f7f5;border-radius:6px;padding:8px;margin-bottom:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto">${t.content}</div>`:''}
+        ${t.draftLink?`<div style="margin-bottom:10px"><a href="${t.draftLink}" target="_blank" style="font-size:12px;color:#1B4FD8;font-weight:500">📄 查看文稿</a></div>`:''}
+        ${isPending?`
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">發布日期 *</label>
+                <input id="vf-date-${t.id}" type="date" value="${new Date().toISOString().slice(0,10)}" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
+              <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">時間</label>
+                <input id="vf-time-${t.id}" type="time" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
+            </div>
+            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">論壇平台</label>
+              <input id="vf-platform-${t.id}" type="text" placeholder="Dcard / PTT / Facebook…" value="${t.platform||''}" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
+            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">板塊</label>
+              <input id="vf-section-${t.id}" type="text" placeholder="板塊名稱" value="${t.section||''}" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
+            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">文章連結 *</label>
+              <input id="vf-link-${t.id}" type="url" placeholder="https://…" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
+            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">使用帳號</label>
+              <input id="vf-account-${t.id}" type="text" placeholder="使用帳號" value="${t.account||''}" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
+            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">截圖連結（選填）</label>
+              <input id="vf-screenshot-${t.id}" type="url" placeholder="截圖 Google Drive 連結" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
+            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">備註</label>
+              <input id="vf-note-${t.id}" type="text" placeholder="選填" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
+            <button onclick="submitVendorPost('${t.id}')"
+              style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-top:4px">
+              ✓ 已上刊，回報樂法
+            </button>
+          </div>`
+        :`<div style="font-size:12px;color:#166534;background:#dcfce7;border-radius:6px;padding:8px">
+            ✓ 已回報 · 等待樂法確認<br>
+            ${t.postLink?`<a href="${t.postLink}" target="_blank" style="color:#166534">${t.postLink.slice(0,50)}…</a>`:''}
+          </div>`}
+      </div>`;
+    };
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#92400E">${pending.length}</div>
+          <div style="font-size:12px;color:#8a8680;margin-top:2px">待上刊</div>
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#166534">${reported.length}</div>
+          <div style="font-size:12px;color:#8a8680;margin-top:2px">已回報</div>
+        </div>
+      </div>
+      ${pending.length?`<div style="font-size:11px;font-weight:600;color:#92400E;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">📌 待上刊（${pending.length}）</div>${pending.map(taskCard).join('')}`
+        :`<div style="text-align:center;padding:32px;color:#8a8680;background:#fff;border-radius:12px;border:1px solid #e8e6e1">目前沒有待上刊的任務</div>`}
+      ${reported.length?`<div style="font-size:11px;font-weight:600;color:#166534;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 8px">✅ 已回報（${reported.length}）</div>${reported.map(taskCard).join('')}`:''}
+      <div style="text-align:center;margin-top:24px;font-size:11px;color:#c0bdb7">資料不會自動更新，請手動重新整理</div>`;
+  } catch(e){
+    el.innerHTML = `<div style="text-align:center;padding:40px;color:#991b1b">載入失敗：${e.message}</div>`;
+  }
+}
+
+async function submitVendorPost(taskId){
+  const link = document.getElementById('vf-link-'+taskId)?.value.trim();
+  if(!link){ toast('請填寫文章連結'); return; }
+  const btn = document.querySelector(`button[onclick="submitVendorPost('${taskId}')"]`);
+  if(btn){ btn.disabled=true; btn.textContent='送出中…'; }
+  const data = {
+    id: taskId,
+    email: _currentUser.email,
+    postLink:    link,
+    publishDate: document.getElementById('vf-date-'+taskId)?.value || '',
+    publishTime: document.getElementById('vf-time-'+taskId)?.value || '',
+    platform:    document.getElementById('vf-platform-'+taskId)?.value || '',
+    section:     document.getElementById('vf-section-'+taskId)?.value || '',
+    account:     document.getElementById('vf-account-'+taskId)?.value || '',
+    screenshot:  document.getElementById('vf-screenshot-'+taskId)?.value || '',
+    note:        document.getElementById('vf-note-'+taskId)?.value || '',
+  };
+  try {
+    await gasApi('submitVendorPostByEmail', data);
+    toast('✓ 已成功回報！','success');
+    setTimeout(renderVendorTasks, 800);
+  } catch(e){
+    toast('送出失敗：'+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='✓ 已上刊，回報樂法'; }
+  }
+}
 async function gasApi(action, body={}){
   // 測試模式：攔截所有寫入，只放行 getAll
   if(window._testMode && action !== 'getAll'){
@@ -4779,12 +5047,21 @@ function openNavGroup(id){
 
 // ═══ 口碑執行記錄 ═══
 
-const OM_STATUSES = ['待發包','撰文中','文稿審核','切角審核','待上刊','待確認','已上刊','觀察中','完成','文章刪除'];
+const OM_STATUSES = ['待規劃','切角確認','待派寫手','撰文中','文稿審核','切角審核','待派帳號商','待上刊','待確認','已上刊','觀察中','完成','文章刪除'];
 const OM_STATUS_COLOR = {
-  '待發包':'tag-gray','撰文中':'tag-amber','文稿審核':'tag-blue',
-  '切角審核':'tag-purple','待上刊':'tag-amber','待確認':'tag-purple','已上刊':'tag-green',
+  '待規劃':'tag-gray','切角確認':'tag-amber','待派寫手':'tag-purple',
+  '撰文中':'tag-amber','文稿審核':'tag-blue',
+  '切角審核':'tag-purple','待派帳號商':'tag-amber','待上刊':'tag-amber','待確認':'tag-purple','已上刊':'tag-green',
   '觀察中':'tag-blue','完成':'tag-green','文章刪除':'tag-red'
 };
+// 內部推進對照（不含寫手/帳號商行動觸發的狀態）
+const OM_NEXT_INTERNAL = {
+  '待規劃':'切角確認','切角確認':'待派寫手','待派寫手':'撰文中',
+  '文稿審核':'切角審核','切角審核':'待派帳號商','待派帳號商':'待上刊',
+  '待確認':'已上刊','已上刊':'觀察中','觀察中':'完成'
+};
+// 寫手行動：撰文中 → 文稿審核（由寫手頁面觸發）
+// 帳號商行動：待上刊 → 已上刊（由帳號商頁面觸發）
 
 function genOmId(vendorName){
   const now=new Date();
@@ -4908,9 +5185,13 @@ function renderOmPage(){
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap">
             ${r.postLink?`<a href="${r.postLink}" target="_blank" class="btn btn-xs" title="開啟上文連結">🔗</a>`:''}
+            ${r.draftLink?`<a href="${r.draftLink}" target="_blank" class="btn btn-xs" style="background:#ede9fe;color:#5b21b6;border-color:#c4b5fd" title="查看稿件">📄</a>`:''}
             ${r.status==='待確認'?`
               <button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="confirmOmTask('${r.id}')" title="確認上刊">✓ 確認</button>
               <button class="btn btn-xs" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="rejectOmTask('${r.id}')" title="退回">↩ 退回</button>
+            `:''}
+            ${OM_NEXT_INTERNAL[r.status]?`
+              <button class="btn btn-xs edit-only" style="font-size:10px" onclick="omAdvanceStatus('${r.id}','${OM_NEXT_INTERNAL[r.status]}')" title="推進至${OM_NEXT_INTERNAL[r.status]}">→ ${OM_NEXT_INTERNAL[r.status]}</button>
             `:''}
             <button class="btn btn-xs edit-only" onclick="openOmDrawer('${r.id}')" title="編輯">✏️</button>
             <button class="btn btn-xs edit-only" style="color:var(--red)" onclick="deleteOmRecord('${r.id}')" title="刪除">✕</button>
@@ -4920,6 +5201,14 @@ function renderOmPage(){
     }).join('')}</tbody>
   </table></div></div>`;
   el.innerHTML=html;
+}
+
+function omAdvanceStatus(id, nextStatus){
+  const r=DB.omRecords.find(x=>x.id===id);if(!r)return;
+  r.status=nextStatus;
+  syncToGAS('omRecords',r).catch(e=>console.error(e));
+  renderOmPage();
+  toast(`→ ${nextStatus}`,'success');
 }
 
 function deleteOmRecord(id){
@@ -6682,15 +6971,43 @@ function openAddFreelancer(){
     <div class="form-row">
       <div class="form-group"><label class="form-label">姓名 *</label><input class="form-input" id="f-name" placeholder="外包人員姓名"></div>
       <div class="form-group"><label class="form-label">類型</label>
-        <select class="form-input" id="f-type"><option>口碑</option><option>社群</option></select>
+        <select class="form-input" id="f-type"><option>口碑</option><option>社群</option><option>廣告</option><option>其他</option></select>
       </div>
     </div>
-    <div class="form-group"><label class="form-label">請款方式</label>
-      <select class="form-input" id="f-pay"><option>勞報</option><option>發票</option><option>其他</option></select>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">請款方式</label>
+        <select class="form-input" id="f-pay"><option>勞報</option><option>發票</option><option>其他</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">所得類別</label>
+        <select class="form-input" id="f-income"><option value="50">兼職薪資（50）</option><option value="9A">稿費（9A）</option><option value="其他">其他</option></select>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px">登入資訊（外部寫手/帳號商）</div>
+      <div class="form-group"><label class="form-label">Email（Google 帳號）</label><input class="form-input" id="f-email" type="email" placeholder="外包人員 Google 帳號"></div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px">勞報單資料</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">身分證字號</label><input class="form-input" id="f-idno" placeholder="A123456789"></div>
+        <div class="form-group"><label class="form-label">聯絡電話</label><input class="form-input" id="f-phone" placeholder="0912345678"></div>
+      </div>
+      <div class="form-group"><label class="form-label">聯絡地址</label><input class="form-input" id="f-address" placeholder="縣市區里街道號碼"></div>
     </div>
   `,()=>{
     const name=document.getElementById('f-name').value.trim();if(!name)return alert('請填寫姓名');
-    DB.freelancers.push({id:nextId('FL'),name,type:document.getElementById('f-type').value,payMethod:document.getElementById('f-pay').value,items:[]});
+    const newF={
+      id:nextId('FL'),name,
+      type:document.getElementById('f-type').value,
+      payMethod:document.getElementById('f-pay').value,
+      incomeCategory:document.getElementById('f-income').value,
+      email:document.getElementById('f-email').value.trim(),
+      idNo:document.getElementById('f-idno').value.trim(),
+      phone:document.getElementById('f-phone').value.trim(),
+      address:document.getElementById('f-address').value.trim(),
+      items:[]
+    };
+    DB.freelancers.push(newF);
     closeModal();renderFreelancerPage();toast('已新增','success');
   });
 }
@@ -6701,16 +7018,42 @@ function openEditFreelancer(id){
     <div class="form-row">
       <div class="form-group"><label class="form-label">姓名</label><input class="form-input" id="f-name" value="${f.name}"></div>
       <div class="form-group"><label class="form-label">類型</label>
-        <select class="form-input" id="f-type"><option ${f.type==='口碑'?'selected':''}>口碑</option><option ${f.type==='社群'?'selected':''}>社群</option></select>
+        <select class="form-input" id="f-type"><option ${f.type==='口碑'?'selected':''}>口碑</option><option ${f.type==='社群'?'selected':''}>社群</option><option ${f.type==='廣告'?'selected':''}>廣告</option><option ${f.type==='其他'?'selected':''}>其他</option></select>
       </div>
     </div>
-    <div class="form-group"><label class="form-label">請款方式</label>
-      <select class="form-input" id="f-pay"><option ${f.payMethod==='勞報'?'selected':''}>勞報</option><option ${f.payMethod==='發票'?'selected':''}>發票</option><option>其他</option></select>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">請款方式</label>
+        <select class="form-input" id="f-pay"><option ${f.payMethod==='勞報'?'selected':''}>勞報</option><option ${f.payMethod==='發票'?'selected':''}>發票</option><option>其他</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">所得類別</label>
+        <select class="form-input" id="f-income">
+          <option value="50" ${(f.incomeCategory||'50')==='50'?'selected':''}>兼職薪資（50）</option>
+          <option value="9A" ${f.incomeCategory==='9A'?'selected':''}>稿費（9A）</option>
+          <option value="其他" ${f.incomeCategory==='其他'?'selected':''}>其他</option>
+        </select>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px">登入資訊</div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="f-email" type="email" value="${f.email||''}"></div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px">勞報單資料</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">身分證字號</label><input class="form-input" id="f-idno" value="${f.idNo||''}"></div>
+        <div class="form-group"><label class="form-label">聯絡電話</label><input class="form-input" id="f-phone" value="${f.phone||''}"></div>
+      </div>
+      <div class="form-group"><label class="form-label">聯絡地址</label><input class="form-input" id="f-address" value="${f.address||''}"></div>
     </div>
   `,()=>{
     f.name=document.getElementById('f-name').value.trim()||f.name;
     f.type=document.getElementById('f-type').value;
     f.payMethod=document.getElementById('f-pay').value;
+    f.incomeCategory=document.getElementById('f-income').value;
+    f.email=document.getElementById('f-email').value.trim();
+    f.idNo=document.getElementById('f-idno').value.trim();
+    f.phone=document.getElementById('f-phone').value.trim();
+    f.address=document.getElementById('f-address').value.trim();
     closeModal();renderFreelancerPage();toast('已更新','success');
   });
 }
