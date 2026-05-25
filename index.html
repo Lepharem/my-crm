@@ -1662,13 +1662,37 @@ async function handleCredential(response){
   // staff：顯示完整 CRM
   document.getElementById('app').style.display = '';
   updateSidebarUser(payload);
+
+  // 確保 myMember 從 GAS 或本地 DB 中找到（決定角色顯示）
+  if(!myMember){
+    myMember = DB.members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
+  }
+  // 若 GAS 回傳了 member 資料，也更新 myMember
+  if(_userProfile && _userProfile.email) myMember = _userProfile;
+  // 根據 myMember 設定 hrRole（老闆/主管/企劃…）
+  if(myMember && !_currentUser.hrRole){
+    _currentUser.hrRole = myMember.role || 'employee';
+  }
+
   const ua = navigator.userAgent;
   const device = /Mobi|Android/i.test(ua) ? '手機' : '電腦';
   const browser = /Chrome/i.test(ua)?'Chrome':/Safari/i.test(ua)?'Safari':/Firefox/i.test(ua)?'Firefox':'其他';
   gasApi('logLogin', { email, name: payload.name, device, browser }).catch(()=>{});
-  loadAllData().then(()=>{
+
+  // loadAllData 完成後，渲染首頁
+  const finishLogin = () => {
+    // 再次嘗試從 DB 找 myMember（loadAllData 後資料更完整）
+    if(!myMember || !myMember.role){
+      myMember = DB.members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
+    }
+    if(myMember && !_currentUser.hrRole){
+      _currentUser.hrRole = myMember.role || 'employee';
+    }
     _applySidebarPermissions();
-  }).catch(()=>{ _applySidebarPermissions(); });
+    renderHome();
+    navTo('home');
+  };
+  loadAllData().then(finishLogin).catch(finishLogin);
 }
 
 function updateSidebarUser(payload){
@@ -2631,7 +2655,12 @@ window.loadAllData = async function(){
 
     // contracts（支援新舊 key）
     const contractsRaw = data.contracts || data.crm_contracts || [];
-    if(contractsRaw.length) DB.contracts = contractsRaw.filter(r => r.id && r.id !== 'id');
+    if(contractsRaw.length) DB.contracts = contractsRaw.filter(r => r.id && r.id !== 'id').map(r => ({
+      ...r,
+      // 正規化 status 中英文
+      status: r.status==='active'?'進行中':r.status==='closed'?'結案':r.status||'進行中',
+      clientId: r.clientId || r.client_id || '',
+    }));
 
     // receivables：GAS 回傳 contract_payments / fin_payments（平面列表），轉換成帶 payments[] 子陣列的格式
     const cpRaw = data.contract_payments || data.fin_payments || data.receivables || [];
@@ -2676,7 +2705,16 @@ window.loadAllData = async function(){
 
     // spec_items（支援新舊 key）
     const siRaw = data.spec_items || data.fin_spec_items || data.specItems || [];
-    if(siRaw.length) DB.specItems = siRaw.filter(r => r.id && r.id !== 'id');
+    if(siRaw.length) DB.specItems = siRaw.filter(r => r.id && r.id !== 'id').map(r => ({
+      ...r,
+      // 正規化欄位名稱（GAS 可能用不同命名）
+      name:       r.name       || r.specName  || r.spec_name || '',
+      contractId: r.contractId || r.contract_id || '',
+      clientId:   r.clientId   || r.client_id   || '',
+      category:   r.category   || '口碑',
+      qty:        Number(r.qty || r.quantity || 0),
+      monthlyQty: Number(r.monthlyQty || r.monthly_qty || 0),
+    }));
 
     // vendor_records（支援新舊 key）
     const vrRaw = data.vendor_records || data.fin_vendor_records || data.vendorRecords || [];
@@ -2875,7 +2913,7 @@ window.loadAllData = async function(){
     }, 0);
   } catch(err) {
     console.error('loadAllData failed:', err);
-    toast('⚠️ 無法連線 GAS，使用本地資料繼續', 'info');
+    // GAS 失敗時靜默 fallback，不顯示 toast（避免干擾使用者）
     // 補 taskName（GAS 未回傳資料，靜態 DB 仍可用）
     const specCount = {};
     (DB.omRecords||[]).forEach(r=>{
@@ -3053,7 +3091,8 @@ function _applyRoleInterface(role){
     // staff — 顯示主 CRM
     const loginScreen = document.getElementById('login-screen');
     if(loginScreen) loginScreen.style.display = 'none';
-    if(app) app.style.display = '';
+    // 確保 app 用 flex 顯示
+    if(app){ app.style.display = 'flex'; }
     // 更新 sidebar 使用者資訊
     const uname = document.getElementById('sidebar-uname');
     const urole = document.getElementById('sidebar-urole');
@@ -3066,11 +3105,13 @@ function _applyRoleInterface(role){
     if(avatar){ avatar.textContent = (_currentUser?.name||'T').charAt(0); avatar.style.backgroundImage = ''; }
     // 套用 sidebar 權限管制
     _applySidebarPermissions();
-    // 重新渲染首頁（加保護）
-    try {
-      if(typeof renderHome === 'function') renderHome();
-    } catch(e) { console.warn('renderHome error:', e); }
-    navTo('home');
+    // 等 DOM 更新後再渲染（確保 app 已顯示）
+    requestAnimationFrame(()=>{
+      try {
+        if(typeof renderHome === 'function') renderHome();
+      } catch(e) { console.warn('renderHome error:', e); }
+      navTo('home');
+    });
   }
 }
 
