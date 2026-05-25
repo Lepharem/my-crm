@@ -2471,7 +2471,14 @@ function _clientConfirmTask(taskId, action){
   if(!r) return;
   if(action==='ok'){
     r.clientConfirmStatus='confirmed';
-    r.status='切角確認';
+    // 根據目前狀態決定下一步：
+    // 「切角審核」= 文稿送過來審的，過稿後進 '待派帳號商'
+    // 「待規劃」  = 切角規劃送來確認的，確認後進 '切角確認'
+    if(r.status==='切角審核'){
+      r.status='待派帳號商';
+    } else {
+      r.status='切角確認';
+    }
     if(!r.reviewHistory) r.reviewHistory=[];
     r.reviewHistory.push({action:'confirmed',by:'client_self',at:new Date().toISOString(),note:''});
     syncToGAS('omRecords',r).catch(()=>{});
@@ -2507,8 +2514,14 @@ function _clientUpdateTaskRow(taskId, r, keepOpen){
   const lastTd = row.querySelector('td:last-child');
   if(!lastTd) return;
   if(cs==='confirmed'){
-    // 收合：只顯示狀態徽章 + 已確認
-    lastTd.innerHTML = `<span style="font-size:11px;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:12px">${r.status}</span><div style="font-size:10px;color:#166534;margin-top:3px">✓ 已確認</div>`;
+    // 收合：只顯示狀態徽章 + 已確認（狀態顏色依最新 r.status）
+    const _stColor = ['已上刊','觀察中','完成','待派帳號商'].includes(r.status)?'#166534':
+                     ['切角審核','切角確認'].includes(r.status)?'#5b21b6':
+                     r.status==='文稿審核'?'#1B4FD8':'#92400E';
+    const _stBg    = ['已上刊','觀察中','完成','待派帳號商'].includes(r.status)?'#dcfce7':
+                     ['切角審核','切角確認'].includes(r.status)?'#ede9fe':
+                     r.status==='文稿審核'?'#eff6ff':'#fef3c7';
+    lastTd.innerHTML = '<span style="font-size:11px;background:'+_stBg+';color:'+_stColor+';padding:2px 8px;border-radius:12px">'+r.status+'</span><div style="font-size:10px;color:#166534;margin-top:3px">✓ 已確認</div>';
     row.style.background = '#f0fdf4';
   } else if(cs==='rejected'){
     if(keepOpen){
@@ -8070,10 +8083,13 @@ h2{font-size:18px;font-weight:bold;margin-bottom:4px}
 function getSopState(clientId, ym, contractId){
   if(!DB.sopState) DB.sopState = {};
   if(!DB.sopState[clientId]) DB.sopState[clientId] = {};
-  if(!DB.sopState[clientId][ym]) DB.sopState[clientId][ym] = { line:null, step:0, clientConfirmed:false, planItems:[], contractId:'' };
-  // 若有傳入 contractId，更新到 state（供後續呼叫使用）
-  if(contractId) DB.sopState[clientId][ym].contractId = contractId;
-  return DB.sopState[clientId][ym];
+  if(!DB.sopState[clientId][ym]) DB.sopState[clientId][ym] = {};
+  // 用 contractId 作為 key，讓同一客戶同一月份可同時有多條獨立流程（A線+多條B線）
+  const ctKey = contractId || '__unknown__';
+  if(!DB.sopState[clientId][ym][ctKey]) DB.sopState[clientId][ym][ctKey] = { line:null, step:0, clientConfirmed:false, planItems:[], contractId: ctKey };
+  // 確保 contractId 有存
+  if(contractId) DB.sopState[clientId][ym][ctKey].contractId = contractId;
+  return DB.sopState[clientId][ym][ctKey];
 }
 
 function renderSopOmPage(){
@@ -8264,10 +8280,11 @@ function renderSopFlow(clientId, contractId, ym){
   }  // if(state.line === 'A')
 
   // ── 指派寫手步驟（A線步3，B線步2）──
-  const writerStep = state.line==='A' ? 3 : 2;
+  // A線有 writerStep，B線步驟1完成後直接進文稿審核
+  const writerStep = state.line==='A' ? 3 : null;
   let swStatus = 'waiting', swContent = '';
-  const writerActive = state.step === writerStep;
-  const writerDone   = state.step > writerStep;
+  const writerActive = writerStep !== null && state.step === writerStep;
+  const writerDone   = writerStep !== null && state.step > writerStep;
   if(writerDone) swStatus = 'done';
   else if(writerActive) swStatus = 'active';
   if(writerActive || writerDone){
@@ -8341,19 +8358,19 @@ function renderSopFlow(clientId, contractId, ym){
         </div>`;
       }).join('')}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${!needWriter.length&&hasWriter.length?`<button class="btn btn-primary" style="flex:1" onclick="_sopStepNext('${clientId}','${ym}')">✓ 全部指派完成，進行下一步</button>`:''}
-        ${hasWriter.length>0&&needWriter.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep3PartialContinue('${clientId}','${ym}')">⚡ 已指派部分（${hasWriter.length}筆），先進行下一步</button>`:''}
+        ${!needWriter.length&&hasWriter.length?`<button id="sop-writer-next-btn" class="btn btn-primary" style="flex:1" onclick="var b=document.getElementById('sop-writer-next-btn');if(b)b.style.display='none';_sopStepNext('${clientId}','${ym}')">✓ 全部指派完成，進行下一步</button>`:''}
+        ${hasWriter.length>0&&needWriter.length>0?`<button id="sop-writer-partial-btn" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="var b=document.getElementById('sop-writer-partial-btn');if(b)b.style.display='none';_sopStep3PartialContinue('${clientId}','${ym}')">⚡ 已指派部分（${hasWriter.length}筆），先進行下一步</button>`:''}
       </div>`;
   }
 
   // ── 文稿審核步驟（A線步4，B線步3）──
-  const reviewStep = state.line==='A' ? 4 : 3;
+  const reviewStep = state.line==='A' ? 4 : 2;  // B線無writerStep，文稿審核是步驟2
   let srStatus = 'waiting', srContent = '';
   if(state.step > reviewStep) srStatus = 'done';
   else if(state.step === reviewStep) srStatus = 'active';
   if(state.step >= reviewStep){
     const reviewing = thisMonthOm.filter(r=>['撰文中','文稿審核','切角審核'].includes(r.status));
-    const reviewed  = thisMonthOm.filter(r=>r.status==='待派帳號商'||r.status==='待上刊'||r.status==='已上刊'||r.status==='完成');
+    const reviewed  = thisMonthOm.filter(r=>['待派帳號商','待上刊','待確認','已上刊','觀察中','完成'].includes(r.status));
     srContent = `
       <div style="font-size:12px;color:var(--text2);margin-bottom:12px">確認寫手回傳的稿件，可送客戶審核或直接通過。</div>
       ${reviewing.map(r=>`
@@ -8381,17 +8398,22 @@ function renderSopFlow(clientId, contractId, ym){
           <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}</span>
           <span class="tag tag-green" style="font-size:10px">✓ 文稿通過</span>
         </div>`).join('')}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="_sopStepNext('${clientId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
-        ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext('${clientId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
+      <div id="sop-review-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('sop-review-actions').style.display='none';_sopStepNext('${clientId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
+        ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById('sop-review-actions').style.display='none';_sopStepNext('${clientId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
       </div>`;
   }
 
   // ── 指派帳號商步驟（A線步5，B線步4）──
-  const vendorStep = state.line==='A' ? 5 : 4;
+  const vendorStep = state.line==='A' ? 5 : 3;  // B線無writerStep，指派帳號商是步驟3
   let svStatus = 'waiting', svContent = '';
   if(state.step > vendorStep) svStatus = 'done';
   else if(state.step === vendorStep) svStatus = 'active';
+  // 指派帳號商：只在前序文稿審核「全部通過」後才真正 active（防止跳步）
+  // 判斷：reviewing 清單是否清空（無 撰文中/文稿審核/切角審核）
+  const _reviewingBlocking = thisMonthOm.filter(r=>['撰文中','文稿審核','切角審核'].includes(r.status));
+  const vendorBlocked = state.step === vendorStep && _reviewingBlocking.length > 0;
+  if(vendorBlocked) svStatus = 'paused';  // 前序未完成：顯示為暫停狀態
   if(state.step >= vendorStep){
     const needVendor = thisMonthOm.filter(r=>r.status==='待派帳號商');
     const hasVendor  = thisMonthOm.filter(r=>['待上刊','待確認','已上刊','觀察中','完成'].includes(r.status));
@@ -8399,7 +8421,10 @@ function renderSopFlow(clientId, contractId, ym){
     // 依規格分組批次指派
     const specGroupsV = {};
     needVendor.forEach(r=>{ const k=r.specType||'其他'; if(!specGroupsV[k]) specGroupsV[k]=[]; specGroupsV[k].push(r); });
-    svContent = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">選擇帳號商後推進至「待上刊」，可同規格批次指派。</div>\n'
+    svContent = (vendorBlocked
+      ? '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400E">⚠️ 尚有 '+_reviewingBlocking.length+' 篇文稿審核未完成，請先完成文稿審核步驟。</div>'
+      : '')
+      + '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">選擇帳號商後推進至「待上刊」，可同規格批次指派。</div>\n'
       // 批次指派區
       + Object.entries(specGroupsV).map(([specType,tasks])=>{
           const bKey = specType.replace(/[^a-zA-Z0-9]/g,'_');
@@ -8445,7 +8470,7 @@ function renderSopFlow(clientId, contractId, ym){
         }).join('')
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
       + (!needVendor.length&&hasVendor.length?'<div style="font-size:12px;color:#16a34a">✓ 所有任務均已指派帳號商</div>':'')
-      + (hasVendor.length>0&&needVendor.length>0?'<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext(\''+clientId+'\',\''+ym+'\')" >⚡ 已指派 '+hasVendor.length+' 筆，先進行下一步</button>':'')
+      + (hasVendor.length>0&&needVendor.length>0?'<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext(\\\''+clientId+'\\\',\\\''+ym+'\\\')" id="sop-vendor-next-btn" >⚡ 已指派 '+hasVendor.length+' 筆，先進行下一步</button>':'')
       + '</div>';
   }  // ← if(state.step >= vendorStep) 結尾
   // ── 組裝最終 HTML ──
@@ -8460,9 +8485,8 @@ function renderSopFlow(clientId, contractId, ym){
     stepsHtml += stepCard(4, '文稿審核', srStatus, srContent);
     stepsHtml += stepCard(5, '指派帳號商', svStatus, svContent, true);
   } else if(state.line==='B'){
-    stepsHtml += stepCard(2, '指派寫手', swStatus, swContent);
-    stepsHtml += stepCard(3, '文稿審核', srStatus, srContent);
-    stepsHtml += stepCard(4, '指派帳號商', svStatus, svContent, true);
+    stepsHtml += stepCard(2, '文稿審核', srStatus, srContent);
+    stepsHtml += stepCard(3, '指派帳號商', svStatus, svContent, true);
   } else {
     // 尚未選線，只顯示步驟1
   }
@@ -8654,15 +8678,22 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
   const writerOpts = writerList.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
   const rows = state.planItems;
 
-  // 取得某寫手的服務項目（開文類）
+  // 取得某寫手的服務項目（從 ref_freelancer_pricing 讀取，只取名稱）
   const getWriterItems = (writerId) => {
-    const fl = writerList.find(f=>f.id===writerId);
-    if(!fl||!fl.items) return [];
-    return fl.items.filter(it=>{
-      const n=it.item||'';
-      // 只列開文類項目
-      return _sopIsOpenPost(n)||/圖文|議題文|長圖文|短圖文/.test(n);
-    });
+    const fl = (DB.freelancerPricing||DB.freelancers||[]).find(f=>f.id===writerId);
+    if(!fl) return [];
+    // fl.items 格式：[{item:'長圖文',price:1100},...] 或直接是陣列
+    let itemList = [];
+    if(Array.isArray(fl.items)) {
+      itemList = fl.items;
+    } else if(typeof fl.items === 'string') {
+      try { itemList = JSON.parse(fl.items); } catch(e){ itemList = []; }
+    }
+    // 只取名稱（排除純報告類、結算類，保留實際執行項目）
+    return itemList.filter(it=>{
+      const n = it.item||it.name||'';
+      return n && !/結算|對帳|行政/.test(n);
+    }).map(it=>({ item: it.item||it.name||'' }));
   };
 
   // 渲染單一發文卡片
@@ -9092,8 +9123,8 @@ function _sopBatchAssignVendor(specType, clientId, ym, contractId){
 
 function _sopReset(clientId, ym){
   if(!confirm(`確定重置 ${ym} 的作業進度？（不會刪除已建立的口碑記錄）`)) return;
-  const ctId = DB.sopState?.[clientId]?.[ym]?.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
-  if(DB.sopState?.[clientId]) delete DB.sopState[clientId][ym];
+  const ctId = (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
+  if(DB.sopState?.[clientId]?.[ym]?.[ctId]) delete DB.sopState[clientId][ym][ctId];
   renderSopFlow(clientId, ctId, ym);
 }
 
