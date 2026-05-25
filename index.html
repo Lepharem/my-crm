@@ -1930,6 +1930,14 @@ async function submitWriterDraft(taskId){
         created:new Date().toISOString(),done:false,taskId
       });
     } else {
+      // 寫手回覆後，同步刷新 SOP 頁（企劃端即時看到狀態變更）
+      const sopEl2=document.getElementById('page-sop-om');
+      if(sopEl2&&sopEl2.classList.contains('active')){
+        const cId2=document.getElementById('sop-client')?.value?.split('::')?.[0];
+        const ctId2=document.getElementById('sop-client')?.value?.split('::')?.[1];
+        const sopYm2=document.getElementById('sop-ym')?.value;
+        if(cId2&&ctId2&&sopYm2) setTimeout(()=>renderSopFlow(cId2,ctId2,sopYm2),200);
+      }
       await gasApi('submitWriterDraft',{id:taskId,email:_currentUser.email,draftLink:link});
     }
     toast('✓ 稿件已送出，等待樂法審核','success');
@@ -2460,8 +2468,12 @@ function _clientConfirmTask(taskId, action){
   if(action==='ok'){
     r.clientConfirmStatus='confirmed';
     r.status='切角確認';
+    if(!r.reviewHistory) r.reviewHistory=[];
+    r.reviewHistory.push({action:'confirmed',by:'client_self',at:new Date().toISOString(),note:''});
     syncToGAS('omRecords',r).catch(()=>{});
-    // 同步刷新 SOP 頁（測試模式下企劃和客戶頁共用 DB）
+    // 只更新當前方塊 UI，不整頁重渲染（避免確認後方塊消失）
+    _clientUpdateTaskRow(taskId, r);
+    // 同步刷新 SOP 頁（測試模式共用 DB）
     const sopEl=document.getElementById('page-sop-om');
     if(sopEl&&sopEl.classList.contains('active')){
       const cId=document.getElementById('sop-client')?.value?.split('::')?.[0];
@@ -2469,33 +2481,52 @@ function _clientConfirmTask(taskId, action){
       const sopYm=document.getElementById('sop-ym')?.value;
       if(cId&&ctId&&sopYm) setTimeout(()=>renderSopFlow(cId,ctId,sopYm),100);
     }
+    return;
   } else if(action==='suggest'){
-    // 展開更動建議輸入欄
     const wrap=document.getElementById('client-suggest-wrap-'+taskId);
     if(wrap) wrap.style.display=wrap.style.display==='none'?'block':'none';
     return;
   }
-  // 若有更動建議才更新
-  const note=document.getElementById('client-note-'+taskId)?.value||'';
-  if(note){
-    r.clientNote=note;
-    r.clientConfirmStatus='rejected';
-    r.status='待規劃'; // 退回重新處理
-    syncToGAS('omRecords',r).catch(()=>{});
-  }
-  if(_clientCurrentPage==='dashboard') renderClientDashboard();
-  else renderClientContractPage(r.contractId);
 }
 
+// 客戶頁：只更新單一方塊的狀態欄（避免整頁重渲染導致確認後方塊消失）
+function _clientUpdateTaskRow(taskId, r){
+  const row = document.getElementById('client-task-card-'+taskId);
+  if(!row) return;
+  const cs = r.clientConfirmStatus;
+  const statusColor = ['已上刊','觀察中','完成'].includes(r.status)?'#166534':
+                      ['切角審核','切角確認'].includes(r.status)?'#5b21b6':
+                      r.status==='文稿審核'?'#1B4FD8':'#92400E';
+  const statusBg = ['已上刊','觀察中','完成'].includes(r.status)?'#dcfce7':
+                   ['切角審核','切角確認'].includes(r.status)?'#ede9fe':
+                   r.status==='文稿審核'?'#eff6ff':'#fef3c7';
+  const confirmBadge = cs==='confirmed'
+    ? '<div style="font-size:10px;color:#166534;margin-top:3px">✓ 已確認</div>'
+    : cs==='rejected'
+    ? '<div style="font-size:10px;color:#991B1B;margin-top:3px">✕ 已退回</div>'
+    : '';
+  const lastTd = row.querySelector('td:last-child');
+  if(lastTd) lastTd.innerHTML = `<span style="font-size:11px;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:12px">${r.status}</span>${confirmBadge}`;
+  row.style.background = cs==='pending' ? '#fffbeb' : '';
+}
 function _clientSubmitSuggestion(taskId){
   const r=(DB.omRecords||[]).find(x=>x.id===taskId);
   if(!r) return;
   const note=document.getElementById('client-note-'+taskId)?.value.trim()||'';
   if(!note){ toast('請填寫更動建議'); return; }
-  r.clientNote=note; r.clientConfirmStatus='rejected'; r.status='待規劃';
+  r.clientNote=note;
+  r.clientConfirmStatus='rejected';
+  r.status='待規劃';
+  if(!r.reviewHistory) r.reviewHistory=[];
+  r.reviewHistory.push({action:'rejected',by:'client_self',at:new Date().toISOString(),note});
   syncToGAS('omRecords',r).catch(()=>{});
   toast('更動建議已送出','success');
-  // 同步刷新 SOP 頁
+  // 更新方塊 UI 而非整頁重渲染
+  _clientUpdateTaskRow(taskId, r);
+  // 隱藏更動表單
+  const wrap=document.getElementById('client-suggest-wrap-'+taskId);
+  if(wrap) wrap.style.display='none';
+  // 同步刷新 SOP 頁（企劃端可見退回狀態）
   const sopEl=document.getElementById('page-sop-om');
   if(sopEl&&sopEl.classList.contains('active')){
     const cId=document.getElementById('sop-client')?.value?.split('::')?.[0];
@@ -2503,10 +2534,7 @@ function _clientSubmitSuggestion(taskId){
     const sopYm=document.getElementById('sop-ym')?.value;
     if(cId&&ctId&&sopYm) setTimeout(()=>renderSopFlow(cId,ctId,sopYm),100);
   }
-  if(_clientCurrentPage==='dashboard') renderClientDashboard();
-  else renderClientContractPage(r.contractId);
 }
-
 function _clientSaveNote(taskId, note){
   const r = (DB.omRecords||[]).find(x=>x.id===taskId);
   if(r){ r.clientNote=note; syncToGAS('omRecords',r).catch(()=>{}); }
@@ -8188,7 +8216,7 @@ function renderSopFlow(clientId, contractId, ym){
                  +'</div>').join('')
                +'</div>'
               :'';
-            return '<div style="border:1px solid '+borderCol+';border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:'+bgCol+'">'
+            return '<div style="border:1px solid '+borderCol+';border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:'+bgCol+'">' 
               +'<div style="display:flex;align-items:flex-start;gap:8px">'
               +'<span class="tag '+tagCls+'" style="font-size:10px;flex-shrink:0;margin-top:1px">'+tagTxt+'</span>'
               +'<div style="flex:1">'
@@ -8196,10 +8224,13 @@ function renderSopFlow(clientId, contractId, ym){
               +'<div style="font-size:11px;color:var(--text3);margin-top:1px">'+(r.platform||'')+' '+(r.section?'· '+r.section:'')+' '+(r.publishDate?r.publishDate.slice(0,10):'')+'</div>'
               +contentHtml+noteHtml
               +'</div>'
-              +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
-              +'<button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="_sopClientConfirm(\''+r.id+'\',\'confirmed\')">✓ 確認</button>'
-              +'<button class="btn btn-xs" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="_sopClientConfirm(\''+r.id+'\',\'rejected\')">✕ 退回</button>'
-              +'</div></div>'
+              +(cs==='pending'
+                ? '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
+                  +'<button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="_sopClientConfirm(\''+r.id+'\',\'confirmed\')">✓ 確認</button>'
+                  +'<button class="btn btn-xs" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="_sopClientConfirm(\''+r.id+'\',\'rejected\')">✕ 退回</button>'
+                  +'</div>'
+                : '')
+              +'</div>'
               +rejectForm+historyHtml+'</div>';
           }).join('')
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
@@ -8810,14 +8841,20 @@ function _sopSubmitDirect(clientId, contractId, ym){
   if(missingWriter.length){ toast(`發文 #${state.planItems.indexOf(missingWriter[0])+1} 尚未選擇寫手`); return; }
   if(missingType.length){ toast(`發文 #${state.planItems.indexOf(missingType[0])+1} 尚未選擇服務項目`); return; }
   if(!validRows.length){ toast('請確認每筆發文都已選擇寫手和服務項目'); return; }
+
+  // 防重複：過濾掉已有對應 planItem id 記錄的
+  const existingIds = new Set((DB.omRecords||[]).filter(r=>r.sopPlanItemId).map(r=>r.sopPlanItemId));
+  const newRows = validRows.filter(row=>!existingIds.has(row.id));
+  if(!newRows.length){ toast('所有任務均已建立，如需追加請新增發文行'); return; }
+
   let created=0;
-  validRows.forEach(row=>{
+  newRows.forEach(row=>{
     const fl = DB.freelancers.find(f=>f.id===row.writerId);
     const id = genOmId(cl.name);
-    // 每筆主文建一個記錄，回文在 replyCount 欄位存儲
     const rec = {
       id, contractId, clientId, clientName:cl.name||'',
       month:ym, specType:row.specType,
+      sopPlanItemId: row.id,   // 記錄 planItem id，防重複派發
       taskName:row.taskName||row.specType||'',
       platform:row.platform||'',
       section:row.section||'', actionType:_sopIsOpenPost(row.specType)?'開文':'回文',
@@ -8826,7 +8863,7 @@ function _sopSubmitDirect(clientId, contractId, ym){
       note:row.note||'',
       writerId:row.writerId||'', writerName:fl?.name||'',
       vendorId:'', vendorName:'',
-      status: row.writerId ? '撰文中' : '待派寫手',
+      status:'撰文中',
       clientConfirmStatus:'', clientNote:'',
       sopLine:'B',
       created_at:new Date().toISOString()
@@ -8835,7 +8872,7 @@ function _sopSubmitDirect(clientId, contractId, ym){
     syncToGAS('omRecords',rec).catch(()=>{});
     created++;
   });
-  // 不清空 planItems，允許繼續追加
+  // 推進至步驟2（等待寫手）
   state.step = 2;
   toast(`✓ 已建立 ${created} 筆任務，通知寫手中`,'success');
   if(!DB.notifications) DB.notifications=[];
