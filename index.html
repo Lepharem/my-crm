@@ -2493,8 +2493,8 @@ function _clientConfirmTask(taskId, action){
   }
 }
 
-// 客戶頁：只更新單一方塊的狀態欄（避免整頁重渲染導致確認後方塊消失）
-function _clientUpdateTaskRow(taskId, r){
+// 客戶頁：確認 → 收合顯示「已確認」；更動建議送出 → 收合顯示「已送出」
+function _clientUpdateTaskRow(taskId, r, keepOpen){
   const row = document.getElementById('client-task-card-'+taskId);
   if(!row) return;
   const cs = r.clientConfirmStatus;
@@ -2504,14 +2504,22 @@ function _clientUpdateTaskRow(taskId, r){
   const statusBg = ['已上刊','觀察中','完成'].includes(r.status)?'#dcfce7':
                    ['切角審核','切角確認'].includes(r.status)?'#ede9fe':
                    r.status==='文稿審核'?'#eff6ff':'#fef3c7';
-  const confirmBadge = cs==='confirmed'
-    ? '<div style="font-size:10px;color:#166534;margin-top:3px">✓ 已確認</div>'
-    : cs==='rejected'
-    ? '<div style="font-size:10px;color:#991B1B;margin-top:3px">✕ 已退回</div>'
-    : '';
   const lastTd = row.querySelector('td:last-child');
-  if(lastTd) lastTd.innerHTML = `<span style="font-size:11px;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:12px">${r.status}</span>${confirmBadge}`;
-  row.style.background = cs==='pending' ? '#fffbeb' : '';
+  if(!lastTd) return;
+  if(cs==='confirmed'){
+    // 收合：只顯示狀態徽章 + 已確認
+    lastTd.innerHTML = `<span style="font-size:11px;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:12px">${r.status}</span><div style="font-size:10px;color:#166534;margin-top:3px">✓ 已確認</div>`;
+    row.style.background = '#f0fdf4';
+  } else if(cs==='rejected'){
+    if(keepOpen){
+      // 保持展開：顯示更動已送出提示 + 客戶意見
+      lastTd.innerHTML = `<span style="font-size:11px;background:#fef3c7;color:#92400E;padding:2px 8px;border-radius:12px">${r.status}</span><div style="font-size:10px;color:#991B1B;margin-top:3px">✕ 更動建議已送出</div>${r.clientNote?`<div style="font-size:10px;color:#92400E;margin-top:2px;background:#fffbeb;border-radius:3px;padding:2px 5px">💬 ${r.clientNote.slice(0,40)}</div>`:''}`;
+      row.style.background = '#fef2f2';
+    } else {
+      lastTd.innerHTML = `<span style="font-size:11px;background:#fef3c7;color:#92400E;padding:2px 8px;border-radius:12px">${r.status}</span><div style="font-size:10px;color:#991B1B;margin-top:3px">✕ 已退回</div>`;
+      row.style.background = '#fef2f2';
+    }
+  }
 }
 function _clientSubmitSuggestion(taskId){
   const r=(DB.omRecords||[]).find(x=>x.id===taskId);
@@ -2526,8 +2534,8 @@ function _clientSubmitSuggestion(taskId){
   syncToGAS('omRecords',r).catch(()=>{});
   toast('更動建議已送出','success');
   // 更新方塊 UI 而非整頁重渲染
-  _clientUpdateTaskRow(taskId, r);
-  // 隱藏更動表單
+  _clientUpdateTaskRow(taskId, r, true);  // keepOpen: 顯示已送出但不收合
+  // 隱藏 textarea 送出按鈕，但保留意見顯示
   const wrap=document.getElementById('client-suggest-wrap-'+taskId);
   if(wrap) wrap.style.display='none';
   // 同步刷新 SOP 頁（企劃端可見退回狀態）
@@ -8097,7 +8105,12 @@ function renderSopOmPage(){
 function renderSopFlow(clientId, contractId, ym){
   const el = document.getElementById('sop-om-content');
   if(!el) return;
-  const state = getSopState(clientId, ym, contractId);
+  // contractId 有效性檢查
+  if(!contractId){
+    el.innerHTML = '<div class="empty-state" style="padding:60px"><p style="color:var(--red)">找不到合約，請重新選擇客戶</p></div>';
+    return;
+  }
+  const state = getSopState(clientId, ym, contractId);  // 每次都更新 state.contractId
   const ct = DB.contracts.find(c=>c.id===contractId)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
   const specs = DB.specItems.filter(s=>s.contractId===contractId&&(s.category==='口碑'||!s.category));
@@ -8258,6 +8271,7 @@ function renderSopFlow(clientId, contractId, ym){
   if(writerDone) swStatus = 'done';
   else if(writerActive) swStatus = 'active';
   if(writerActive || writerDone){
+    const cutDocLink3 = ct.driveLink || '';  // 切角 DOC 連結（來自合約）
     const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
     const platformOpts3 = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
     const needWriter = thisMonthOm.filter(r=>
@@ -8787,15 +8801,17 @@ function _sopPlanAddRow(clientId, ym, contractId){
 }
 
 function _sopDirectAddRow(clientId, ym){
-  const state = getSopState(clientId, ym);
-  const [,contractId] = (document.getElementById('sop-client')?.value||'::').split('::');
+  const [,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
+  const contractId = ctId || '';
+  const state = getSopState(clientId, ym, contractId);
   const newIdx = state.planItems.length + 1;
   state.planItems.push({
     id:'di_'+Date.now(), specType:'', platform:'', section:'',
     writerId:'', replyCount:5, cutAngle:'',
     taskName:'新任務#'+newIdx
   });
-  renderSopFlow(clientId,contractId,ym);
+  if(!contractId){ toast('請先選擇客戶','error'); return; }
+  renderSopFlow(clientId, contractId, ym);
 }
 
 // A 線：送交客戶確認 → 建立 omRecords + 狀態推進至步驟2
@@ -8954,7 +8970,16 @@ function _sopResubmitToClient(taskId){
 function _sopStep2Complete(clientId, ym){
   const state = getSopState(clientId, ym);
   state.step = (state.line==='A') ? 3 : 2;
-  const ctId = state.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
+  // 嘗試多個來源取 contractId
+  let ctId = state.contractId || '';
+  if(!ctId){
+    const sel = document.getElementById('sop-client')?.value || '::';
+    ctId = sel.split('::')[1] || '';
+  }
+  if(!ctId){
+    toast('找不到合約ID，請重新選擇客戶','error');
+    return;
+  }
   renderSopFlow(clientId, ctId, ym);
 }
 
