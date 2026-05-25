@@ -2943,6 +2943,21 @@ function enableTestMode(){
   window._testOriginalRole    = _userRole;
   window._testOriginalUser    = _currentUser ? {..._currentUser} : null;
   window._testOriginalProfile = _userProfile ? {..._userProfile} : null;
+
+  // 確保 DB taskName 完整（跳過 GAS 的靜態初始化）
+  const specCount = {};
+  (DB.omRecords||[]).forEach(r=>{
+    if(!r.taskName){
+      const k=(r.contractId||'')+'_'+(r.specType||'');
+      specCount[k]=(specCount[k]||0)+1;
+      r.taskName=(r.specType||'任務')+'#'+specCount[k];
+    }
+  });
+
+  // 確保登入畫面隱藏，讓後續介面可以正常顯示
+  const loginScreen = document.getElementById('login-screen');
+  if(loginScreen) loginScreen.style.display = 'none';
+
   toast('🧪 測試模式已開啟 — 所有操作不會寫入資料庫', 'info');
   console.log('%c[🧪 TEST MODE ON]', 'background:#7c3aed;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold');
   // 立即顯示角色切換控制台
@@ -3024,18 +3039,25 @@ function _applyRoleInterface(role){
     showClientInterface();
   } else {
     // staff — 顯示主 CRM
+    const loginScreen = document.getElementById('login-screen');
+    if(loginScreen) loginScreen.style.display = 'none';
     if(app) app.style.display = '';
     // 更新 sidebar 使用者資訊
     const uname = document.getElementById('sidebar-uname');
     const urole = document.getElementById('sidebar-urole');
     const avatar = document.getElementById('sidebar-avatar');
     if(uname) uname.textContent = _currentUser?.name || '測試用戶';
-    if(urole) urole.textContent = `${_currentUser?.name||''}（測試）`;
+    if(urole){
+      const roleLabel = {owner:'老闆',manager:'主管',employee:'企劃',staff:'員工'}[_currentUser?.hrRole||myMember?.role] || '員工';
+      urole.textContent = `${_currentUser?.name||''}（${roleLabel}）`;
+    }
     if(avatar){ avatar.textContent = (_currentUser?.name||'T').charAt(0); avatar.style.backgroundImage = ''; }
     // 套用 sidebar 權限管制
     _applySidebarPermissions();
-    // 重新渲染首頁
-    if(typeof renderHome === 'function') renderHome();
+    // 重新渲染首頁（加保護）
+    try {
+      if(typeof renderHome === 'function') renderHome();
+    } catch(e) { console.warn('renderHome error:', e); }
     navTo('home');
   }
 }
@@ -3206,16 +3228,29 @@ function switchTestRole(roleConfig){
   }
 
   // 套用介面
-  _applyRoleInterface(role);
+  try {
+    _applyRoleInterface(role);
+  } catch(e) {
+    console.error('_applyRoleInterface failed:', e);
+    // 強制顯示 app（staff fallback）
+    if(role === 'staff'){
+      const loginScreen = document.getElementById('login-screen');
+      const app = document.getElementById('app');
+      if(loginScreen) loginScreen.style.display = 'none';
+      if(app) app.style.display = '';
+      navTo('home');
+    }
+  }
 
   const roleLabels = {staff:'內部員工',writer:'寫手',vendor:'帳號商',client:'客戶'};
   toast(`🧪 已切換為：${name}（${roleLabels[role]||role}）`, 'info');
   console.log(`%c[🧪 ROLE] → ${name} (${role})`, `background:${color};color:#fff;padding:2px 8px;border-radius:4px`);
 
-  // 重整控制台
+  // 重整控制台（讓角色按鈕更新 active 狀態）
   setTimeout(()=>{
     if(window._refreshTestPanel) window._refreshTestPanel();
-  }, 100);
+    showTestRolePanel(); // 重新渲染以更新 active 狀態
+  }, 200);
 }
 
 window.syncDeleteGAS = async function(collection, id){
@@ -3882,6 +3917,7 @@ function renderHome(){
     ${noticeHtml}
 
     ${(()=>{
+      try {
       // ── 角色專屬通知區 ──
       const hrRole2=(typeof myMember!=='undefined'&&myMember)?myMember.role:(_currentUser?.hrRole||'employee');
       let roleHtml='';
@@ -3928,6 +3964,7 @@ function renderHome(){
         }
       }
       return roleHtml;
+      } catch(e){ console.warn('role section error:',e); return ''; }
     })()}
 
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px">
