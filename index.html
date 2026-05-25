@@ -495,9 +495,10 @@ body.test-mode .test-mode-fab{display:flex}</style>
   <div style="background:#0f172a;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">
     <div style="font-size:15px;font-weight:600;flex:1">樂法 × 帳號商工作台</div>
     <div id="vendor-name-badge" style="font-size:12px;color:rgba(255,255,255,.5)"></div>
+    <button onclick="renderVendorTasks()" style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;margin-right:4px">🔄 重整</button>
     <button onclick="logoutUser()" style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">登出</button>
   </div>
-  <div id="vendor-content" style="max-width:720px;margin:0 auto;padding:20px 16px"></div>
+  <div id="vendor-content" style="max-width:1200px;margin:0 auto;padding:20px 16px"></div>
 </div>
 
 <!-- 客戶儀錶板介面 -->
@@ -1930,82 +1931,190 @@ async function showVendorInterface(){
   await renderVendorTasks();
 }
 
+// ══════════════════════════════════════════
+//  帳號商介面 — 完整口碑總表格式
+// ══════════════════════════════════════════
+
 async function renderVendorTasks(){
   const el = document.getElementById('vendor-content');
   if(!el) return;
   el.innerHTML = `<div style="text-align:center;padding:40px;color:#8a8680">載入中…</div>`;
   try {
-    const res = await gasApi('getVendorTasksByEmail', { email: _currentUser.email });
-    const tasks = res.tasks || [];
-    const vendorName = res.vendor || _userProfile?.name || '';
-    const pending  = tasks.filter(t => t.status === '待上刊');
-    const reported = tasks.filter(t => t.status === '待確認');
+    let tasks = [], vendorName = _userProfile?.name || _currentUser?.name || '';
+    if(window._testMode){
+      const vc = _userProfile || (DB.vendorCompanies||[]).find(v=>v.name===vendorName||v.id===_userProfile?.id);
+      if(vc){
+        vendorName = vc.name;
+        tasks = (DB.omRecords||[]).filter(r=>
+          (r.vendorId===vc.id||r.vendorName===vc.name) &&
+          ['待上刊','待確認','已上刊','觀察中','完成'].includes(r.status)
+        ).map(r=>({...r}));
+      }
+    } else {
+      const res = await gasApi('getVendorTasksByEmail', { email: _currentUser.email });
+      tasks = res.tasks || [];
+      vendorName = res.vendor || vendorName;
+    }
 
-    const taskCard = (t) => {
-      const isPending = t.status === '待上刊';
-      return `<div style="background:#fff;border:1px solid ${isPending?'#fcd34d':'#bbf7d0'};border-radius:12px;padding:16px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:#1a1917">${t.clientName}</div>
-            <div style="font-size:11px;color:#8a8680;margin-top:2px">${t.month} · ${t.specType}</div>
+    // 依月份分組
+    const byMonth = {};
+    tasks.forEach(t => {
+      const m = (t.month||t.publishDate||'').slice(0,7) || '未分類';
+      if(!byMonth[m]) byMonth[m] = [];
+      byMonth[m].push(t);
+    });
+    const months = Object.keys(byMonth).sort().reverse();
+
+    const pending  = tasks.filter(t=>t.status==='待上刊');
+    const done     = tasks.filter(t=>['待確認','已上刊','觀察中','完成'].includes(t.status));
+
+    // 單筆回傳表單
+    const postForm = (t) => `
+      <div id="vf-form-${t.id}" style="display:none;border-top:1px solid #e8e6e1;padding-top:10px;margin-top:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">發布日期 *</label>
+            <input id="vf-date-${t.id}" type="date" value="${t.publishDate||new Date().toISOString().slice(0,10)}"
+              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
           </div>
-          <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${isPending?'#fef3c7':'#dcfce7'};color:${isPending?'#92400E':'#166534'}">${t.status}</span>
+          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">時間</label>
+            <input id="vf-time-${t.id}" type="time"
+              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
+          </div>
         </div>
-        ${t.platform?`<div style="font-size:12px;color:#4a4845;margin-bottom:6px">📍 ${t.platform}${t.actionType?' · '+t.actionType:''}${t.section?' · '+t.section:''}</div>`:''}
-        ${t.title?`<div style="font-size:13px;font-weight:500;margin-bottom:6px">${t.title}</div>`:''}
-        ${t.content?`<div style="font-size:12px;color:#4a4845;background:#f8f7f5;border-radius:6px;padding:8px;margin-bottom:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto">${t.content}</div>`:''}
-        ${t.draftLink?`<div style="margin-bottom:10px"><a href="${t.draftLink}" target="_blank" style="font-size:12px;color:#1B4FD8;font-weight:500">📄 查看文稿</a></div>`:''}
-        ${isPending?`
-          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">發布日期 *</label>
-                <input id="vf-date-${t.id}" type="date" value="${new Date().toISOString().slice(0,10)}" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-              <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">時間</label>
-                <input id="vf-time-${t.id}" type="time" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-            </div>
-            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">論壇平台</label>
-              <input id="vf-platform-${t.id}" type="text" placeholder="Dcard / PTT / Facebook…" value="${t.platform||''}" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">板塊</label>
-              <input id="vf-section-${t.id}" type="text" placeholder="板塊名稱" value="${t.section||''}" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">文章連結 *</label>
-              <input id="vf-link-${t.id}" type="url" placeholder="https://…" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">使用帳號</label>
-              <input id="vf-account-${t.id}" type="text" placeholder="使用帳號" value="${t.account||''}" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">截圖連結（選填）</label>
-              <input id="vf-screenshot-${t.id}" type="url" placeholder="截圖 Google Drive 連結" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-            <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">備註</label>
-              <input id="vf-note-${t.id}" type="text" placeholder="選填" style="width:100%;padding:7px 9px;border:1px solid #d4d1cb;border-radius:7px;font-size:13px;box-sizing:border-box"></div>
-            <button onclick="submitVendorPost('${t.id}')"
-              style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-top:4px">
-              ✓ 已上刊，回報樂法
-            </button>
-          </div>`
-        :`<div style="font-size:12px;color:#166534;background:#dcfce7;border-radius:6px;padding:8px">
-            ✓ 已回報 · 等待樂法確認<br>
-            ${t.postLink?`<a href="${t.postLink}" target="_blank" style="color:#166534">${t.postLink.slice(0,50)}…</a>`:''}
-          </div>`}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">論壇平台</label>
+            <input id="vf-platform-${t.id}" value="${t.platform||''}" placeholder="Dcard/PTT…"
+              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
+          </div>
+          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">板塊</label>
+            <input id="vf-section-${t.id}" value="${t.section||''}" placeholder="板塊"
+              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
+          </div>
+        </div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">上文連結 *</label>
+          <input id="vf-link-${t.id}" type="url" placeholder="https://…" value="${t.postLink||''}"
+            style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">使用帳號</label>
+            <input id="vf-account-${t.id}" value="${t.account||''}" placeholder="帳號名稱"
+              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
+          </div>
+          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">截圖連結（選填）</label>
+            <input id="vf-screenshot-${t.id}" type="url" placeholder="Google Drive 截圖"
+              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
+          </div>
+        </div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">備註</label>
+          <input id="vf-note-${t.id}" value="${t.note||''}" placeholder="選填"
+            style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
+        </div>
+        <button onclick="submitVendorPost('${t.id}')"
+          style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;width:100%">
+          ✓ 已上刊，回報樂法
+        </button>
       </div>`;
+
+    // 表格列
+    const tableRow = (t, idx) => {
+      const isPending = t.status==='待上刊';
+      const isDone    = ['待確認','已上刊','觀察中','完成'].includes(t.status);
+      const statusColor = isPending?'#92400E':isDone?'#166534':'#4a4845';
+      const statusBg    = isPending?'#fef3c7':isDone?'#dcfce7':'#f3f4f6';
+      return `<tr style="border-bottom:1px solid #f0efe9;${isPending?'background:#fffdf5':''}">
+        <td style="padding:8px 10px;font-size:12px;color:#8a8680;white-space:nowrap">${idx+1}</td>
+        <td style="padding:8px 10px;font-size:12px;font-weight:600;white-space:nowrap">${t.clientName||'—'}</td>
+        <td style="padding:8px 10px;font-size:12px;white-space:nowrap">${(t.publishDate||t.month||'').slice(0,10)}</td>
+        <td style="padding:8px 10px;font-size:12px;white-space:nowrap">${t.platform||'—'}</td>
+        <td style="padding:8px 10px;font-size:12px;white-space:nowrap">${t.section||'—'}</td>
+        <td style="padding:8px 10px;font-size:12px;white-space:nowrap">${t.taskName&&t.taskName!==t.specType?t.taskName:t.specType||'—'}</td>
+        <td style="padding:8px 10px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(t.title||t.content||'').replace(/"/g,'')}">
+          ${t.title||t.content||'—'}
+        </td>
+        <td style="padding:8px 10px">
+          ${t.postLink?`<a href="${t.postLink}" target="_blank" style="font-size:12px;color:#1B4FD8">連結↗</a>`:
+            isPending?`<span style="font-size:11px;color:#92400E">待填入</span>`:'—'}
+        </td>
+        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${t.account||'—'}</td>
+        <td style="padding:8px 10px">
+          <span style="font-size:11px;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:12px;white-space:nowrap">${t.status}</span>
+        </td>
+        <td style="padding:8px 10px">
+          ${isPending?`<button onclick="document.getElementById('vf-form-${t.id}').style.display=document.getElementById('vf-form-${t.id}').style.display==='none'?'block':'none'"
+            style="font-size:11px;background:#0f6e56;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap">
+            回報
+          </button>`:''}
+        </td>
+      </tr>
+      <tr id="vf-form-row-${t.id}">
+        <td colspan="11" style="padding:0 16px 12px">
+          ${postForm(t)}
+        </td>
+      </tr>`;
     };
 
     el.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
-        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+      <!-- 統計列 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
+        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #fcd34d;text-align:center">
           <div style="font-size:24px;font-weight:700;color:#92400E">${pending.length}</div>
           <div style="font-size:12px;color:#8a8680;margin-top:2px">待上刊</div>
         </div>
         <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-          <div style="font-size:24px;font-weight:700;color:#166534">${reported.length}</div>
+          <div style="font-size:24px;font-weight:700;color:#166534">${done.length}</div>
           <div style="font-size:12px;color:#8a8680;margin-top:2px">已回報</div>
         </div>
+        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#1a1917">${tasks.length}</div>
+          <div style="font-size:12px;color:#8a8680;margin-top:2px">本期總計</div>
+        </div>
       </div>
-      ${pending.length?`<div style="font-size:11px;font-weight:600;color:#92400E;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">📌 待上刊（${pending.length}）</div>${pending.map(taskCard).join('')}`
-        :`<div style="text-align:center;padding:32px;color:#8a8680;background:#fff;border-radius:12px;border:1px solid #e8e6e1">目前沒有待上刊的任務</div>`}
-      ${reported.length?`<div style="font-size:11px;font-weight:600;color:#166534;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 8px">✅ 已回報（${reported.length}）</div>${reported.map(taskCard).join('')}`:''}
-      <div style="text-align:center;margin-top:24px;font-size:11px;color:#c0bdb7">資料不會自動更新，請手動重新整理</div>`;
+
+      <!-- 口碑總表 -->
+      ${months.map(ym => {
+        const mTasks = byMonth[ym];
+        return `<div style="margin-bottom:20px">
+          <div style="font-size:12px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">
+            ${ym} · ${mTasks.length} 筆
+          </div>
+          <div style="background:#fff;border:1px solid #e8e6e1;border-radius:12px;overflow:hidden">
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">
+                <thead>
+                  <tr style="background:#0f172a;color:#fff">
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">#</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">專案名稱</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">發布日期</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">論壇平台</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">板塊</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">項目</th>
+                    <th style="padding:8px 10px;text-align:left;min-width:180px">標題 / 內容摘要</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">上文連結</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">帳號</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">狀態</th>
+                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${mTasks.map((t,i) => tableRow(t,i)).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+
+      ${!tasks.length?`<div style="text-align:center;padding:48px;background:#fff;border-radius:12px;border:1px solid #e8e6e1;color:#8a8680">
+        <div style="font-size:32px;margin-bottom:8px">📋</div>
+        目前沒有指派給 ${vendorName} 的任務
+      </div>`:''}
+      <div style="text-align:center;margin-top:16px;font-size:11px;color:#c0bdb7">資料不會自動更新，請手動重新整理</div>
+    `;
   } catch(e){
     el.innerHTML = `<div style="text-align:center;padding:40px;color:#991b1b">載入失敗：${e.message}</div>`;
   }
 }
+
 
 // ══════════════════════════════════════════
 //  客戶儀錶板介面
@@ -2154,9 +2263,9 @@ function renderClientDashboard(){
 function renderClientContractPage(contractId){
   const el = document.getElementById('client-content');
   if(!el) return;
-  const cl = _userProfile;
   const ct = DB.contracts.find(c=>c.id===contractId);
   if(!ct){ el.innerHTML='<div style="padding:40px;text-align:center">找不到合約</div>'; return; }
+  const cl = _userProfile || DB.clients.find(c=>c.id===ct.clientId) || {};
   const specs = DB.specItems.filter(s=>s.contractId===contractId);
   const allOm = (DB.omRecords||[]).filter(r=>r.contractId===contractId);
   const ym = new Date().toISOString().slice(0,7);
@@ -2165,49 +2274,93 @@ function renderClientContractPage(contractId){
   const progress=totalMs>0?Math.min(1,(now-start)/totalMs):0;
   const daysLeft=end?Math.max(0,Math.round((end-now)/86400000)):null;
 
-  // 規格執行統計
-  const specStats = specs.map(s=>{
-    const done=allOm.filter(r=>r.specId===s.id&&['已上刊','觀察中','完成'].includes(r.status)).length;
-    return {...s, done, pct:s.qty>0?done/s.qty:0};
+  // 規格執行統計（開文類）
+  const openSpecs = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name));
+  const specStats = openSpecs.map(s=>{
+    const recs = allOm.filter(r=>r.specId===s.id||(r.specType===s.name));
+    const done  = recs.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
+    return {...s, done, pct:s.qty>0?done/s.qty:0, recs};
   });
 
-  // 本月上刊
-  const published=allOm.filter(r=>['已上刊','觀察中','完成'].includes(r.status));
-  const thisMonthPub=published.filter(r=>(r.publishDate||r.date||'').slice(0,7)===ym);
-  const months=[...new Set(published.map(r=>(r.publishDate||r.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  // 依規格分組顯示論壇文章追蹤表
+  const specTable = (s) => {
+    const rows = s.recs;
+    if(!rows.length && s.pct===0){
+      return `<tr><td colspan="9" style="padding:12px;text-align:center;color:var(--text3);font-size:12px">尚無執行記錄</td></tr>`;
+    }
+    return rows.map((r,i)=>{
+      const statusColor = ['已上刊','觀察中','完成'].includes(r.status)?'#166534':
+                          r.status==='切角審核'?'#5b21b6':
+                          r.status==='文稿審核'?'#1B4FD8':'#92400E';
+      const statusBg    = ['已上刊','觀察中','完成'].includes(r.status)?'#dcfce7':
+                          r.status==='切角審核'?'#ede9fe':
+                          r.status==='文稿審核'?'#eff6ff':'#fef3c7';
+      const isReview = r.status==='切角審核';
+      const isPending = r.clientConfirmStatus==='pending'||isReview;
+      return `<tr id="client-task-card-${r.id}" style="border-bottom:1px solid #f0efe9;${isPending?'background:#fffbeb':''}">
+        <td style="padding:8px 10px;font-size:11px;color:#8a8680">${i+1}</td>
+        <td style="padding:8px 10px;font-size:12px;font-weight:600">${r.taskName||r.specType}</td>
+        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${(r.publishDate||r.date||'').slice(0,10)||'—'}</td>
+        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${r.platform||'—'}</td>
+        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${r.section||'—'}</td>
+        <td style="padding:8px 10px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.content||r.title||'').replace(/"/g,'')}">
+          ${r.content||r.title||'—'}
+        </td>
+        <td style="padding:8px 10px">
+          ${r.draftLink?`<a href="${r.draftLink}" target="_blank" style="font-size:11px;color:#1B4FD8">稿件↗</a>`:'—'}
+        </td>
+        <td style="padding:8px 10px">
+          ${r.postLink?`<a href="${r.postLink}" target="_blank" style="font-size:11px;color:#166534">連結↗</a>`:'—'}
+        </td>
+        <td style="padding:8px 10px;white-space:nowrap">
+          <span style="font-size:11px;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:12px">${r.status}</span>
+          ${isPending?`<div style="margin-top:6px;display:flex;gap:4px">
+            <button onclick="_clientConfirmTask('${r.id}','ok')" style="font-size:11px;background:#16a34a;color:#fff;border:none;border-radius:5px;padding:3px 8px;cursor:pointer">✓ OK</button>
+            <button onclick="_clientConfirmTask('${r.id}','suggest')" style="font-size:11px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:5px;padding:3px 8px;cursor:pointer">✏️ 更動</button>
+          </div>`:''}
+          ${r.clientNote?`<div style="font-size:10px;color:#92400E;margin-top:3px">💬 ${r.clientNote.slice(0,30)}</div>`:''}
+          <div id="client-suggest-wrap-${r.id}" style="display:none;margin-top:6px">
+            <textarea id="client-note-${r.id}" rows="2" placeholder="更動建議…"
+              style="width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #fcd34d;border-radius:5px;font-size:11px;resize:vertical">${r.clientNote||''}</textarea>
+            <button onclick="_clientSubmitSuggestion('${r.id}')"
+              style="margin-top:4px;padding:4px 10px;background:#d97706;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">送出</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  };
 
   // 待確認切角
-  // 客戶需要確認的：切角待確認（pending）或已送客戶審核（切角審核）
-  const pendingConfirm=allOm.filter(r=>r.clientConfirmStatus==='pending'||r.status==='切角審核');
+  const pendingConfirm = allOm.filter(r=>r.clientConfirmStatus==='pending'||r.status==='切角審核');
 
   el.innerHTML = `
+    <!-- 返回 + 標題 -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <button onclick="_clientNavTo('dashboard')" style="background:none;border:none;color:#8a8680;cursor:pointer;font-size:13px">← 返回</button>
       <div>
-        <div style="font-size:18px;font-weight:700">${ct.name}</div>
-        <div style="font-size:11px;color:#8a8680;font-family:monospace">${ct.contractNo||''}</div>
+        <div style="font-size:18px;font-weight:700">${ct.name||cl.name}</div>
+        <div style="font-size:11px;color:#8a8680;font-family:monospace">${ct.contractNo||''} · ${(ct.start||'').slice(0,10)} ～ ${(ct.end||'').slice(0,10)}</div>
       </div>
     </div>
 
-    <!-- 合約概覽 -->
+    <!-- 概覽統計 -->
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
       <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
         <div style="font-size:20px;font-weight:700;color:#1B4FD8">${Math.round(progress*100)}%</div>
         <div style="font-size:11px;color:#8a8680;margin-top:2px">合約進度</div>
       </div>
       <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#166534">${thisMonthPub.length}</div>
+        <div style="font-size:20px;font-weight:700;color:#166534">${allOm.filter(r=>['已上刊','觀察中','完成'].includes(r.status)&&(r.publishDate||r.date||'').slice(0,7)===ym).length}</div>
         <div style="font-size:11px;color:#8a8680;margin-top:2px">本月已上刊</div>
       </div>
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid ${daysLeft!==null&&daysLeft<=30?'#fcd34d':'#e8e6e1'};text-align:center">
         <div style="font-size:20px;font-weight:700;color:${daysLeft!==null&&daysLeft<=30?'#92400E':'#1a1917'}">${daysLeft??'—'}</div>
         <div style="font-size:11px;color:#8a8680;margin-top:2px">剩餘天數</div>
       </div>
     </div>
 
     <!-- 走期進度條 -->
-    <div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1;margin-bottom:12px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:8px">合約走期</div>
+    <div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1;margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;font-size:11px;color:#4a4845;margin-bottom:6px">
         <span>${(ct.start||'').slice(0,10)}</span><span>${(ct.end||'').slice(0,10)}</span>
       </div>
@@ -2216,67 +2369,58 @@ function renderClientContractPage(contractId){
       </div>
     </div>
 
-    <!-- 規格執行進度 -->
-    ${specStats.length?`<div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1;margin-bottom:12px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:12px">規格執行進度</div>
-      ${specStats.map(s=>`<div style="margin-bottom:12px">
+    <!-- 規格進度摘要 -->
+    <div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">規格執行進度</div>
+      ${specStats.map(s=>`<div style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px">
           <span style="font-size:12px;font-weight:500">${s.name}</span>
-          <span style="font-size:12px;font-weight:600;color:${s.pct>=1?'#166534':'#4a4845'}">${s.done}/${s.qty||0}</span>
+          <span style="font-size:12px;font-weight:600;color:${s.pct>=1?'#166534':'#4a4845'}">${s.done}/${s.qty}</span>
         </div>
-        <div style="background:#f4f3f0;border-radius:4px;overflow:hidden;height:6px">
-          <div style="background:${s.pct>=1?'#16a34a':s.pct>=0.5?'#1B4FD8':'#d97706'};height:100%;width:${Math.round((s.pct||0)*100)}%;transition:.6s"></div>
-        </div>
-      </div>`).join('')}
-    </div>`:''}
-
-    <!-- 待確認切角 -->
-    ${pendingConfirm.length?`<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:14px 16px;margin-bottom:12px">
-      <div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:10px">📋 ${pendingConfirm.length} 篇切角待確認</div>
-      ${pendingConfirm.map(r=>`<div style="border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff">
-        <div style="display:flex;align-items:flex-start;gap:8px">
-          <div style="flex:1">
-            <div style="font-size:12px;font-weight:600">${r.taskName||r.specType}</div>
-            <div style="font-size:11px;color:#8a8680;margin-top:1px">${r.platform||''} ${r.section?'· '+r.section:''} · ${(r.month||'').slice(0,7)}</div>
-            ${r.status==='切角審核'?`<div style="font-size:10px;background:#ede9fe;color:#5b21b6;display:inline-block;padding:1px 7px;border-radius:10px;margin-top:3px">文稿審核中，請確認切角</div>`:''}
-            <div style="font-size:11px;color:#4a4845;margin-top:6px;white-space:pre-wrap;background:#f8f7f5;border-radius:6px;padding:6px 8px">${(r.content||r.title||'').slice(0,200)}${(r.content||r.title||'').length>200?'…':''}</div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-            <button onclick="_clientConfirmTask('${r.id}','ok')" style="padding:5px 12px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">✓ OK</button>
-            <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:5px 12px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:12px;cursor:pointer">✏️ 更動</button>
-          </div>
-        </div>
-        <div id="client-suggest-wrap-${r.id}" style="display:none;margin-top:8px">
-          <textarea id="client-note-${r.id}" placeholder="請填寫更動建議…" rows="2"
-            style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:12px;resize:vertical">${r.clientNote||''}</textarea>
-          <button onclick="_clientSubmitSuggestion('${r.id}')" style="margin-top:4px;padding:5px 12px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">送出更動建議</button>
+        <div style="background:#f4f3f0;border-radius:3px;overflow:hidden;height:5px">
+          <div style="background:${s.pct>=1?'#16a34a':s.pct>=0.5?'#1B4FD8':'#d97706'};height:100%;width:${Math.round((s.pct||0)*100)}%"></div>
         </div>
       </div>`).join('')}
+    </div>
+
+    <!-- 待確認提醒 -->
+    ${pendingConfirm.length?`<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;padding:12px 16px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:#92400E">📋 ${pendingConfirm.length} 篇待您確認</div>
+      <div style="font-size:11px;color:#92400E;margin-top:2px">請在下方規格表中查看詳情並確認</div>
     </div>`:''}
 
-    <!-- 已上刊記錄 -->
-    ${published.length?`<div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1">
-      <div style="font-size:12px;font-weight:600;margin-bottom:10px">已執行記錄（共 ${published.length} 篇）</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        <button onclick="_filterClientRecords('',this)" style="padding:3px 10px;border-radius:20px;border:1px solid #1a1917;background:#1a1917;color:#fff;font-size:11px;cursor:pointer">全部</button>
-        ${months.map(m=>`<button onclick="_filterClientRecords('${m}',this)" style="padding:3px 10px;border-radius:20px;border:1px solid #d4d1cb;background:#fff;color:#4a4845;font-size:11px;cursor:pointer">${m}</button>`).join('')}
+    <!-- 各規格執行追蹤表 -->
+    ${specStats.map(s=>`<div style="background:#fff;border-radius:12px;border:1px solid #e8e6e1;margin-bottom:16px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f8f7f5;border-bottom:1px solid #e8e6e1">
+        <div>
+          <span style="font-size:13px;font-weight:600">${s.name}</span>
+          <span style="font-size:11px;color:#8a8680;margin-left:8px">合約 ${s.qty} 篇 · 已完成 ${s.done} 篇</span>
+        </div>
+        <span style="font-size:12px;font-weight:600;background:${s.pct>=1?'#dcfce7':'#eff6ff'};color:${s.pct>=1?'#166534':'#1B4FD8'};padding:3px 10px;border-radius:20px">${Math.round((s.pct||0)*100)}%</span>
       </div>
-      <div id="client-records-list">
-        ${published.map(r=>`<div class="client-rec" data-month="${(r.publishDate||r.date||'').slice(0,7)}" style="padding:8px 0;border-bottom:1px solid #f0efe9;display:flex;gap:8px;align-items:flex-start">
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:3px">
-              <span style="background:#EEF2FF;color:#1B4FD8;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:500">${r.specType||'—'}</span>
-              <span style="font-size:10px;color:#8a8680">${r.platform||''} ${r.section?'· '+r.section:''}</span>
-              ${r.publishDate||r.date?`<span style="font-size:10px;color:#8a8680;margin-left:auto">${(r.publishDate||r.date||'').slice(0,10)}</span>`:''}
-            </div>
-            ${r.title?`<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.title}</div>`:''}
-          </div>
-          ${r.postLink?`<a href="${r.postLink}" target="_blank" style="flex-shrink:0;background:#EEF2FF;color:#1B4FD8;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none">查看 →</a>`:''}
-        </div>`).join('')}
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
+          <thead><tr style="background:#1e293b;color:#fff">
+            <th style="padding:8px 10px;text-align:left;white-space:nowrap">#</th>
+            <th style="padding:8px 10px;text-align:left;white-space:nowrap">任務名稱</th>
+            <th style="padding:8px 10px;text-align:left;white-space:nowrap">上刊日期</th>
+            <th style="padding:8px 10px;text-align:left;white-space:nowrap">論壇平台</th>
+            <th style="padding:8px 10px;text-align:left;white-space:nowrap">板塊</th>
+            <th style="padding:8px 10px;text-align:left;min-width:150px">切角方向</th>
+            <th style="padding:8px 10px;text-align:left;white-space:nowrap">文稿</th>
+            <th style="padding:8px 10px;text-align:left;white-space:nowrap">上文連結</th>
+            <th style="padding:8px 10px;text-align:left;min-width:120px">狀態 / 確認</th>
+          </tr></thead>
+          <tbody>${specTable(s)}</tbody>
+        </table>
       </div>
-    </div>`:''}
-  `;
+    </div>`).join('')}
+
+    <div style="text-align:center;margin-top:8px;font-size:11px;color:#c0bdb7">
+      數據即時更新 · 如有疑問請聯繫樂法網路行銷
+    </div>`;
 }
+
 
 function _filterClientRecords(month, btn){
   document.querySelectorAll('.client-records-filter-btn').forEach(b=>{b.style.background='#fff';b.style.color='#4a4845';b.style.borderColor='#d4d1cb';});
@@ -7846,11 +7990,18 @@ function renderSopFlow(clientId, contractId, ym){
                 ${r.clientNote?`<div style="font-size:11px;color:#d97706;margin-top:4px;padding:4px 8px;background:#fffbeb;border-radius:4px">客戶意見：${r.clientNote}</div>`:''}
               </div>
               <div style="display:flex;gap:4px;flex-shrink:0">
-                <button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="_sopClientConfirm('${r.id}','confirmed')">✓</button>
-                <button class="btn btn-xs" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="_sopClientConfirm('${r.id}','rejected')">✕</button>
-              </div>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                <button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="_sopClientConfirm('${r.id}','confirmed')">✓ 確認</button>
+                <button class="btn btn-xs" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="_sopClientConfirm('${r.id}','rejected')">✕ 退回</button>
             </div>
-            ${cs==='rejected'?`<div style="margin-top:8px"><input id="client-note-${r.id}" value="${r.clientNote||''}" placeholder="填寫退回原因或修改建議…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px" onblur="_sopSaveClientNote('${r.id}',this.value)"></div>`:''}
+            ${cs==='rejected'?`<div style="margin-top:8px">
+              <input id="client-note-${r.id}" value="${r.clientNote||''}" placeholder="填寫退回原因或修改建議…"
+                style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px"
+                onblur="_sopSaveClientNote('${r.id}',this.value)">
+              <button class="btn btn-xs btn-primary" style="margin-top:6px" onclick="_sopResubmitToClient('${r.id}')">
+                🔄 修正完成，重新送交客戶確認
+              </button>
+            </div>`:''}
           </div>`;
         }).join('')}
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
@@ -7880,30 +8031,32 @@ function renderSopFlow(clientId, contractId, ym){
     const platformOpts3 = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
     const needWriter = thisMonthOm.filter(r=>
       !r.writerId && ['待規劃','切角確認','待派寫手'].includes(r.status) &&
-      (state.partialConfirm ? r.clientConfirmStatus==='confirmed' : (r.clientConfirmStatus==='confirmed'||!r.clientConfirmStatus))
+      (state.partialConfirm ? r.clientConfirmStatus==='confirmed' : (r.clientConfirmStatus==='confirmed'||!r.clientConfirmStatus||_sopIsMonitor(r.specType)||_sopIsGoogle(r.specType)))
     );
     const hasWriter = thisMonthOm.filter(r=>r.writerId&&['撰文中','文稿審核','切角審核','待派帳號商','待上刊','已上刊','觀察中','完成'].includes(r.status));
     swContent = `
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">為每筆開文指派寫手（回文已綁定在開文行），指派後狀態推進至「撰文中」。</div>
       ${cutDocLink3?`<div style="margin-bottom:10px"><a href="${cutDocLink3}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 14px;text-decoration:none;font-weight:500">📄 開啟切角DOC</a></div>`:''}
       ${needWriter.map(r=>{
-        const isOpen=_sopIsOpenPost(r.specType);
-        return `<div style="border:1px solid ${isOpen?'#c4b5fd':'#d1fae5'};border-radius:var(--r);padding:12px;margin-bottom:8px;background:${isOpen?'#f5f3ff':'#f0fdf4'}">
+        const isOpen  = _sopIsOpenPost(r.specType);
+        const isMon   = _sopIsMonitor(r.specType);
+        const isGoogle= _sopIsGoogle(r.specType);
+        return `<div style="border:1px solid ${isOpen?'#c4b5fd':isMon?'#bae6fd':isGoogle?'#fde68a':'#d1fae5'};border-radius:var(--r);padding:12px;margin-bottom:8px;background:${isOpen?'#f5f3ff':'#f0fdf4'}">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
             <span style="font-size:13px;font-weight:600">${r.taskName||r.specType}</span>
             ${r.replyCount?`<span style="font-size:11px;background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:12px">含 ${r.replyCount} 回文</span>`:''}
           </div>
-          ${isOpen?`<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;align-items:end">
+          ${(isOpen || isMon || isGoogle)?`<div style="display:grid;grid-template-columns:1fr ${isOpen?'1fr 1fr ':''} auto;gap:6px;align-items:end">
             <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">指派寫手 *</div>
               <select id="sw-writer-${r.id}" class="form-input" style="font-size:12px;width:100%">
                 <option value="">— 選擇 —</option>${writerOpts}
               </select></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">論壇平台</div>
+            ${isOpen?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">論壇平台</div>
               <select id="sw-platform-${r.id}" class="form-input" style="font-size:12px;width:100%">
                 <option value="${r.platform||''}">${r.platform||'— 選擇 —'}</option>${platformOpts3}
               </select></div>
             <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">版塊</div>
-              <input id="sw-section-${r.id}" value="${r.section||''}" placeholder="版塊" class="form-input" style="font-size:12px;width:100%"></div>
+              <input id="sw-section-${r.id}" value="${r.section||''}" placeholder="版塊" class="form-input" style="font-size:12px;width:100%"></div>`:''}
             <button class="btn btn-sm btn-primary" onclick="_sopAssignWriter('${r.id}')" style="white-space:nowrap">指派</button>
           </div>
           <div style="margin-top:6px"><div style="font-size:10px;color:var(--text3);margin-bottom:2px">備註</div>
@@ -8459,7 +8612,11 @@ function _sopClientConfirm(taskId, status){
   const r = (DB.omRecords||[]).find(x=>x.id===taskId);
   if(!r) return;
   r.clientConfirmStatus = status;
-  if(status==='confirmed') r.status = '切角確認';
+  if(status==='confirmed'){
+    r.status = '切角確認';
+  } else if(status==='rejected'){
+    r.status = '待規劃'; // 退回回到待規劃，讓企劃修正
+  }
   syncToGAS('omRecords',r).catch(()=>{});
   const [cId,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
   const ym = document.getElementById('sop-ym')?.value||'';
@@ -8469,6 +8626,20 @@ function _sopClientConfirm(taskId, status){
 function _sopSaveClientNote(taskId, note){
   const r = (DB.omRecords||[]).find(x=>x.id===taskId);
   if(r){ r.clientNote=note; syncToGAS('omRecords',r).catch(()=>{}); }
+}
+
+// 企劃修正後重新送出給客戶（退回 → 修改 → 重置為 pending）
+function _sopResubmitToClient(taskId){
+  const r = (DB.omRecords||[]).find(x=>x.id===taskId);
+  if(!r) return;
+  r.clientConfirmStatus = 'pending'; // 重置為待確認
+  r.clientNote = '';                  // 清除舊意見
+  r.status = '待規劃';
+  syncToGAS('omRecords',r).catch(()=>{});
+  toast('已重新送交客戶確認','success');
+  const [cId,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
+  const ym = document.getElementById('sop-ym')?.value||'';
+  renderSopFlow(cId,ctId,ym);
 }
 
 function _sopStep2Complete(clientId, ym){
