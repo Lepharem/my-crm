@@ -1663,11 +1663,8 @@ async function handleCredential(response){
   document.getElementById('app').style.display = '';
   updateSidebarUser(payload);
 
-  // 確保 myMember 從 GAS 或本地 DB 中找到（用 window.myMember 安全存取）
+  // myMember 用 window. 安全存取（let 宣告在 HR 模組，防止 before initialization）
   if(typeof window.myMember === 'undefined') window.myMember = null;
-  if(!window.myMember){
-    window.myMember = DB.members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
-  }
   if(_userProfile && _userProfile.email) window.myMember = _userProfile;
   if(window.myMember && !_currentUser.hrRole){
     _currentUser.hrRole = window.myMember.role || 'employee';
@@ -1682,7 +1679,9 @@ async function handleCredential(response){
   const finishLogin = () => {
     if(typeof window.myMember === 'undefined') window.myMember = null;
     if(!window.myMember || !window.myMember.role){
-      window.myMember = DB.members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
+      // loadAllData 後 HR 模組的 D.members 已填入
+      const memberList = (typeof D !== 'undefined' ? D.members : null) || [];
+      window.myMember = memberList.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
     }
     if(window.myMember && !_currentUser.hrRole){
       _currentUser.hrRole = window.myMember.role || 'employee';
@@ -2825,7 +2824,7 @@ window.loadAllData = async function(){
       D.annual_leave   = data.annual_leave   || data.hr_annual_leave   || [];
       D.holidays       = data.holidays       || data.hr_holidays       || [];
       if(typeof _currentUser !== 'undefined' && _currentUser) {
-        myMember = D.members.find(m => m.email === _currentUser.email) || null;
+        window.myMember = D.members.find(m => m.email === _currentUser.email) || null;
         // 補上 taskName（若 GAS 回傳的記錄沒有此欄位）
         const specCount = {};
         (DB.omRecords||[]).forEach(r=>{
@@ -3036,7 +3035,7 @@ function disableTestMode(){
     window._testOriginalRole = null;
     window._testOriginalUser = null;
     window._testOriginalProfile = null;
-    myMember = null;
+    window.myMember = null;
     // 套用介面
     _applyRoleInterface(originalRole);
     toast('✅ 已退出測試模式，還原身份');
@@ -3258,7 +3257,7 @@ function switchTestRole(roleConfig){
 
   if(role === 'staff'){
     _userProfile = { name, role: hrRole, email };
-    myMember = { id:'TEST_'+hrRole, name_zh:name, email, role:hrRole, active:true };
+    window.myMember = { id:'TEST_'+hrRole, name_zh:name, email, role:hrRole, active:true };
     if(typeof hrApplyPermissions === 'function') hrApplyPermissions();
   } else if(role === 'writer'){
     const fl = DB.freelancers.find(f=>f.id===flId);
@@ -3772,7 +3771,7 @@ function renderHome(){
   const d=new Date();
   document.getElementById('today-date').textContent=d.toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
   // 依角色顯示對應的儀錶板通知區
-  const hrRole = (typeof myMember !== 'undefined' && myMember) ? myMember.role : (_currentUser?.hrRole || 'employee');
+  const hrRole = (typeof window.myMember !== 'undefined' && window.myMember) ? window.myMember.role : (_currentUser?.hrRole || 'employee');
   const isOwner   = hrRole==='owner';
   const isManager = hrRole==='manager';
 
@@ -3962,7 +3961,7 @@ function renderHome(){
     ${(()=>{
       try {
       // ── 角色專屬通知區 ──
-      const hrRole2=(typeof myMember!=='undefined'&&myMember)?myMember.role:(_currentUser?.hrRole||'employee');
+      const hrRole2=(typeof window.myMember!=='undefined'&&window.myMember)?window.myMember.role:(_currentUser?.hrRole||'employee');
       let roleHtml='';
       // 企劃/staff：我的待辦、我有參與的合約
       if(hrRole2==='employee'||hrRole2==='staff'){
@@ -8204,7 +8203,16 @@ function renderSopFlow(clientId, contractId, ym){
         + '</div>';
   }
     }
-    const cutDocLink3 = ct3.driveLink||'';
+  }
+
+  // ── 指派寫手步驟（A線步3，B線步2）──
+  const writerStep = state.line==='A' ? 3 : 2;
+  let swStatus = 'waiting', swContent = '';
+  const writerActive = state.step === writerStep;
+  const writerDone   = state.step > writerStep;
+  if(writerDone) swStatus = 'done';
+  else if(writerActive) swStatus = 'active';
+  if(writerActive || writerDone){
     const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
     const platformOpts3 = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
     const needWriter = thisMonthOm.filter(r=>
