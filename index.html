@@ -1663,15 +1663,14 @@ async function handleCredential(response){
   document.getElementById('app').style.display = '';
   updateSidebarUser(payload);
 
-  // 確保 myMember 從 GAS 或本地 DB 中找到（決定角色顯示）
-  if(!myMember){
-    myMember = DB.members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
+  // 確保 myMember 從 GAS 或本地 DB 中找到（用 window.myMember 安全存取）
+  if(typeof window.myMember === 'undefined') window.myMember = null;
+  if(!window.myMember){
+    window.myMember = DB.members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
   }
-  // 若 GAS 回傳了 member 資料，也更新 myMember
-  if(_userProfile && _userProfile.email) myMember = _userProfile;
-  // 根據 myMember 設定 hrRole（老闆/主管/企劃…）
-  if(myMember && !_currentUser.hrRole){
-    _currentUser.hrRole = myMember.role || 'employee';
+  if(_userProfile && _userProfile.email) window.myMember = _userProfile;
+  if(window.myMember && !_currentUser.hrRole){
+    _currentUser.hrRole = window.myMember.role || 'employee';
   }
 
   const ua = navigator.userAgent;
@@ -1681,12 +1680,12 @@ async function handleCredential(response){
 
   // loadAllData 完成後，渲染首頁
   const finishLogin = () => {
-    // 再次嘗試從 DB 找 myMember（loadAllData 後資料更完整）
-    if(!myMember || !myMember.role){
-      myMember = DB.members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
+    if(typeof window.myMember === 'undefined') window.myMember = null;
+    if(!window.myMember || !window.myMember.role){
+      window.myMember = DB.members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
     }
-    if(myMember && !_currentUser.hrRole){
-      _currentUser.hrRole = myMember.role || 'employee';
+    if(window.myMember && !_currentUser.hrRole){
+      _currentUser.hrRole = window.myMember.role || 'employee';
     }
     _applySidebarPermissions();
     renderHome();
@@ -2629,12 +2628,7 @@ async function gasApi(action, body={}){
   });
   const json = await res.json();
   if(!json.ok) throw new Error(json.error || 'GAS error');
-  // 容錯雙重包裝：有些 GAS 版本回傳 {ok:true, data:{ok:true, data:{...}}}
-  const payload = json.data;
-  if(payload && typeof payload === 'object' && payload.ok === true && payload.data) {
-    return payload.data;
-  }
-  return payload;
+  return json.data;
 }
 
 
@@ -2643,18 +2637,8 @@ window.loadAllData = async function(){
   try {
     toast('資料載入中...');
     const data = await gasApi('getAll');
-    // ── 詳細 debug（診斷用）──
-    console.group('%c[GAS] getAllData 回傳', 'color:#1D4ED8;font-weight:bold');
-    console.log('keys:', Object.keys(data));
-    console.log('clients:', (data.clients||data.crm_clients||[]).length);
-    console.log('contracts:', (data.contracts||data.crm_contracts||[]).length);
-    console.log('spec_items:', (data.spec_items||data.fin_spec_items||[]).length);
-    console.log('om_records:', (data.om_records||data.ops_om_records||[]).length);
-    console.log('members:', (data.members||data.hr_members||[]).length);
-    console.log('freelancer_pricing:', (data.freelancer_pricing||data.ref_freelancer_pricing||[]).length);
-    console.log('raw sample contract:', (data.contracts||data.crm_contracts||[])[0]);
-    console.log('raw sample specItem:', (data.spec_items||data.fin_spec_items||[])[0]);
-    console.groupEnd();
+    console.log('GAS getAll keys:', Object.keys(data));
+    console.log('clients:', (data.clients||data.crm_clients||[]).length, 'contracts:', (data.contracts||data.crm_contracts||[]).length, 'contract_payments:', (data.contract_payments||data.fin_payments||[]).length);
 
     // clients（支援新舊 key 名稱）
     const clientsRaw = data.clients || data.crm_clients || [];
@@ -2856,13 +2840,7 @@ window.loadAllData = async function(){
       }
     }
 
-    // ── 資料診斷 toast（確認抓到幾筆）──
-    const diagParts = [];
-    if(DB.clients.length)    diagParts.push(`客戶 ${DB.clients.length}`);
-    if(DB.contracts.length)  diagParts.push(`合約 ${DB.contracts.length}`);
-    if(DB.specItems.length)  diagParts.push(`規格 ${DB.specItems.length}`);
-    if(DB.omRecords.length)  diagParts.push(`口碑 ${DB.omRecords.length}`);
-    toast('✅ 載入完成：' + (diagParts.join(' · ') || '使用靜態資料'), 'success');
+    toast('資料載入完成');
 
     // ── B3 修復：vendorRecords.clientId 自動補齊 ──
     // 建立 clientName → id 的對照表（同時比 name 和 brandName）
