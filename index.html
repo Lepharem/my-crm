@@ -2576,62 +2576,53 @@ async function submitVendorPost(taskId){
   }
 }
 async function gasApi(action, body={}){
-  // 測試模式：攔截所有寫入，只放行 getAll
-  if(window._testMode){
-    console.log(`%c[🧪 TEST] 模擬 GAS: ${action}`, 'color:#7c3aed;font-weight:bold', body);
-    // 測試模式：模擬各種寫入動作到本地 DB（不實際呼叫 GAS）
-    const testId = 'TEST_' + Date.now().toString(36);
-    if(action === 'getAll'){
-      // getAll 也不打 GAS，直接回傳現有 DB 資料
-      return {
-        clients: DB.clients, contracts: DB.contracts,
-        contract_payments: DB.receivables.flatMap(r=>r.payments),
-        spec_items: DB.specItems, tasks: DB.tasks,
-        om_records: DB.omRecords, social_records: DB.socialRecords||[],
-        ad_records: DB.adRecords||[], members: DB.members||[],
-        vendor_companies: DB.vendorCompanies||[], freelancer_pricing: DB.freelancers||[],
-      };
+  // ── 讀取類動作：永遠打真實 GAS（測試模式也要取得最新資料）──
+  const READ_ACTIONS = ['getAll','getMyRole','getWriterTasks','getVendorTasksByEmail',
+    'getMonthlyCheckup','getAttendanceStatus','getAnnualLeaveBalance','checkHoliday'];
+
+  if(window._testMode && !READ_ACTIONS.includes(action)){
+    // ── 測試模式：寫入不打 GAS，只更新本地 DB ──
+    console.log(`%c[🧪 TEST] 攔截寫入: ${action}`, 'color:#7c3aed;font-weight:bold', body);
+
+    // 新增的記錄 id 加 [TEST] 前綴，方便事後清除
+    if(!body.id) body.id = 'TEST_' + Date.now().toString(36);
+    else if(!String(body.id).startsWith('TEST_')) body.id = 'TEST_' + body.id;
+
+    // ── 本地 DB 模擬更新 ──
+    const id = body.id;
+
+    if(action === 'saveOmRecord' || (action === 'saveRecord' && body.sheet?.includes('om'))){
+      const existing = (DB.omRecords||[]).find(r=>r.id===id);
+      if(existing){ Object.assign(existing, body); }
+      else { (DB.omRecords = DB.omRecords||[]).push({...body, id}); }
     }
-    // saveOmRecord / saveRecord 類：更新本地 DB
-    if(action==='saveOmRecord'||action==='saveRecord'||action==='saveTask'){
-      const rec=(DB.omRecords||[]).find(r=>r.id===body.id);
-      if(rec){ Object.assign(rec,body); }
-      else if(action==='saveOmRecord'||action==='saveRecord'){
-        if(!body.id) body.id=testId;
-        (DB.omRecords=DB.omRecords||[]).push(body);
-      }
-    }
-    // 帳號商送稿
-    if(action==='submitVendorPostByEmail'||action==='submitVendorResult'){
-      const rec=(DB.omRecords||[]).find(r=>r.id===body.id);
+    if(action === 'submitVendorPostByEmail' || action === 'submitVendorResult'){
+      const rec = (DB.omRecords||[]).find(r=>r.id===body.id);
       if(rec){
-        rec.status='待確認'; rec.postLink=body.postLink||'';
-        rec.account=body.account||''; rec.publishDate=body.publishDate||new Date().toISOString().slice(0,10);
-        if(body.platform) rec.platform=body.platform;
+        Object.assign(rec, { status:'待確認', postLink:body.postLink||'',
+          account:body.account||'', publishDate:body.publishDate||new Date().toISOString().slice(0,10) });
+        if(body.platform) rec.platform = body.platform;
         if(!DB.notifications) DB.notifications=[];
-        DB.notifications.push({
-          id:'VA_'+Date.now(), type:'vendorReported', taskId:body.id,
-          msg:`帳號商回報上刊：${rec.clientName||''} · ${rec.taskName||rec.specType||''} · ${rec.month||''}`,
-          created:new Date().toISOString(), done:false
-        });
+        DB.notifications.push({ id:'VA_'+Date.now(), type:'vendorReported', taskId:body.id,
+          msg:`帳號商回報上刊：${rec.clientName||''} · ${rec.taskName||rec.specType||''}`,
+          created:new Date().toISOString(), done:false });
       }
     }
-    // submitWriterDraft
-    if(action==='submitWriterDraft'){
-      const rec=(DB.omRecords||[]).find(r=>r.id===body.id);
+    if(action === 'submitWriterDraft'){
+      const rec = (DB.omRecords||[]).find(r=>r.id===body.id);
       if(rec){
-        rec.status='文稿審核'; rec.draftLink=body.draftLink||'';
-        rec.draftSubmittedAt=new Date().toISOString();
+        Object.assign(rec, { status:'文稿審核', draftLink:body.draftLink||'',
+          draftSubmittedAt:new Date().toISOString() });
         if(!DB.notifications) DB.notifications=[];
-        DB.notifications.push({
-          id:'WR_'+Date.now(), type:'draftSubmitted', taskId:body.id,
-          msg:`寫手送回稿件：${rec.clientName||''} · ${rec.taskName||rec.specType||''} · ${rec.month||''}`,
-          created:new Date().toISOString(), done:false
-        });
+        DB.notifications.push({ id:'WR_'+Date.now(), type:'draftSubmitted', taskId:body.id,
+          msg:`寫手送回稿件：${rec.clientName||''} · ${rec.taskName||rec.specType||''}`,
+          created:new Date().toISOString(), done:false });
       }
     }
-    return { ok: true, id: body.id||testId };
+    return { ok: true, id };
   }
+
+  // ── 正式呼叫 GAS ──
   const res = await fetch(GAS_URL + '?action=' + action, {
     method: 'POST',
     body: JSON.stringify({ action, ...body })
@@ -2640,6 +2631,7 @@ async function gasApi(action, body={}){
   if(!json.ok) throw new Error(json.error || 'GAS error');
   return json.data;
 }
+
 
 // ── 載入所有資料 ──
 window.loadAllData = async function(){
@@ -2913,7 +2905,7 @@ window.loadAllData = async function(){
     }, 0);
   } catch(err) {
     console.error('loadAllData failed:', err);
-    // GAS 失敗時靜默 fallback，不顯示 toast（避免干擾使用者）
+    toast('⚠️ 資料載入失敗，使用快取資料', 'info');
     // 補 taskName（GAS 未回傳資料，靜態 DB 仍可用）
     const specCount = {};
     (DB.omRecords||[]).forEach(r=>{
