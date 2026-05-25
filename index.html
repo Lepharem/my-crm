@@ -1680,7 +1680,7 @@ async function handleCredential(response){
     if(typeof window.myMember === 'undefined') window.myMember = null;
     if(!window.myMember || !window.myMember.role){
       // loadAllData 後 HR 模組的 D.members 已填入
-      const memberList = (typeof D !== 'undefined' ? D.members : null) || [];
+      const memberList = (typeof window.D !== 'undefined' ? window.D.members : null) || [];
       window.myMember = memberList.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
     }
     if(window.myMember && !_currentUser.hrRole){
@@ -2814,17 +2814,17 @@ window.loadAllData = async function(){
     }
 
     // ── HR 資料填入 D 物件（支援新舊 key）──
-    if(typeof D !== 'undefined') {
-      D.members        = data.members        || data.hr_members        || [];
-      D.leave_types    = data.leave_types    || data.hr_leave_types    || [];
-      D.leave_requests = data.leave_requests || data.hr_leave_requests || [];
-      D.attendance     = data.attendance     || data.hr_attendance     || [];
-      D.salary_records = data.salary_records || data.hr_salary_records || [];
-      D.login_logs     = data.login_logs     || data.sys_login_logs    || [];
-      D.annual_leave   = data.annual_leave   || data.hr_annual_leave   || [];
-      D.holidays       = data.holidays       || data.hr_holidays       || [];
+    if(typeof window.D !== 'undefined') {
+      window.D.members        = data.members        || data.hr_members        || [];
+      window.D.leave_types    = data.leave_types    || data.hr_leave_types    || [];
+      window.D.leave_requests = data.leave_requests || data.hr_leave_requests || [];
+      window.D.attendance     = data.attendance     || data.hr_attendance     || [];
+      window.D.salary_records = data.salary_records || data.hr_salary_records || [];
+      window.D.login_logs     = data.login_logs     || data.sys_login_logs    || [];
+      window.D.annual_leave   = data.annual_leave   || data.hr_annual_leave   || [];
+      window.D.holidays       = data.holidays       || data.hr_holidays       || [];
       if(typeof _currentUser !== 'undefined' && _currentUser) {
-        window.myMember = D.members.find(m => m.email === _currentUser.email) || null;
+        window.myMember = window.D.members.find(m => m.email === _currentUser.email) || null;
         // 補上 taskName（若 GAS 回傳的記錄沒有此欄位）
         const specCount = {};
         (DB.omRecords||[]).forEach(r=>{
@@ -3834,14 +3834,14 @@ function renderHome(){
   }
 
   // 3. HR 待審請假
-  if(typeof D!=='undefined'){
+  if(typeof window.D!=='undefined'){
     const pendingLeave=(D.leave_requests||[]).filter(r=>r.status==='pending');
     if(pendingLeave.length){
       notices.push({
         level:'amber', icon:'🗓️',
         title:`HR 請假待審核 ${pendingLeave.length} 筆`,
         tags: pendingLeave.slice(0,4).map(r=>{
-          const m=(D.members||[]).find(x=>String(x.id)===String(r.member_id));
+          const m=((typeof window.D!=='undefined'&&window.D.members)||[]).find(x=>String(x.id)===String(r.member_id));
           return`${m?m.name_zh:'—'} · ${r.start_date||''}`;
         }),
         more: pendingLeave.length>4?`等 ${pendingLeave.length-4} 筆`:'',
