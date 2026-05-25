@@ -2309,7 +2309,11 @@ function renderClientContractPage(contractId){
   // 規格執行統計（開文類）
   const openSpecs = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name));
   const specStats = openSpecs.map(s=>{
-    const recs = allOm.filter(r=>r.specId===s.id||(r.specType===s.name));
+    const recs = allOm.filter(r=>
+      r.specId===s.id ||
+      r.specType===s.name ||
+      (!r.specId && !r.specType)  // 未分類的也顯示在第一個 spec 下
+    );
     const done  = recs.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
     return {...s, done, pct:s.qty>0?done/s.qty:0, recs};
   });
@@ -8055,10 +8059,12 @@ h2{font-size:18px;font-weight:bold;margin-bottom:4px}
 
 // ── SOP 狀態存儲（本地，不寫 GAS）──
 // DB.sopState[clientId][ym] = { line:'A'|'B', step:1..5, clientConfirmed:bool, planItems:[...] }
-function getSopState(clientId, ym){
+function getSopState(clientId, ym, contractId){
   if(!DB.sopState) DB.sopState = {};
   if(!DB.sopState[clientId]) DB.sopState[clientId] = {};
-  if(!DB.sopState[clientId][ym]) DB.sopState[clientId][ym] = { line:null, step:0, clientConfirmed:false, planItems:[] };
+  if(!DB.sopState[clientId][ym]) DB.sopState[clientId][ym] = { line:null, step:0, clientConfirmed:false, planItems:[], contractId:'' };
+  // 若有傳入 contractId，更新到 state（供後續呼叫使用）
+  if(contractId) DB.sopState[clientId][ym].contractId = contractId;
   return DB.sopState[clientId][ym];
 }
 
@@ -8091,7 +8097,7 @@ function renderSopOmPage(){
 function renderSopFlow(clientId, contractId, ym){
   const el = document.getElementById('sop-om-content');
   if(!el) return;
-  const state = getSopState(clientId, ym);
+  const state = getSopState(clientId, ym, contractId);
   const ct = DB.contracts.find(c=>c.id===contractId)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
   const specs = DB.specItems.filter(s=>s.contractId===contractId&&(s.category==='口碑'||!s.category));
@@ -8234,7 +8240,7 @@ function renderSopFlow(clientId, contractId, ym){
               +rejectForm+historyHtml+'</div>';
           }).join('')
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
-        + (thisMonthOm.length&&thisMonthOm.every(r=>r.clientConfirmStatus==='confirmed'||r.clientConfirmStatus==='rejected')
+        + (thisMonthOm.length>0&&!thisMonthOm.some(r=>!r.clientConfirmStatus||r.clientConfirmStatus==='pending')
           ? '<button class="btn btn-primary" style="flex:1" onclick="_sopStep2Complete(\''+clientId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
           : '')
         + (confirmed.length>0&&thisMonthOm.some(r=>r.clientConfirmStatus==='pending')
@@ -8747,7 +8753,7 @@ function _sopDirectWriterChange(clientId, ym, rowId, writerId){
 
 
 function _sopSelectLine(clientId, contractId, ym, line){
-  const state = getSopState(clientId, ym);
+  const state = getSopState(clientId, ym, contractId);
   state.line = line; state.step = 1;
   const [,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
   renderSopFlow(clientId, contractId||ctId, ym);
@@ -8775,7 +8781,7 @@ function _sopPlanDeleteRow(clientId, ym, rowId){
 }
 
 function _sopPlanAddRow(clientId, ym, contractId){
-  const state = getSopState(clientId, ym);
+  const state = getSopState(clientId, ym, contractId);
   state.planItems.push({id:'pi_'+Date.now(),specType:'',date:'',platform:'',section:'',replyRatio:5,cutAngle:'',imgLink:'',note:''});
   renderSopFlow(clientId,contractId,ym);
 }
@@ -8794,7 +8800,7 @@ function _sopDirectAddRow(clientId, ym){
 
 // A 線：送交客戶確認 → 建立 omRecords + 狀態推進至步驟2
 function _sopSubmitPlan(clientId, contractId, ym){
-  const state = getSopState(clientId, ym);
+  const state = getSopState(clientId, ym, contractId);
   if(!state.planItems.length){ toast('請至少填寫一行任務'); return; }
   const ct = DB.contracts.find(c=>c.id===contractId)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
@@ -8831,7 +8837,7 @@ function _sopSubmitPlan(clientId, contractId, ym){
 
 // B 線：直接派寫手 → 建立 omRecords + 狀態「撰文中」
 function _sopSubmitDirect(clientId, contractId, ym){
-  const state = getSopState(clientId, ym);
+  const state = getSopState(clientId, ym, contractId);
   const ct = DB.contracts.find(c=>c.id===contractId)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
   const validRows = state.planItems.filter(row=>row.writerId && row.specType);
@@ -8907,7 +8913,8 @@ function _sopClientConfirm(taskId, status){
   // 刷新 SOP 頁
   const [cId,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
   const ym = document.getElementById('sop-ym')?.value||'';
-  if(cId&&ctId&&ym) renderSopFlow(cId,ctId,ym);
+  const _ctId = ctId || getSopState(cId||'', ym||'')?.contractId || '';
+  if(cId&&_ctId&&ym) renderSopFlow(cId, _ctId, ym);
   // 同步刷新客戶頁（不離開當前頁面）
   if(_clientCurrentPage&&_clientCurrentPage!=='dashboard'){
     setTimeout(()=>renderClientContractPage(r.contractId),150);
@@ -8947,15 +8954,15 @@ function _sopResubmitToClient(taskId){
 function _sopStep2Complete(clientId, ym){
   const state = getSopState(clientId, ym);
   state.step = (state.line==='A') ? 3 : 2;
-  const [,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
-  renderSopFlow(clientId,ctId,ym);
+  const ctId = state.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
+  renderSopFlow(clientId, ctId, ym);
 }
 
 function _sopStepNext(clientId, ym){
   const state = getSopState(clientId, ym);
   state.step++;
-  const [,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
-  renderSopFlow(clientId,ctId,ym);
+  const ctId = state.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
+  renderSopFlow(clientId, ctId, ym);
 }
 
 function _sopAssignWriter(taskId){
@@ -8972,7 +8979,8 @@ function _sopAssignWriter(taskId){
   toast(`✓ 已指派 ${fl?.name||''}`,'success');
   const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
   const ym=document.getElementById('sop-ym')?.value||'';
-  setTimeout(()=>renderSopFlow(cId,ctId,ym),200);
+  const _cId=cId||'', _ctId=ctId||getSopState(_cId,ym)?.contractId||'';
+  setTimeout(()=>{ if(_cId&&_ctId&&ym) renderSopFlow(_cId,_ctId,ym); },200);
 }
 
 function _sopBatchAssignWriter(specType, clientId, ym){
@@ -8995,24 +9003,25 @@ function _sopBatchAssignWriter(specType, clientId, ym){
   });
   toast(`✓ 已批次指派 ${targets.length} 筆給 ${fl?.name||''}`,'success');
   const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
-  setTimeout(()=>renderSopFlow(cId,ctId,ym),200);
+  const _ctId=ctId||getSopState(clientId,ym)?.contractId||'';
+  setTimeout(()=>{ if(cId&&_ctId&&ym) renderSopFlow(cId,_ctId,ym); },200);
 }
 
 function _sopStep2PartialContinue(clientId, ym){
   if(!confirm('確定先以已確認的部分繼續進行步驟3？未確認的任務狀態不變。')) return;
   const state = getSopState(clientId, ym);
   state.step = 3;
-  state.partialConfirm = true; // 標記部分確認，步驟3只顯示已確認
-  const [,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
-  renderSopFlow(clientId,ctId,ym);
+  state.partialConfirm = true;
+  const ctId = state.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
+  renderSopFlow(clientId, ctId, ym);
 }
 
 function _sopStep3PartialContinue(clientId, ym){
   if(!confirm('確定先以已指派的部分繼續進行步驟4？未指派的任務可繼續回來處理。')) return;
   const state = getSopState(clientId, ym);
   state.step = 4;
-  const [,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
-  renderSopFlow(clientId,ctId,ym);
+  const ctId = state.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
+  renderSopFlow(clientId, ctId, ym);
 }
 
 function _sopSaveNote(taskId, inputId){
@@ -9058,9 +9067,9 @@ function _sopBatchAssignVendor(specType, clientId, ym, contractId){
 
 function _sopReset(clientId, ym){
   if(!confirm(`確定重置 ${ym} 的作業進度？（不會刪除已建立的口碑記錄）`)) return;
+  const ctId = DB.sopState?.[clientId]?.[ym]?.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
   if(DB.sopState?.[clientId]) delete DB.sopState[clientId][ym];
-  const [,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
-  renderSopFlow(clientId,ctId,ym);
+  renderSopFlow(clientId, ctId, ym);
 }
 
 function sopAssignWriter(taskId){_sopAssignWriter(taskId);}
