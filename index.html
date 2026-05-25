@@ -2699,12 +2699,15 @@ window.loadAllData = async function(){
       ...r,
       // 正規化欄位名稱（GAS 可能用不同命名）
       name:       r.name       || r.specName  || r.spec_name || '',
-      contractId: r.contractId || r.contract_id || '',
+      contractId: r.contractId || r.contract_id || r.contractID || '',
       clientId:   r.clientId   || r.client_id   || '',
       category:   r.category   || '口碑',
       qty:        Number(r.qty || r.quantity || 0),
       monthlyQty: Number(r.monthlyQty || r.monthly_qty || 0),
     }));
+    console.log('[loadAllData] specItems:', DB.specItems.length,
+      DB.specItems.slice(0,2).map(s=>`${s.id}|name=${s.name}|contractId=${s.contractId}|cat=${s.category}`));
+    console.log('[loadAllData] contracts sample:', DB.contracts.slice(0,2).map(c=>`${c.id}|status=${c.status}`));
 
     // vendor_records（支援新舊 key）
     const vrRaw = data.vendor_records || data.fin_vendor_records || data.vendorRecords || [];
@@ -3095,13 +3098,16 @@ function _applyRoleInterface(role){
     if(avatar){ avatar.textContent = (_currentUser?.name||'T').charAt(0); avatar.style.backgroundImage = ''; }
     // 套用 sidebar 權限管制
     _applySidebarPermissions();
-    // 等 DOM 更新後再渲染（確保 app 已顯示）
-    requestAnimationFrame(()=>{
+    // 等 DOM 更新後再渲染
+    setTimeout(()=>{
       try {
         if(typeof renderHome === 'function') renderHome();
-      } catch(e) { console.warn('renderHome error:', e); }
-      navTo('home');
-    });
+        navTo('home');
+      } catch(e) {
+        console.warn('renderHome error:', e);
+        navTo('home');
+      }
+    }, 50);
   }
 }
 
@@ -8099,6 +8105,9 @@ function renderSopFlow(clientId, contractId, ym){
   // ── 步驟1：選擇執行線 + 展開表單 ──
   let s1Status = 'active', s1Content = '';
   if(state.line && state.step > 1) s1Status = 'done';
+  // debug（確認規格資料）
+  console.log('[SOP] specs for contract', contractId, ':', specs.length, 'total,', specsOpen.length, 'open');
+  if(specs.length) console.log('[SOP] first spec:', JSON.stringify(specs[0]));
 
   if(state.line === null){
     // 尚未選擇：顯示 A/B 選擇卡
