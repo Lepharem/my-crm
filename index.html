@@ -3092,7 +3092,7 @@ function _applyRoleInterface(role){
     const avatar = document.getElementById('sidebar-avatar');
     if(uname) uname.textContent = _currentUser?.name || '測試用戶';
     if(urole){
-      const roleLabel = {owner:'老闆',manager:'主管',employee:'企劃',staff:'員工'}[_currentUser?.hrRole||myMember?.role] || '員工';
+      const roleLabel = {owner:'老闆',manager:'主管',employee:'企劃',staff:'員工'}[_currentUser?.hrRole||(window.myMember?.role)] || '員工';
       urole.textContent = `${_currentUser?.name||''}（${roleLabel}）`;
     }
     if(avatar){ avatar.textContent = (_currentUser?.name||'T').charAt(0); avatar.style.backgroundImage = ''; }
@@ -8210,9 +8210,8 @@ function renderSopFlow(clientId, contractId, ym){
           ? '<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep2PartialContinue(\''+clientId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
         + '</div>';
-  }
-  }
-  }
+    }  // if(state.step >= 2)
+  }  // if(state.line === 'A')
 
   // ── 指派寫手步驟（A線步3，B線步2）──
   const writerStep = state.line==='A' ? 3 : 2;
@@ -8397,6 +8396,7 @@ function renderSopFlow(clientId, contractId, ym){
       + (!needVendor.length&&hasVendor.length?'<div style="font-size:12px;color:#16a34a">✓ 所有任務均已指派帳號商</div>':'')
       + (hasVendor.length>0&&needVendor.length>0?'<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext(\''+clientId+'\',\''+ym+'\')" >⚡ 已指派 '+hasVendor.length+' 筆，先進行下一步</button>':'')
       + '</div>';
+  }  // ← if(state.step >= vendorStep) 結尾
   // ── 組裝最終 HTML ──
   const allDone = state.step > vendorStep;
 
