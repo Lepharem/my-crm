@@ -1983,8 +1983,10 @@ async function renderVendorTasks(){
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">論壇平台</label>
-            <input id="vf-platform-${t.id}" value="${t.platform||''}" placeholder="Dcard/PTT…"
+            <select id="vf-platform-${t.id}"
               style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
+              ${['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google','其他'].map(p=>'<option value="'+p+'"'+(t.platform===p?' selected':'')+'>'+ p+'</option>').join('')}
+            </select>
           </div>
           <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">板塊</label>
             <input id="vf-section-${t.id}" value="${t.section||''}" placeholder="板塊"
@@ -2437,12 +2439,14 @@ function _clientConfirmTask(taskId, action){
     r.clientConfirmStatus='confirmed';
     r.status='切角確認';
     syncToGAS('omRecords',r).catch(()=>{});
-    // 隱藏建議欄
-    const wrap=document.getElementById('client-suggest-wrap-'+taskId);
-    if(wrap) wrap.style.display='none';
-    // 視覺更新此卡片狀態
-    const card=document.getElementById('client-task-card-'+taskId);
-    if(card) card.style.borderColor='#86efac';
+    // 同步刷新 SOP 頁（測試模式下企劃和客戶頁共用 DB）
+    const sopEl=document.getElementById('page-sop-om');
+    if(sopEl&&sopEl.classList.contains('active')){
+      const cId=document.getElementById('sop-client')?.value?.split('::')?.[0];
+      const ctId=document.getElementById('sop-client')?.value?.split('::')?.[1];
+      const sopYm=document.getElementById('sop-ym')?.value;
+      if(cId&&ctId&&sopYm) setTimeout(()=>renderSopFlow(cId,ctId,sopYm),100);
+    }
   } else if(action==='suggest'){
     // 展開更動建議輸入欄
     const wrap=document.getElementById('client-suggest-wrap-'+taskId);
@@ -2469,6 +2473,14 @@ function _clientSubmitSuggestion(taskId){
   r.clientNote=note; r.clientConfirmStatus='rejected'; r.status='待規劃';
   syncToGAS('omRecords',r).catch(()=>{});
   toast('更動建議已送出','success');
+  // 同步刷新 SOP 頁
+  const sopEl=document.getElementById('page-sop-om');
+  if(sopEl&&sopEl.classList.contains('active')){
+    const cId=document.getElementById('sop-client')?.value?.split('::')?.[0];
+    const ctId=document.getElementById('sop-client')?.value?.split('::')?.[1];
+    const sopYm=document.getElementById('sop-ym')?.value;
+    if(cId&&ctId&&sopYm) setTimeout(()=>renderSopFlow(cId,ctId,sopYm),100);
+  }
   if(_clientCurrentPage==='dashboard') renderClientDashboard();
   else renderClientContractPage(r.contractId);
 }
@@ -2495,13 +2507,33 @@ async function submitVendorPost(taskId){
     screenshot:  document.getElementById('vf-screenshot-'+taskId)?.value || '',
     note:        document.getElementById('vf-note-'+taskId)?.value || '',
   };
+  // 測試模式：gasApi 攔截前先補完整資料到本地 DB
+  if(window._testMode){
+    const rec = (DB.omRecords||[]).find(r=>r.id===taskId);
+    if(rec){
+      rec.status = '待確認';
+      rec.postLink    = data.postLink;
+      rec.publishDate = data.publishDate;
+      rec.account     = data.account;
+      if(data.platform) rec.platform = data.platform;
+      if(data.section)  rec.section  = data.section;
+      if(data.note)     rec.note     = data.note;
+      // 通知
+      if(!DB.notifications) DB.notifications=[];
+      DB.notifications.push({
+        id:'VA_'+Date.now(), type:'vendorReported', taskId,
+        msg:'帳號商回報上刊：'+(rec.clientName||'')+' · '+(rec.taskName||rec.specType||'')
+          +' · '+(rec.platform||'')+' · '+data.publishDate,
+        created:new Date().toISOString(), done:false
+      });
+    }
+  }
   try {
     await gasApi('submitVendorPostByEmail', data);
     toast('✓ 已成功回報！','success');
-    // 測試模式：gasApi 已更新本地 DB，重渲帳號商頁和 SOP 頁
     setTimeout(async ()=>{
       await renderVendorTasks();
-      // 若 SOP 頁面正在顯示，同步刷新
+      // 刷新 SOP 頁
       const sopEl = document.getElementById('page-sop-om');
       if(sopEl && sopEl.classList.contains('active')){
         const cId = document.getElementById('sop-client')?.value?.split('::')?.[0];
@@ -2509,7 +2541,11 @@ async function submitVendorPost(taskId){
         const ym   = document.getElementById('sop-ym')?.value;
         if(cId && ctId && ym) renderSopFlow(cId,ctId,ym);
       }
-    }, 400);
+      // 刷新口碑執行頁
+      if(typeof renderOmPage==='function' && document.getElementById('page-exec-om')?.classList.contains('active')){
+        renderOmPage();
+      }
+    }, 300);
   } catch(e){
     toast('送出失敗：'+e.message);
     if(btn){ btn.disabled=false; btn.textContent='✓ 已上刊，回報樂法'; }
@@ -7969,54 +8005,58 @@ function renderSopFlow(clientId, contractId, ym){
     if(state.step > 2) s2Status = 'done';
     else if(state.step === 2) s2Status = 'paused';
     if(state.step >= 2){
-      const pending = thisMonthOm.filter(r=>r.status==='待規劃'||r.clientConfirmStatus==='pending');
+      const pending   = thisMonthOm.filter(r=>r.status==='待規劃'||r.clientConfirmStatus==='pending');
       const confirmed = thisMonthOm.filter(r=>r.clientConfirmStatus==='confirmed');
       const rejected  = thisMonthOm.filter(r=>r.clientConfirmStatus==='rejected');
       s2Content = `
-        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">客戶逐筆確認各切角方向，可填修改意見。</div>
-        <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-          <span class="tag tag-amber"style="font-size:11px">待確認 ${pending.length} 筆</span>
-          <span class="tag tag-green"style="font-size:11px">已確認 ${confirmed.length} 筆</span>
-          ${rejected.length?`<span class="tag tag-red"style="font-size:11px">退回 ${rejected.length} 筆</span>`:''}
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">客戶逐筆確認各切角方向。企劃可代為操作（✓確認 / ✕退回），或等客戶在客戶頁自行回覆。</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <span class="tag tag-amber" style="font-size:11px">⏳ 待確認 ${pending.length} 筆</span>
+          <span class="tag tag-green" style="font-size:11px">✓ 已確認 ${confirmed.length} 筆</span>
+          ${rejected.length?`<span class="tag tag-red" style="font-size:11px">✕ 退回 ${rejected.length} 筆</span>`:''}
         </div>
         ${thisMonthOm.map(r=>{
           const cs = r.clientConfirmStatus||'pending';
-          return `<div style="border:1px solid ${cs==='confirmed'?'#86efac':cs==='rejected'?'#fca5a5':'#fcd34d'};border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:${cs==='confirmed'?'#f0fdf4':cs==='rejected'?'#fef2f2':'#fffbeb'}">
+          const borderCol = cs==='confirmed'?'#86efac':cs==='rejected'?'#fca5a5':'#fcd34d';
+          const bgCol     = cs==='confirmed'?'#f0fdf4':cs==='rejected'?'#fef2f2':'#fffbeb';
+          return `<div style="border:1px solid ${borderCol};border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:${bgCol}">
             <div style="display:flex;align-items:flex-start;gap:8px">
-              <span class="tag ${cs==='confirmed'?'tag-green':cs==='rejected'?'tag-red':'tag-amber'}"style="font-size:10px;flex-shrink:0;margin-top:1px">${cs==='confirmed'?'✓ 確認':cs==='rejected'?'✕ 退回':'待確認'}</span>
+              <span class="tag ${cs==='confirmed'?'tag-green':cs==='rejected'?'tag-red':'tag-amber'}" style="font-size:10px;flex-shrink:0;margin-top:1px">
+                ${cs==='confirmed'?'✓ 確認':cs==='rejected'?'✕ 退回':'待確認'}
+              </span>
               <div style="flex:1">
-                <div style="font-size:12px;font-weight:500">${r.specType||'—'} ／ ${r.platform||'—'} ${r.section?'· '+r.section:''}</div>
-                <div style="font-size:11px;color:var(--text3);margin-top:2px">${(r.title||r.content||'').slice(0,80)}${(r.title||r.content||'').length>80?'…':''}</div>
-                ${r.clientNote?`<div style="font-size:11px;color:#d97706;margin-top:4px;padding:4px 8px;background:#fffbeb;border-radius:4px">客戶意見：${r.clientNote}</div>`:''}
+                <div style="font-size:12px;font-weight:600">${r.taskName||r.specType||'—'}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:1px">${r.platform||''} ${r.section?'· '+r.section:''} ${(r.publishDate||'').slice(0,10)?'· '+r.publishDate.slice(0,10):''}</div>
+                ${r.content||r.title?`<div style="font-size:11px;color:var(--text3);margin-top:4px;background:#fff;border-radius:4px;padding:5px 8px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${(r.content||r.title).slice(0,200)}</div>`:''}
+                ${r.clientNote?`<div style="font-size:11px;color:#d97706;margin-top:4px;padding:4px 8px;background:#fffbeb;border-radius:4px">💬 客戶意見：${r.clientNote}</div>`:''}
               </div>
-              <div style="display:flex;gap:4px;flex-shrink:0">
-              <div style="display:flex;gap:4px;flex-shrink:0">
+              <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
                 <button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="_sopClientConfirm('${r.id}','confirmed')">✓ 確認</button>
                 <button class="btn btn-xs" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="_sopClientConfirm('${r.id}','rejected')">✕ 退回</button>
+              </div>
             </div>
             ${cs==='rejected'?`<div style="margin-top:8px">
-              <input id="client-note-${r.id}" value="${r.clientNote||''}" placeholder="填寫退回原因或修改建議…"
-                style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px"
-                onblur="_sopSaveClientNote('${r.id}',this.value)">
-              <button class="btn btn-xs btn-primary" style="margin-top:6px" onclick="_sopResubmitToClient('${r.id}')">
-                🔄 修正完成，重新送交客戶確認
+              <textarea id="client-note-${r.id}" rows="2" placeholder="填寫退回原因或修改意見…"
+                style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px;resize:vertical"
+                onblur="_sopSaveClientNote('${r.id}',this.value)">${r.clientNote||''}</textarea>
+              <button class="btn btn-xs btn-primary" style="margin-top:4px" onclick="_sopResubmitToClient('${r.id}')">
+                🔄 修正完成，重新送交客戶
               </button>
             </div>`:''}
           </div>`;
         }).join('')}
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
           ${thisMonthOm.length&&thisMonthOm.every(r=>r.clientConfirmStatus==='confirmed'||r.clientConfirmStatus==='rejected')?`
             <button class="btn btn-primary" style="flex:1" onclick="_sopStep2Complete('${clientId}','${ym}')">
-              ✓ 全部確認完成，進行步驟3
-            </button>`:''}
+              ✓ 全部回覆完成，進行步驟3
+            </button>`:``}
           ${confirmed.length>0&&thisMonthOm.some(r=>r.clientConfirmStatus==='pending')?`
             <button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep2PartialContinue('${clientId}','${ym}')">
-              ⚡ 已確認部分（${confirmed.length}/${thisMonthOm.length}），先進行步驟3
-            </button>`:''}
+              ⚡ 已確認 ${confirmed.length}/${thisMonthOm.length} 筆，先進行步驟3
+            </button>`:``}
         </div>`;
     }
   }
-
   // ── 指派寫手步驟（A線步3，B線步2）──
   const writerStep = state.line==='A' ? 3 : 2;
   let swStatus = 'waiting', swContent = '';
@@ -8041,30 +8081,39 @@ function renderSopFlow(clientId, contractId, ym){
         const isOpen  = _sopIsOpenPost(r.specType);
         const isMon   = _sopIsMonitor(r.specType);
         const isGoogle= _sopIsGoogle(r.specType);
-        return `<div style="border:1px solid ${isOpen?'#c4b5fd':isMon?'#bae6fd':isGoogle?'#fde68a':'#d1fae5'};border-radius:var(--r);padding:12px;margin-bottom:8px;background:${isOpen?'#f5f3ff':'#f0fdf4'}">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:600">${r.taskName||r.specType}</span>
-            ${r.replyCount?`<span style="font-size:11px;background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:12px">含 ${r.replyCount} 回文</span>`:''}
-          </div>
-          ${(isOpen || isMon || isGoogle)?`<div style="display:grid;grid-template-columns:1fr ${isOpen?'1fr 1fr ':''} auto;gap:6px;align-items:end">
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">指派寫手 *</div>
-              <select id="sw-writer-${r.id}" class="form-input" style="font-size:12px;width:100%">
-                <option value="">— 選擇 —</option>${writerOpts}
-              </select></div>
-            ${isOpen?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">論壇平台</div>
-              <select id="sw-platform-${r.id}" class="form-input" style="font-size:12px;width:100%">
-                <option value="${r.platform||''}">${r.platform||'— 選擇 —'}</option>${platformOpts3}
-              </select></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">版塊</div>
-              <input id="sw-section-${r.id}" value="${r.section||''}" placeholder="版塊" class="form-input" style="font-size:12px;width:100%"></div>`:''}
-            <button class="btn btn-sm btn-primary" onclick="_sopAssignWriter('${r.id}')" style="white-space:nowrap">指派</button>
-          </div>
-          <div style="margin-top:6px"><div style="font-size:10px;color:var(--text3);margin-bottom:2px">備註</div>
-            <input id="sw-note-${r.id}" value="${r.note||''}" placeholder="備註（選填）" class="form-input" style="font-size:11px;width:100%"></div>`
-          :`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">回文備註</div>
-            <input id="sw-note-${r.id}" value="${r.note||''}" placeholder="回文備註（選填）" class="form-input" style="font-size:11px;width:100%">
-            <button class="btn btn-xs" style="margin-top:4px" onclick="_sopSaveNote('${r.id}','sw-note-${r.id}')">儲存</button></div>`}
-        </div>`;
+        const needW   = isOpen||isMon||isGoogle;
+        const cardBorder = isOpen?'#c4b5fd':isMon?'#bae6fd':isGoogle?'#fde68a':'#d1fae5';
+        const cardBg     = isOpen?'#f5f3ff':isMon?'#f0f9ff':isGoogle?'#fffbeb':'#f0fdf4';
+        // 用字串拼接避免 template literal 嵌套問題
+        let wFields = '';
+        if(needW){
+          const cols = isOpen ? '1fr 1fr 1fr auto' : '1fr auto';
+          wFields += '<div style="display:grid;grid-template-columns:'+cols+';gap:6px;align-items:end;margin-bottom:6px">';
+          wFields += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">指派寫手 *</div>'
+            + '<select id="sw-writer-'+r.id+'" class="form-input" style="font-size:12px;width:100%">'
+            + '<option value="">— 選擇 —</option>'+writerOpts+'</select></div>';
+          if(isOpen){
+            wFields += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">論壇平台</div>'
+              + '<select id="sw-platform-'+r.id+'" class="form-input" style="font-size:12px;width:100%">'
+              + '<option value="'+(r.platform||'')+'">'+(r.platform||'— 選擇 —')+'</option>'
+              + platformOpts3+'</select></div>'
+              + '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">版塊</div>'
+              + '<input id="sw-section-'+r.id+'" value="'+(r.section||'')+'" placeholder="版塊" class="form-input" style="font-size:12px;width:100%"></div>';
+          }
+          wFields += '<button class="btn btn-sm btn-primary" style="white-space:nowrap;align-self:end"'
+            + ' onclick="_sopAssignWriter(\''+r.id+'\')">指派</button></div>';
+          wFields += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">備註</div>'
+            + '<input id="sw-note-'+r.id+'" value="'+(r.note||'')+'" placeholder="備註（選填）" class="form-input" style="font-size:11px;width:100%"></div>';
+        } else {
+          wFields = '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">回文備註</div>'
+            + '<input id="sw-note-'+r.id+'" value="'+(r.note||'')+'" placeholder="回文備註（選填）" class="form-input" style="font-size:11px;width:100%">'
+            + '<button class="btn btn-xs" style="margin-top:4px" onclick="_sopSaveNote(\''+r.id+'\',\'sw-note-'+r.id+'\')">儲存</button></div>';
+        }
+        return '<div style="border:1px solid '+cardBorder+';border-radius:var(--r);padding:12px;margin-bottom:8px;background:'+cardBg+'">'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'
+          + '<span style="font-size:13px;font-weight:600">'+(r.taskName||r.specType)+'</span>'
+          + (r.replyCount?'<span style="font-size:11px;background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:12px">含 '+r.replyCount+' 回文</span>':'')
+          + '</div>' + wFields + '</div>';
       }).join('')}
       ${hasWriter.map(r=>{
         const fl=DB.freelancers.find(f=>f.id===r.writerId);
@@ -8113,7 +8162,10 @@ function renderSopFlow(clientId, contractId, ym){
           <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}</span>
           <span class="tag tag-green" style="font-size:10px">✓ 文稿通過</span>
         </div>`).join('')}
-      ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary"style="width:100%;margin-top:4px" onclick="_sopStepNext('${clientId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="_sopStepNext('${clientId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
+        ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext('${clientId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
+      </div>`;
   }
 
   // ── 指派帳號商步驟（A線步5，B線步4）──
@@ -8160,7 +8212,10 @@ function renderSopFlow(clientId, contractId, ym){
           <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:10px">${r.status}</span>
         </div>`;
       }).join('')}
-      ${!needVendor.length?`<div style="font-size:12px;color:#16a34a;margin-top:4px">✓ 所有任務均已指派帳號商</div>`:''}`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${!needVendor.length&&hasVendor.length?`<div style="font-size:12px;color:#16a34a">✓ 所有任務均已指派帳號商</div>`:''}
+        ${hasVendor.length>0&&needVendor.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext('${clientId}','${ym}')">⚡ 已指派 ${hasVendor.length} 筆，先進行下一步</button>`:''}
+      </div>`;
   }
 
   // ── 組裝最終 HTML ──
