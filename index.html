@@ -1710,7 +1710,7 @@ window.logoutUser = function(){
 // ══════════════════════════════════════════
 async function showWriterInterface(){
   const app = document.getElementById('writer-app');
-  if(app){ app.style.display = 'flex'; }
+  if(app){ app.style.display = 'flex'; app.style.flexDirection = 'column'; }
   const badge = document.getElementById('writer-name-badge');
   if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
   _renderWriterNav();
@@ -2123,7 +2123,7 @@ async function renderVendorTasks(){
 // ══════════════════════════════════════════
 function showClientInterface(){
   const app = document.getElementById('client-app');
-  if(app){ app.style.display = 'flex'; }
+  if(app){ app.style.display = 'flex'; app.style.flexDirection = 'column'; }
   const badge = document.getElementById('client-name-badge');
   if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
   _renderClientNav();
@@ -2584,6 +2584,19 @@ async function gasApi(action, body={}){
 
 // ── 載入所有資料 ──
 window.loadAllData = async function(){
+  // 測試模式：skip GAS，直接用靜態 DB，補 taskName 即可
+  if(window._testMode){
+    const specCount = {};
+    (DB.omRecords||[]).forEach(r=>{
+      if(!r.taskName){
+        const k=(r.contractId||'')+'_'+(r.specType||'');
+        specCount[k]=(specCount[k]||0)+1;
+        r.taskName=(r.specType||'任務')+'#'+specCount[k];
+      }
+    });
+    toast('✅ 已載入靜態測試資料','success');
+    return;
+  }
   try {
     toast('資料載入中...');
     const data = await gasApi('getAll');
@@ -2839,8 +2852,17 @@ window.loadAllData = async function(){
       }
     }, 0);
   } catch(err) {
-    toast('載入失敗：' + err.message);
-    console.error(err);
+    console.error('loadAllData failed:', err);
+    toast('⚠️ 無法連線 GAS，使用本地資料繼續', 'info');
+    // 補 taskName（GAS 未回傳資料，靜態 DB 仍可用）
+    const specCount = {};
+    (DB.omRecords||[]).forEach(r=>{
+      if(!r.taskName){
+        const k=(r.contractId||'')+'_'+(r.specType||'');
+        specCount[k]=(specCount[k]||0)+1;
+        r.taskName=(r.specType||'任務')+'#'+specCount[k];
+      }
+    });
   }
 };
 
@@ -2928,31 +2950,56 @@ function enableTestMode(){
 }
 
 function disableTestMode(){
-  const restore = confirm('退出測試模式？\n\n確定 → 還原測試前資料與身份\n取消 → 保留測試資料（不寫入資料庫）');
+  const restore = confirm('退出測試模式？\n\n確定 → 還原測試前資料與身份\n取消 → 僅關閉測試標記');
   window._testMode = false;
   document.body.classList.remove('test-mode');
-  // 移除控制台
+  // 移除控制台 FAB 和 Panel
   const panel = document.getElementById('test-role-panel');
   if(panel) panel.remove();
-  if(restore && window._testModeDbSnapshot){
-    try{
-      const snap = JSON.parse(window._testModeDbSnapshot);
-      Object.assign(DB, snap);
-      window._testModeDbSnapshot = null;
-      // 還原身份
-      if(window._testOriginalRole){
-        _userRole    = window._testOriginalRole;
-        _currentUser = window._testOriginalUser;
-        _userProfile = window._testOriginalProfile;
-        // 還原介面
-        _applyRoleInterface(_userRole);
-      }
-      toast('✅ 已還原測試前資料與身份');
-      const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
-      if(activePage && typeof renders !== 'undefined' && renders[activePage]) renders[activePage]();
-    } catch(e){ toast('還原失敗，請重新載入頁面'); }
+  const fab = document.getElementById('test-mode-fab');
+  if(fab) fab.remove();
+  const banner = document.getElementById('test-mode-banner');
+  if(banner) banner.remove();
+
+  if(restore){
+    // 還原 DB 快照
+    if(window._testModeDbSnapshot){
+      try{
+        const snap = JSON.parse(window._testModeDbSnapshot);
+        Object.assign(DB, snap);
+        window._testModeDbSnapshot = null;
+      } catch(e){ console.warn('DB restore failed', e); }
+    }
+    // 還原身份（不論原本是否有登入）
+    const originalRole = window._testOriginalRole || 'staff';
+    const originalUser = window._testOriginalUser;
+    const originalProfile = window._testOriginalProfile;
+    _userRole    = originalRole;
+    _currentUser = originalUser || { email:'', name:'企劃' };
+    _userProfile = originalProfile || null;
+    window._testOriginalRole = null;
+    window._testOriginalUser = null;
+    window._testOriginalProfile = null;
+    myMember = null;
+    // 套用介面
+    _applyRoleInterface(originalRole);
+    toast('✅ 已退出測試模式，還原身份');
   } else {
-    toast('已退出測試模式');
+    // 不還原資料，只關閉視覺標記，確保介面正確
+    if(_userRole === 'staff' || !_userRole){
+      const app = document.getElementById('app');
+      const wi = document.getElementById('writer-app');
+      const vi = document.getElementById('vendor-app');
+      const ci = document.getElementById('client-app');
+      if(wi) wi.style.display = 'none';
+      if(vi) vi.style.display = 'none';
+      if(ci) ci.style.display = 'none';
+      if(app) app.style.display = '';
+      _applySidebarPermissions();
+      if(typeof renderHome === 'function') renderHome();
+      navTo('home');
+    }
+    toast('已關閉測試標記（資料未還原）');
   }
   console.log('%c[🧪 TEST MODE OFF]', 'background:#16a34a;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold');
 }
