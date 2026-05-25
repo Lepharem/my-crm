@@ -3576,7 +3576,7 @@ const NAV_PERM_MAP = {
 };
 
 function _getCurrentRole(){
-  if(typeof myMember !== 'undefined' && myMember) return myMember.role;
+  if(typeof window.myMember !== 'undefined' && window.myMember) return window.myMember.role;
   return _currentUser?.hrRole || 'employee';
 }
 
@@ -4047,7 +4047,7 @@ function renderHome(){
 
     ${(()=>{
       // ── 進行中合約方框（依角色顯示）──
-      const hrRole3=(typeof myMember!=='undefined'&&myMember)?myMember.role:(_currentUser?.hrRole||'employee');
+      const hrRole3=(typeof window.myMember!=='undefined'&&window.myMember)?window.myMember.role:(_currentUser?.hrRole||'employee');
       const activeContracts = DB.contracts.filter(c=>c.status==='進行中');
       if(!activeContracts.length) return '';
       // owner/manager 全看，employee 看有口碑記錄的
@@ -8202,7 +8202,7 @@ function renderSopFlow(clientId, contractId, ym){
           : '')
         + '</div>';
   }
-    }
+  }
   }
 
   // ── 指派寫手步驟（A線步3，B線步2）──
@@ -10549,7 +10549,7 @@ let D = {
   annual_leave:[], holidays:[]
 };
 let hrCurrentUser = null;  // 指向 _currentUser 的別名，登入後更新
-let myMember = null;
+let myMember = null; window.myMember = null; // TDZ 避開用 window.myMember
 let hrClockInterval = null, hrClockLocked = false;
 let hrCurrentClockIn = null, hrCurrentClockOut = null;
 let hrAttMonth = new Date().toISOString().slice(0,7);
