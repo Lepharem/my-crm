@@ -2553,16 +2553,37 @@ async function submitVendorPost(taskId){
 }
 async function gasApi(action, body={}){
   // 測試模式：攔截所有寫入，只放行 getAll
-  if(window._testMode && action !== 'getAll'){
-    console.log(`%c[🧪 TEST] 攔截 GAS: ${action}`, 'color:#7c3aed;font-weight:bold', body);
-    // 帳號商送稿：本地更新狀態
-    if(action === 'submitVendorPostByEmail' || action === 'submitVendorResult'){
-      const rec = (DB.omRecords||[]).find(r=>r.id===body.id);
+  if(window._testMode){
+    console.log(`%c[🧪 TEST] 模擬 GAS: ${action}`, 'color:#7c3aed;font-weight:bold', body);
+    // 測試模式：模擬各種寫入動作到本地 DB（不實際呼叫 GAS）
+    const testId = 'TEST_' + Date.now().toString(36);
+    if(action === 'getAll'){
+      // getAll 也不打 GAS，直接回傳現有 DB 資料
+      return {
+        clients: DB.clients, contracts: DB.contracts,
+        contract_payments: DB.receivables.flatMap(r=>r.payments),
+        spec_items: DB.specItems, tasks: DB.tasks,
+        om_records: DB.omRecords, social_records: DB.socialRecords||[],
+        ad_records: DB.adRecords||[], members: DB.members||[],
+        vendor_companies: DB.vendorCompanies||[], freelancer_pricing: DB.freelancers||[],
+      };
+    }
+    // saveOmRecord / saveRecord 類：更新本地 DB
+    if(action==='saveOmRecord'||action==='saveRecord'||action==='saveTask'){
+      const rec=(DB.omRecords||[]).find(r=>r.id===body.id);
+      if(rec){ Object.assign(rec,body); }
+      else if(action==='saveOmRecord'||action==='saveRecord'){
+        if(!body.id) body.id=testId;
+        (DB.omRecords=DB.omRecords||[]).push(body);
+      }
+    }
+    // 帳號商送稿
+    if(action==='submitVendorPostByEmail'||action==='submitVendorResult'){
+      const rec=(DB.omRecords||[]).find(r=>r.id===body.id);
       if(rec){
-        rec.status = '待確認';
-        rec.postLink = body.postLink||'';
-        rec.account  = body.account||'';
-        rec.publishDate = body.publishDate||new Date().toISOString().slice(0,10);
+        rec.status='待確認'; rec.postLink=body.postLink||'';
+        rec.account=body.account||''; rec.publishDate=body.publishDate||new Date().toISOString().slice(0,10);
+        if(body.platform) rec.platform=body.platform;
         if(!DB.notifications) DB.notifications=[];
         DB.notifications.push({
           id:'VA_'+Date.now(), type:'vendorReported', taskId:body.id,
@@ -2571,7 +2592,21 @@ async function gasApi(action, body={}){
         });
       }
     }
-    return { ok: true, id: 'TEST_' + Date.now().toString(36) };
+    // submitWriterDraft
+    if(action==='submitWriterDraft'){
+      const rec=(DB.omRecords||[]).find(r=>r.id===body.id);
+      if(rec){
+        rec.status='文稿審核'; rec.draftLink=body.draftLink||'';
+        rec.draftSubmittedAt=new Date().toISOString();
+        if(!DB.notifications) DB.notifications=[];
+        DB.notifications.push({
+          id:'WR_'+Date.now(), type:'draftSubmitted', taskId:body.id,
+          msg:`寫手送回稿件：${rec.clientName||''} · ${rec.taskName||rec.specType||''} · ${rec.month||''}`,
+          created:new Date().toISOString(), done:false
+        });
+      }
+    }
+    return { ok: true, id: body.id||testId };
   }
   const res = await fetch(GAS_URL + '?action=' + action, {
     method: 'POST',
@@ -2584,19 +2619,6 @@ async function gasApi(action, body={}){
 
 // ── 載入所有資料 ──
 window.loadAllData = async function(){
-  // 測試模式：skip GAS，直接用靜態 DB，補 taskName 即可
-  if(window._testMode){
-    const specCount = {};
-    (DB.omRecords||[]).forEach(r=>{
-      if(!r.taskName){
-        const k=(r.contractId||'')+'_'+(r.specType||'');
-        specCount[k]=(specCount[k]||0)+1;
-        r.taskName=(r.specType||'任務')+'#'+specCount[k];
-      }
-    });
-    toast('✅ 已載入靜態測試資料','success');
-    return;
-  }
   try {
     toast('資料載入中...');
     const data = await gasApi('getAll');
@@ -2944,16 +2966,6 @@ function enableTestMode(){
   window._testOriginalUser    = _currentUser ? {..._currentUser} : null;
   window._testOriginalProfile = _userProfile ? {..._userProfile} : null;
 
-  // 確保 DB taskName 完整（跳過 GAS 的靜態初始化）
-  const specCount = {};
-  (DB.omRecords||[]).forEach(r=>{
-    if(!r.taskName){
-      const k=(r.contractId||'')+'_'+(r.specType||'');
-      specCount[k]=(specCount[k]||0)+1;
-      r.taskName=(r.specType||'任務')+'#'+specCount[k];
-    }
-  });
-
   // 確保登入畫面隱藏，讓後續介面可以正常顯示
   const loginScreen = document.getElementById('login-screen');
   if(loginScreen) loginScreen.style.display = 'none';
@@ -3246,11 +3258,10 @@ function switchTestRole(roleConfig){
   toast(`🧪 已切換為：${name}（${roleLabels[role]||role}）`, 'info');
   console.log(`%c[🧪 ROLE] → ${name} (${role})`, `background:${color};color:#fff;padding:2px 8px;border-radius:4px`);
 
-  // 重整控制台（讓角色按鈕更新 active 狀態）
+  // 只更新控制台列表的 active 狀態（不重建整個面板）
   setTimeout(()=>{
     if(window._refreshTestPanel) window._refreshTestPanel();
-    showTestRolePanel(); // 重新渲染以更新 active 狀態
-  }, 200);
+  }, 100);
 }
 
 window.syncDeleteGAS = async function(collection, id){
