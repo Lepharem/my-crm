@@ -2299,12 +2299,12 @@ function renderClientDashboard(){
                }
              </div>
              <div id="client-task-btns-${r.id}" style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-               ${cs==='confirmed'
-                 ? '<span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>'
+               ${(r.status==='切角審核'||cs==='pending')
+                 ? `<button onclick="_clientConfirmTask('${r.id}','ok')" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ OK</button>
+                    <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:6px 14px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✏️ 更動建議</button>`
                  : cs==='rejected'
                  ? '<span style="font-size:11px;color:#991B1B;font-weight:600">✕ 已送出更動</span>'
-                 : `<button onclick="_clientConfirmTask('${r.id}','ok')" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ OK</button>
-                    <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:6px 14px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✏️ 更動建議</button>`
+                 : '<span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>'
                }
              </div>
            </div>
@@ -2393,6 +2393,7 @@ function renderClientContractPage(contractId){
         <td style="padding:8px 10px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.content||r.title||'').replace(/"/g,'')}">
           ${r.content||r.title||'—'}
         </td>
+        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${r.vendorName||r.writerName||'—'}</td>
         <td style="padding:8px 10px">
           ${r.draftLink?`<a href="${r.draftLink}" target="_blank" style="font-size:11px;color:#1B4FD8">稿件↗</a>`:'—'}
         </td>
@@ -2508,6 +2509,7 @@ function renderClientContractPage(contractId){
             <th style="padding:8px 10px;text-align:left;white-space:nowrap">論壇平台</th>
             <th style="padding:8px 10px;text-align:left;white-space:nowrap">板塊</th>
             <th style="padding:8px 10px;text-align:left;min-width:150px">切角方向</th>
+            <th style="padding:8px 10px;text-align:left;white-space:nowrap">帳號商</th>
             <th style="padding:8px 10px;text-align:left;white-space:nowrap">文稿</th>
             <th style="padding:8px 10px;text-align:left;white-space:nowrap">上文連結</th>
             <th style="padding:8px 10px;text-align:left;min-width:120px">狀態 / 確認</th>
@@ -8249,11 +8251,6 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   if(contractId.includes('::A')){ activeLine='A'; baseCtId=contractId.replace('::A',''); }
   else if(contractId.includes('::B')){ activeLine='B'; baseCtId=contractId.replace('::B',''); }
   if(activeLine) window._sopActiveLine[baseCtId] = activeLine;
-  // lineKey 在 activeLine 偵測後計算，確保使用正確的線別
-  // （先用暫時值，偵測後再更新）
-  let lineKey = baseCtId + '::' + (window._sopActiveLine[baseCtId]||'none');
-  let state = getSopState(clientId, ym, lineKey);
-  if(activeLine && !state.contractId) state.contractId = baseCtId;
   // 若 activeLine 為 null（直接傳 baseCtId 進來），從既有 state 推斷線別
   if(!activeLine){
     const stA = getSopState(clientId, ym, baseCtId+'::A');
@@ -8261,12 +8258,12 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     if(stA.step > 0 || stA.line==='A') { activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
     else if(stB.step > 0 || stB.line==='B') { activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
   }
-  // 偵測後重新計算 lineKey 和 state（確保 activeLine 已正確設定）
-  if(activeLine) {
-    lineKey = baseCtId + '::' + activeLine;
-    state = getSopState(clientId, ym, lineKey);
-    if(!state.contractId) state.contractId = baseCtId;
-  }
+  // lineKey 和 state 在 activeLine 確定後才計算
+  const lineKey = baseCtId + '::' + (activeLine || (window._sopActiveLine[baseCtId]||'none'));
+  // 重新指向 lineKey，確保所有 ${contractId} 插值都用正確的 lineKey
+  contractId = lineKey;
+  let state = getSopState(clientId, ym, lineKey);
+  if(!state.contractId) state.contractId = baseCtId;
   // 若從 A/B tab 點進來，自動進入步驟1（顯示規劃表或選線表單）
   if(activeLine && state.line===null) state.line = activeLine;
   if(activeLine && state.step === 0) state.step = 1;
@@ -8538,7 +8535,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
           </div>
           ${(r.reviewHistory&&r.reviewHistory.length)?'<details open style="margin-bottom:8px"><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--text3);list-style:none">📋 往返記錄（'+r.reviewHistory.length+'次）</summary><div style="margin-top:4px">'+r.reviewHistory.map(h=>'<div style="padding:4px 8px;border-left:2px solid '+(h.action==='confirmed'?'#16a34a':h.action==='rejected'?'#dc2626':'#1D4ED8')+';margin-bottom:3px;font-size:11px;color:#4a4845"><span style="font-weight:600">'+(h.action==='confirmed'?'✓ 確認':h.action==='rejected'?'✕ 退回':'🔄 重送')+'</span> · '+(h.at||'').slice(0,10)+(h.note?'<div style="margin-top:2px">'+h.note+'</div>':'')+'</div>').join('')+'</div></details>':''}
           ${r.status==='文稿審核'?`<div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-sm" onclick="omAdvanceStatus('${r.id}','切角審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">→ 送客戶審核</button>
+            <button class="btn btn-sm" onclick="(function(){const rc=(DB.omRecords||[]).find(x=>x.id==='${r.id}');if(rc){rc.clientConfirmStatus='pending';syncToGAS('omRecords',rc).catch(()=>{});}omAdvanceStatus('${r.id}','切角審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);})()">→ 送客戶審核</button>
             <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">✓ 文稿直接通過</button>
           </div>`:r.status==='切角審核'?`<div>
             <div style="font-size:11px;background:#ede9fe;color:#5b21b6;border-radius:6px;padding:6px 10px;margin-bottom:8px">⏸ 已送客戶審核，等待回覆中…</div>
@@ -9179,13 +9176,9 @@ function _sopResubmitToClient(taskId){
   r.reviewHistory.push({action:'resubmit',by:'planner',at:new Date().toISOString(),content:r.content||''});
   syncToGAS('omRecords',r).catch(()=>{});
   toast('已重新送交客戶確認','success');
-  // 刷新
-  const ym = document.getElementById('sop-ym')?.value||'';
-  if(r.clientId&&r.contractId&&ym) renderSopFlow(r.clientId,r.contractId,ym,_sopGetContainerId());
-  // 同步刷新客戶頁
-  if(_clientCurrentPage&&_clientCurrentPage!=='dashboard'){
-    setTimeout(()=>renderClientContractPage(r.contractId),150);
-  }
+  // 刷新 SOP 頁（用 _sopRefreshFromRecord 確保 lineKey 正確）
+  _sopRefreshFromRecord(r);
+  // 不強制刷新客戶頁，避免跳頁
 }
 
 function _sopStep2Complete(clientId, contractId, ym){
