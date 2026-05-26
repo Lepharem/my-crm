@@ -8263,7 +8263,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     s1Content = `
       <div style="font-size:12px;color:var(--text2);margin-bottom:14px">選擇本月執行方式：</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div onclick="_sopSelectLine('${clientId}','${contractId}','${ym}','A','${containerId||""}')"
+        <div onclick="_sopSelectLine('${clientId}','${baseCtId}::A','${ym}','A','${containerId||""}')"
           style="border:2px solid var(--border);border-radius:10px;padding:18px;cursor:pointer;transition:.15s;text-align:center"
           onmouseover="this.style.borderColor='#1D4ED8';this.style.background='#eff6ff'"
           onmouseout="this.style.borderColor='var(--border)';this.style.background=''">
@@ -8271,7 +8271,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
           <div style="font-size:14px;font-weight:700;color:#1D4ED8;margin-bottom:4px">A 線：規劃</div>
           <div style="font-size:11px;color:var(--text3)">需填專案規劃表<br>送交客戶確認後再派寫手</div>
         </div>
-        <div onclick="_sopSelectLine('${clientId}','${contractId}','${ym}','B','${containerId||""}')"
+        <div onclick="_sopSelectLine('${clientId}','${baseCtId}::B','${ym}','B','${containerId||""}')"
           style="border:2px solid var(--border);border-radius:10px;padding:18px;cursor:pointer;transition:.15s;text-align:center"
           onmouseover="this.style.borderColor='#0f6e56';this.style.background='#f0fdf4'"
           onmouseout="this.style.borderColor='var(--border)';this.style.background=''">
@@ -8282,10 +8282,10 @@ function renderSopFlow(clientId, contractId, ym, containerId){
       </div>`;
   } else if(state.line === 'A' && state.step === 1){
     // A 線步驟1：顯示專案規劃表
-    s1Content = _renderSopPlanTable(clientId, baseCtId, ym, specsOpen, thisMonthOm, state);
+    s1Content = _renderSopPlanTable(clientId, lineKey, ym, specsOpen, thisMonthOm, state);
   } else if(state.line === 'B' && state.step === 1){
     // B 線步驟1：直接選規格+寫手
-    s1Content = _renderSopDirectForm(clientId, baseCtId, ym, specs, state);
+    s1Content = _renderSopDirectForm(clientId, lineKey, ym, specs, state);
   } else {
     // 已完成步驟1：摘要
     s1Content = `<div style="font-size:12px;color:#166534">✓ 已選擇 ${state.line==='A'?'A 線（規劃）':'B 線（直發）'}，本月共 ${totalCount} 筆任務</div>`;
@@ -8645,7 +8645,9 @@ function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state
   // 週監控：每月最多4週（一週7天，一月最多4個完整週）
   const weeksRaw = Math.ceil((lastDay.getDate() + firstDay.getDay()) / 7);
   const weeks = Math.min(weeksRaw, 4); // 一個月不超過4週
-  const ct = DB.contracts.find(c=>c.id===contractId)||{};
+  // contractId 可能是 lineKey（如 CT001::A），查 DB 用 baseCtId
+  const baseCtIdPT = contractId.includes('::')?contractId.split('::')[0]:contractId;
+  const ct = DB.contracts.find(c=>c.id===baseCtIdPT)||{};
   const cutAngleDocLink = ct.driveLink||'';
   const platformOpts = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
 
@@ -8793,7 +8795,9 @@ function _sopReplyAdj(clientId, contractId, ym, rowId, delta){
 
 // ── B 線直發表單 ──
 function _renderSopDirectForm(clientId, contractId, ym, specs, state){
-  const ct = DB.contracts.find(c=>c.id===contractId)||{};
+  // contractId 可能是 lineKey（如 CT001::B），查 DB 用 baseCtId
+  const baseCtIdDF = contractId.includes('::')?contractId.split('::')[0]:contractId;
+  const ct = DB.contracts.find(c=>c.id===baseCtIdDF)||{};
   const cutAngleDocLink = ct.driveLink||'';
   const platformOpts = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
   const writerList = DB.freelancers.filter(f=>f.type==='口碑');
@@ -8966,16 +8970,18 @@ function _sopDirectAddRow(clientId, contractId, ym){
 
 // A 線：送交客戶確認 → 建立 omRecords + 狀態推進至步驟2
 function _sopSubmitPlan(clientId, contractId, ym){
+  // contractId 可能是 lineKey（CT001::A），getSopState 用完整 key，DB 查詢用 baseCtId
+  const baseCtIdSP = contractId.includes('::')?contractId.split('::')[0]:contractId;
   const state = getSopState(clientId, ym, contractId);
-  if(!state.planItems.length){ toast('請至少填寫一行任務'); return; }
-  const ct = DB.contracts.find(c=>c.id===contractId)||{};
+  if(!state.planItems.length){ toast('規格表尚無任務，請確認合約規格已設定'); return; }
+  const ct = DB.contracts.find(c=>c.id===baseCtIdSP)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
   let created = 0;
   state.planItems.forEach(row=>{
     if(!row.specType) return;
     const id = genOmId(cl.name);
     const rec = {
-      id, contractId, clientId, clientName:cl.name||'',
+      id, contractId:baseCtIdSP, clientId, clientName:cl.name||'',
       month:ym, specType:row.specType,
       specId:row.specId||'',
       taskName:row.taskName||row.specType||'',
