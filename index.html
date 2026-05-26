@@ -4146,47 +4146,101 @@ function renderHome(){
       const hrRole2=(typeof window.myMember!=='undefined'&&window.myMember)?window.myMember.role:(_currentUser?.hrRole||'employee');
       let roleHtml='';
       // 企劃/staff：我的待辦、我有參與的合約
-      // ── 即時從 DB.omRecords 計算各類待辦（完成後自動消失）──
+      // ── 即時從 DB.omRecords 計算待辦，以合約卡片呈現（完成後自動消失）──
       const omAll = DB.omRecords||[];
-      // 稿件待企劃審核（文稿審核）
-      const draftReview = omAll.filter(r=>r.status==='文稿審核');
-      // 客戶審核中（切角審核）— 等客戶回覆
-      const clientAuditing = omAll.filter(r=>r.status==='切角審核');
-      // 客戶退回需修改（clientConfirmStatus=rejected）
-      const clientRejectedRecs = omAll.filter(r=>r.clientConfirmStatus==='rejected'&&['待規劃','切角確認'].includes(r.status));
-      // 客戶待確認切角（step2 pending）
-      const clientPending = omAll.filter(r=>r.clientConfirmStatus==='pending'&&['待規劃','切角確認'].includes(r.status));
-      // 待派帳號商
-      const needVendor = omAll.filter(r=>r.status==='待派帳號商');
-      // 寫手撰文中（派出去但未回稿）
-      const writingInProgress = omAll.filter(r=>r.status==='撰文中');
+      const ym4todo = new Date().toISOString().slice(0,7);
 
-      const hasTodo = draftReview.length||clientAuditing.length||clientRejectedRecs.length||clientPending.length||needVendor.length||writingInProgress.length;
+      // 取得所有有待辦的合約，以 contractId 分組
+      const todoContracts = {};
+      omAll.forEach(r=>{
+        // 只看本月及需要處理的狀態
+        const hasAction =
+          r.clientConfirmStatus==='rejected' ||
+          (r.clientConfirmStatus==='pending' && ['待規劃','切角確認'].includes(r.status)) ||
+          r.status==='文稿審核' ||
+          r.status==='切角審核' ||
+          r.status==='待派帳號商' ||
+          r.status==='撰文中';
+        if(!hasAction) return;
+        const key = r.contractId||'unknown';
+        if(!todoContracts[key]) todoContracts[key] = { recs:[], clientName:r.clientName||'', contractId:key };
+        todoContracts[key].recs.push(r);
+      });
 
-      const _taskRow=(r, icon, label, level)=>{
-        const cl = r.clientName||(DB.clients.find(c=>c.id===r.clientId)||{}).name||'—';
-        const lvlBg = level==='red'?'#fef2f2':level==='amber'?'#fffbeb':'#f0fdf4';
-        const lvlBd = level==='red'?'#fca5a5':level==='amber'?'#fcd34d':'#86efac';
-        const lvlTx = level==='red'?'#991B1B':level==='amber'?'#92400E':'#166534';
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:${lvlBg};border:1px solid ${lvlBd};border-radius:7px;margin-bottom:5px;cursor:pointer;font-size:12px" onclick="navTo('sop-om')">
-          <span style="flex-shrink:0">${icon}</span>
-          <span style="font-weight:600;color:${lvlTx};min-width:80px;flex-shrink:0">${label}</span>
-          <span style="flex:1;color:#1a1917;font-weight:500">${cl}</span>
-          <span style="color:var(--text3);font-size:11px">${r.taskName||r.specType||''}</span>
-          ${r.writerName?`<span style="color:var(--text3);font-size:11px">✍️${r.writerName}</span>`:''}
-          <span style="color:var(--text3);font-size:10px">${(r.month||'').slice(0,7)}</span>
-        </div>`;
+      // 每筆記錄的優先順序和顯示設定
+      const _todoInfo = (r) => {
+        if(r.clientConfirmStatus==='rejected')
+          return {pri:1,icon:'✕',label:'待修改',bg:'#fef2f2',bd:'#fca5a5',tx:'#991B1B',msg:'客戶退回，需修正切角'};
+        if(r.clientConfirmStatus==='pending'&&['待規劃','切角確認'].includes(r.status))
+          return {pri:2,icon:'⏳',label:'待確認',bg:'#fffbeb',bd:'#fcd34d',tx:'#92400E',msg:'等客戶確認切角方向'};
+        if(r.status==='文稿審核')
+          return {pri:3,icon:'📄',label:'待審稿',bg:'#eff6ff',bd:'#93c5fd',tx:'#1D4ED8',msg:'寫手已回稿，待審核'};
+        if(r.status==='切角審核')
+          return {pri:4,icon:'🔍',label:'客審中',bg:'#f5f3ff',bd:'#c4b5fd',tx:'#5b21b6',msg:'已送客戶，等待回覆'};
+        if(r.status==='待派帳號商')
+          return {pri:5,icon:'🚀',label:'待派發',bg:'#f0fdf4',bd:'#86efac',tx:'#166534',msg:'文稿通過，待指派帳號商'};
+        return    {pri:6,icon:'✍️',label:'撰文中',bg:'#f8f7f5',bd:'#d4d1cb',tx:'#6b7280',msg:'寫手撰文中'};
       };
 
-      if(hasTodo){
+      const ctKeys = Object.keys(todoContracts);
+      if(ctKeys.length){
+        // 每個合約算本月進度
+        const _ctProgress = (ctId) => {
+          const all = omAll.filter(r=>r.contractId===ctId&&(r.month||'').slice(0,7)===ym4todo);
+          const done = all.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
+          return {done, total:all.length};
+        };
+
+        const contractCards = ctKeys.map(ctId=>{
+          const grp = todoContracts[ctId];
+          const ct = DB.contracts.find(c=>c.id===ctId)||{};
+          const cl = grp.clientName || (DB.clients.find(c=>c.id===ct.clientId)||{}).name || ctId;
+          const prog = _ctProgress(ctId);
+          // 依優先順序排列
+          const sortedRecs = [...grp.recs].sort((a,b)=>_todoInfo(a).pri - _todoInfo(b).pri);
+          // 是否有緊急（退回/待確認/待審稿）
+          const hasUrgent = grp.recs.some(r=>_todoInfo(r).pri<=3);
+          const urgentCount = grp.recs.filter(r=>_todoInfo(r).pri<=3).length;
+          const headerBg = hasUrgent ? '#fffbeb' : '#f8f7f5';
+          const headerBd = hasUrgent ? '#fcd34d' : 'var(--border)';
+          const pct = prog.total>0 ? Math.round(prog.done/prog.total*100) : 0;
+          const pctColor = pct>=80?'#16a34a':pct>=40?'#1D4ED8':'#d97706';
+
+          const rows = sortedRecs.map(r=>{
+            const info = _todoInfo(r);
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${info.bg};border:1px solid ${info.bd};border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:12px" onclick="navTo('sop-om')">
+              <span style="flex-shrink:0;font-size:13px">${info.icon}</span>
+              <span style="font-weight:600;color:${info.tx};font-size:11px;min-width:50px;flex-shrink:0">${info.label}</span>
+              <span style="flex:1;color:#1a1917;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.taskName||r.specType||'—'}</span>
+              ${r.writerName?`<span style="color:var(--text3);font-size:11px;flex-shrink:0">✍️ ${r.writerName}</span>`:''}
+              <span style="color:var(--text3);font-size:10px;flex-shrink:0">${info.msg}</span>
+            </div>`;
+          }).join('');
+
+          return `<details ${hasUrgent?'open':''} style="margin-bottom:10px;border:1px solid ${headerBd};border-radius:10px;overflow:hidden">
+            <summary style="cursor:pointer;padding:10px 14px;background:${headerBg};display:flex;align-items:center;gap:10px;list-style:none;user-select:none" onclick="this.parentElement.open=!this.parentElement.open">
+              <span style="font-size:14px;font-weight:700;flex:1;color:#1a1917">${cl}</span>
+              <span style="font-size:11px;color:var(--text3);font-family:monospace">${ct.contractNo||''}</span>
+              ${hasUrgent?`<span style="background:#fef2f2;color:#991B1B;border:1px solid #fca5a5;border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700">${urgentCount} 待處理</span>`:''}
+              <span style="background:#f8f7f5;border:1px solid var(--border);border-radius:12px;padding:2px 8px;font-size:10px;color:var(--text3)">${grp.recs.length} 筆</span>
+              <div style="display:flex;align-items:center;gap:4px">
+                <div style="width:60px;height:5px;background:#e8e6e1;border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:${pct}%;background:${pctColor};transition:.3s"></div>
+                </div>
+                <span style="font-size:10px;color:${pctColor};font-weight:600">${prog.done}/${prog.total}</span>
+              </div>
+              <span style="color:var(--text3);font-size:12px;transition:.2s">${hasUrgent?'▲':'▼'}</span>
+            </summary>
+            <div style="padding:10px 12px;background:#fff">${rows}</div>
+          </details>`;
+        }).join('');
+
         roleHtml+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px;margin-bottom:12px">
-          <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">📋 SOP 待辦進度</div>
-          ${clientRejectedRecs.length?`<div style="font-size:11px;font-weight:600;color:#991B1B;margin:8px 0 4px">✕ 客戶退回，待修改（${clientRejectedRecs.length}）</div>${clientRejectedRecs.map(r=>_taskRow(r,'✕','待修改','red')).join('')}`:''}
-          ${clientPending.length?`<div style="font-size:11px;font-weight:600;color:#92400E;margin:8px 0 4px">⏳ 等客戶確認切角（${clientPending.length}）</div>${clientPending.map(r=>_taskRow(r,'⏳','待確認','amber')).join('')}`:''}
-          ${draftReview.length?`<div style="font-size:11px;font-weight:600;color:#1D4ED8;margin:8px 0 4px">📄 寫手已回稿，待企劃審核（${draftReview.length}）</div>${draftReview.map(r=>_taskRow(r,'📄','待審稿','amber')).join('')}`:''}
-          ${clientAuditing.length?`<div style="font-size:11px;font-weight:600;color:#5b21b6;margin:8px 0 4px">🔍 已送客戶審核，等待回覆（${clientAuditing.length}）</div>${clientAuditing.map(r=>_taskRow(r,'🔍','客審中','amber')).join('')}`:''}
-          ${needVendor.length?`<div style="font-size:11px;font-weight:600;color:#0f6e56;margin:8px 0 4px">🚀 文稿通過，待派帳號商（${needVendor.length}）</div>${needVendor.map(r=>_taskRow(r,'🚀','待派發','amber')).join('')}`:''}
-          ${writingInProgress.length?`<div style="font-size:11px;font-weight:600;color:var(--text3);margin:8px 0 4px">✍️ 寫手撰文中（${writingInProgress.length}）</div>${writingInProgress.map(r=>_taskRow(r,'✍️','撰文中','')).join('')}`:''}
+          <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">
+            📋 月度作業待辦
+            <span style="float:right;font-size:11px;font-weight:400;color:var(--text3);letter-spacing:0;text-transform:none">${ctKeys.length} 個合約有待辦事項</span>
+          </div>
+          ${contractCards}
         </div>`;
       }
       // 主管：額外顯示組員動態（DB.notifications 的靜態記錄，可手動清除）
