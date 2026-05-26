@@ -2155,20 +2155,8 @@ function showClientInterface(){
   if(app){ app.style.display = 'flex'; app.style.flexDirection = 'column'; }
   const badge = document.getElementById('client-name-badge');
   if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
-  // 設定 clientId：支援 mock id（C001/C002）和 GAS 真實 id
-  const _rawId = _userProfile?.id || '';
-  // _userProfile 可能用 clientEmail（mock DB）或 email（GAS）
-  const _email = (_userProfile?.email || _userProfile?.clientEmail || _currentUser?.email || '').toLowerCase();
-  // 嘗試用 email 在 DB.clients 裡比對找到對應的客戶 id
-  let _resolvedId = _rawId;
-  if(_email){
-    const byEmail = DB.clients.find(c=>
-      (c.clientEmail||c.email||'').toLowerCase()===_email
-    );
-    if(byEmail) _resolvedId = byEmail.id;
-  }
-  window._clientId = _resolvedId || _rawId;
-  window._clientIdFallback = (_resolvedId !== _rawId) ? _rawId : '';
+  // clientId 直接用 _userProfile.id
+  window._clientId = _userProfile?.id || '';
   _renderClientNav();
   _clientNavTo('dashboard');
 }
@@ -2184,9 +2172,8 @@ function _renderClientNav(){
   if(!el) return;
   const cl = _userProfile;
   if(!cl) return;
-  const _cqId = window._clientId||cl.id||'';
-  const _cqFb = window._clientIdFallback||'';
-  const contracts = DB.contracts.filter(c=>(c.clientId===_cqId||(c.clientId===_cqFb&&_cqFb))&&c.status==='進行中');
+  const _cqId = window._clientId || cl.id || '';
+  const contracts = DB.contracts.filter(c=>c.clientId===_cqId&&c.status==='進行中');
   const navItemStyle = (id) => {
     const isActive = window._clientCurrentPage === id;
     return `display:block;padding:9px 16px;font-size:13px;cursor:pointer;color:${isActive?'#fff':'rgba(255,255,255,.65)'};background:${isActive?'rgba(255,255,255,.12)':'transparent'};border-left:3px solid ${isActive?'#38bdf8':'transparent'};transition:.15s;text-decoration:none`;
@@ -2222,8 +2209,7 @@ function renderClientDashboard(){
   if(!cl){ el.innerHTML='<div style="padding:40px;text-align:center;color:#8a8680">找不到客戶資料</div>'; return; }
 
   const _clId = window._clientId || cl.id || '';
-  const _clIdFb = window._clientIdFallback || '';
-  const contracts = DB.contracts.filter(c=>(c.clientId===_clId||(c.clientId===_clIdFb&&_clIdFb))&&c.status==='進行中');
+  const contracts = DB.contracts.filter(c=>c.clientId===_clId&&c.status==='進行中');
   const ym = new Date().toISOString().slice(0,7);
   const allOm = (DB.omRecords||[]).filter(r=>r.clientId===_clId);
 
@@ -2800,13 +2786,13 @@ window.loadAllData = async function(){
     // clients（支援新舊 key 名稱）
     // 注意：測試模式+客戶角色時，保留 mock DB 避免 id 不一致導致合約查不到
     const clientsRaw = data.clients || data.crm_clients || [];
-    if(clientsRaw.length && !(_userRole==='client' && window._testMode)){
+    if(clientsRaw.length && !window._testMode){
       DB.clients = clientsRaw.filter(r => r.id && r.id !== 'id');
     }
 
     // contracts（支援新舊 key）
     const contractsRaw = data.contracts || data.crm_contracts || [];
-    if(contractsRaw.length && !(_userRole==='client' && window._testMode)){
+    if(contractsRaw.length && !window._testMode){
       DB.contracts = contractsRaw.filter(r => r.id && r.id !== 'id').map(r => ({
         ...r,
         // 正規化 status 中英文
@@ -3006,14 +2992,8 @@ window.loadAllData = async function(){
     }
 
     toast('資料載入完成');
-    // 若目前是客戶角色，DB.clients/contracts 可能已被更新
-    // 重新用 email 比對找到正確的 clientId，並刷新側邊欄
+    // 若目前是客戶角色，資料更新後刷新側邊欄（clientId 已在 showClientInterface 設定，不需重算）
     if(_userRole==='client'){
-      const _em = (_userProfile?.email||_userProfile?.clientEmail||_currentUser?.email||'').toLowerCase();
-      if(_em){
-        const _fc = DB.clients.find(c=>(c.clientEmail||c.email||'').toLowerCase()===_em);
-        if(_fc) window._clientId = _fc.id;
-      }
       if(document.getElementById('client-app')?.style.display!=='none'){
         _renderClientNav();
         renderClientDashboard();
