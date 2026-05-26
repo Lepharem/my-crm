@@ -1864,7 +1864,7 @@ function _renderWriterTaskList(tasks){
   const el=document.getElementById('writer-content');
   if(!el) return;
   const pending=tasks.filter(t=>t.status==='撰文中');
-  const reviewing=tasks.filter(t=>['文稿審核','切角審核','待派帳號商'].includes(t.status));
+  const reviewing=tasks.filter(t=>['文稿審核','切角審核'].includes(t.status));
   el.innerHTML=`
     ${pending.length?`<div style="font-size:12px;font-weight:600;color:#92400E;margin-bottom:8px">📝 待撰文（${pending.length}）</div>${pending.map(t=>_writerTaskCard(t)).join('')}`:''}
     ${reviewing.length?`<div style="font-size:12px;font-weight:600;color:#5b21b6;margin:14px 0 8px">🔍 審核中（${reviewing.length}）</div>${reviewing.map(t=>_writerTaskCard(t)).join('')}`:''}
@@ -8220,8 +8220,13 @@ function renderSopOmPage(){
   const activeCtId = window._sopActiveContractId?.[clientId] || contracts[0].id;
   const tabsHtml = contracts.map(ct=>{
     const isActive = ct.id === activeCtId;
-    const state = getSopState(clientId, ym, ct.id);
-    const lineTag = state.line==='A'?'A':state.line==='B'?'B':'?';
+    // 用已記錄的 activeLine 查正確線別的 state
+    const ctActiveLine = window._sopActiveLine?.[ct.id];
+    const ctLineKey = ctActiveLine ? ct.id+'::'+ctActiveLine : ct.id+'::none';
+    const ymStates4Tab = DB.sopState?.[clientId]?.[ym]||{};
+    const stA4Tab = ymStates4Tab[ct.id+'::A'], stB4Tab = ymStates4Tab[ct.id+'::B'];
+    const detectedLine = ctActiveLine || (stA4Tab&&stA4Tab.step>0?'A':stB4Tab&&stB4Tab.step>0?'B':null);
+    const state = detectedLine ? (ymStates4Tab[ct.id+'::'+detectedLine]||{}) : {};
     return `<div onclick="window._sopActiveContractId=window._sopActiveContractId||{};window._sopActiveContractId['${clientId}']='${ct.id}';renderSopOmPage()"
       style="padding:8px 16px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;border-bottom:2px solid ${isActive?'#1D4ED8':'transparent'};color:${isActive?'#1D4ED8':'var(--text3)'};transition:.15s">
       ${ct.contractNo||ct.name}${state.line?` <span style="font-size:10px;background:${state.line==='A'?'#eff6ff':'#f0fdf4'};color:${state.line==='A'?'#1D4ED8':'#166534'};padding:1px 5px;border-radius:4px">${state.line}線</span>`:''}
@@ -8230,7 +8235,10 @@ function renderSopOmPage(){
 
   el.innerHTML = `<div style="border-bottom:1px solid var(--border);display:flex;gap:0;overflow-x:auto;background:#fff;sticky:top 0" id="sop-contract-tabs">${tabsHtml}</div>
     <div id="sop-contract-body"></div>`;
-  renderSopFlow(clientId, activeCtId, ym, 'sop-contract-body');
+  // 傳帶線別後綴的 key，確保渲染正確的 A/B 線（不被偵測邏輯覆蓋）
+  const activeLine4Page = window._sopActiveLine?.[activeCtId];
+  const contractId4Page = activeLine4Page ? activeCtId+'::'+activeLine4Page : activeCtId;
+  renderSopFlow(clientId, contractId4Page, ym, 'sop-contract-body');
 }
 
 // ── 主流程渲染 ──
@@ -8249,14 +8257,20 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   if(contractId.includes('::A')){ activeLine='A'; baseCtId=contractId.replace('::A',''); }
   else if(contractId.includes('::B')){ activeLine='B'; baseCtId=contractId.replace('::B',''); }
   if(activeLine) window._sopActiveLine[baseCtId] = activeLine;
-  // 若 activeLine 為 null，從 DB.sopState 直接查（不呼叫 getSopState 以免建立空 state）
+  // 若 activeLine 為 null，先查 _sopActiveLine 記憶，再從 DB.sopState 推斷
   if(!activeLine){
-    const ymStates = DB.sopState?.[clientId]?.[ym] || {};
-    const stA = ymStates[baseCtId+'::A'];
-    const stB = ymStates[baseCtId+'::B'];
-    if(stA && (stA.step > 0 || stA.line==='A')) { activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
-    else if(stB && (stB.step > 0 || stB.line==='B')) { activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
-    // 若兩邊都沒有，維持 null（顯示選線卡）
+    // 優先使用 _sopActiveLine 的記憶（用戶上次選的線）
+    if(window._sopActiveLine[baseCtId]){
+      activeLine = window._sopActiveLine[baseCtId];
+    } else {
+      // 否則從 DB.sopState 直接查（不呼叫 getSopState 以免建立空 state）
+      const ymStates = DB.sopState?.[clientId]?.[ym] || {};
+      const stA = ymStates[baseCtId+'::A'];
+      const stB = ymStates[baseCtId+'::B'];
+      if(stA && (stA.step > 0 || stA.line==='A')) { activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
+      else if(stB && (stB.step > 0 || stB.line==='B')) { activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
+      // 若兩邊都沒有，維持 null（顯示選線卡）
+    }
   }
   // lineKey 和 state 在 activeLine 確定後才計算
   const lineKey = baseCtId + '::' + (activeLine || (window._sopActiveLine[baseCtId]||'none'));
@@ -8362,9 +8376,12 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     if(state.step > 2) s2Status = 'done';
     else if(state.step === 2) s2Status = 'paused';
     if(state.step >= 2){
-      const pending   = thisMonthOm.filter(r=>r.status==='待規劃'||r.clientConfirmStatus==='pending');
-      const confirmed = thisMonthOm.filter(r=>r.clientConfirmStatus==='confirmed');
-      const rejected  = thisMonthOm.filter(r=>r.clientConfirmStatus==='rejected');
+      // 步驟2只顯示切角規劃確認階段（待規劃、切角確認）的記錄
+      // 文稿審核後的記錄（status=撰文中/文稿審核/切角審核等）只在步驟4顯示
+      const s2Records = thisMonthOm.filter(r=>['待規劃','切角確認'].includes(r.status)||(!r.status&&r.clientConfirmStatus));
+      const pending   = s2Records.filter(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus);
+      const confirmed = s2Records.filter(r=>r.clientConfirmStatus==='confirmed');
+      const rejected  = s2Records.filter(r=>r.clientConfirmStatus==='rejected');
       s2Content = ''
         + '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">客戶逐筆確認各切角方向。企劃可代為操作（✓確認 / ✕退回），或等客戶在客戶頁自行回覆。</div>'
         + '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
@@ -8372,7 +8389,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
         + '<span class="tag tag-green" style="font-size:11px">✓ 已確認 '+confirmed.length+' 筆</span>'
         + (rejected.length?'<span class="tag tag-red" style="font-size:11px">✕ 退回 '+rejected.length+' 筆</span>':'')
         + '</div>'
-        + thisMonthOm.map(r=>{
+        + s2Records.map(r=>{
             const cs=r.clientConfirmStatus||'pending';
             const borderCol=cs==='confirmed'?'#86efac':cs==='rejected'?'#fca5a5':'#fcd34d';
             const bgCol=cs==='confirmed'?'#f0fdf4':cs==='rejected'?'#fef2f2':'#fffbeb';
@@ -8418,13 +8435,13 @@ function renderSopFlow(clientId, contractId, ym, containerId){
               +rejectForm+historyHtml+'</div>';
           }).join('')
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
-        + (thisMonthOm.length>0&&!thisMonthOm.some(r=>r.clientConfirmStatus==='pending')
+        + (s2Records.length>0&&!s2Records.some(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus)
           ? '<button id="btn-s2-done" class="btn btn-primary" style="flex:1" onclick="document.getElementById(\'btn-s2-done\').style.display=\'none\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
           : '')
-        + (confirmed.length>0&&thisMonthOm.some(r=>r.clientConfirmStatus==='pending')
+        + (confirmed.length>0&&s2Records.some(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus)
           ? '<button id="btn-s2-part" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById(\'btn-s2-part\').style.display=\'none\';_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
-        + (thisMonthOm.length>0&&!confirmed.length&&thisMonthOm.every(r=>r.clientConfirmStatus==='pending')
+        + (s2Records.length>0&&!confirmed.length&&s2Records.every(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus)
           ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="document.getElementById(\'btn-s2-force\').style.display=\'none\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >→ 略過客戶回覆，直接進行步驟3</button>'
           : '')
         + '</div>';
