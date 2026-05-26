@@ -2620,9 +2620,30 @@ function _clientSubmitSuggestion(taskId){
   r.reviewHistory.push({action:'rejected',by:'client_self',at:new Date().toISOString(),note});
   syncToGAS('omRecords',r).catch(()=>{});
   toast('更動建議已送出','success');
-  // 更新方塊 UI 而非整頁重渲染
-  _clientUpdateTaskCard(taskId, r, true);  // keepOpen: 顯示已送出保持展開
-  // 隱藏 textarea 送出按鈕，但保留意見顯示
+  // 更新按鈕區顯示「✕ 已送出更動」
+  _clientUpdateTaskCard(taskId, r, false);
+  // 找到小卡的 noteArea 部分（textarea 和送出按鈕），替換成「已送出」訊息
+  const card = document.getElementById('client-task-card-'+taskId);
+  if(card){
+    // 隱藏所有 textarea 和送出按鈕
+    card.querySelectorAll('textarea, button').forEach(el=>{
+      // 保留「補充修改」等其他按鈕，只隱藏送出類的
+      if(el.tagName==='BUTTON' && (el.textContent.includes('送出') || el.textContent.includes('更動建議'))){
+        el.style.display='none';
+      }
+      if(el.tagName==='TEXTAREA') el.style.display='none';
+    });
+    // 顯示已送出的意見
+    const existingNote = card.querySelector('[data-note-display]');
+    if(!existingNote){
+      const noteDiv = document.createElement('div');
+      noteDiv.setAttribute('data-note-display','1');
+      noteDiv.style.cssText='margin-top:8px;padding:8px 10px;background:#fff3f3;border:1px solid #fca5a5;border-radius:6px;font-size:11px;color:#991B1B';
+      noteDiv.innerHTML='<span style="font-weight:600">您的更動建議：</span><div style="margin-top:3px;color:#1a1917">'+note+'</div>';
+      card.appendChild(noteDiv);
+    }
+  }
+  // 也嘗試隱藏 client-suggest-wrap
   const wrap=document.getElementById('client-suggest-wrap-'+taskId);
   if(wrap) wrap.style.display='none';
   // 刷新 SOP 頁（用 record 資料）
@@ -8228,9 +8249,24 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   if(contractId.includes('::A')){ activeLine='A'; baseCtId=contractId.replace('::A',''); }
   else if(contractId.includes('::B')){ activeLine='B'; baseCtId=contractId.replace('::B',''); }
   if(activeLine) window._sopActiveLine[baseCtId] = activeLine;
-  const lineKey = baseCtId + '::' + (window._sopActiveLine[baseCtId]||'none');
-  const state = getSopState(clientId, ym, lineKey);
+  // lineKey 在 activeLine 偵測後計算，確保使用正確的線別
+  // （先用暫時值，偵測後再更新）
+  let lineKey = baseCtId + '::' + (window._sopActiveLine[baseCtId]||'none');
+  let state = getSopState(clientId, ym, lineKey);
   if(activeLine && !state.contractId) state.contractId = baseCtId;
+  // 若 activeLine 為 null（直接傳 baseCtId 進來），從既有 state 推斷線別
+  if(!activeLine){
+    const stA = getSopState(clientId, ym, baseCtId+'::A');
+    const stB = getSopState(clientId, ym, baseCtId+'::B');
+    if(stA.step > 0 || stA.line==='A') { activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
+    else if(stB.step > 0 || stB.line==='B') { activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
+  }
+  // 偵測後重新計算 lineKey 和 state（確保 activeLine 已正確設定）
+  if(activeLine) {
+    lineKey = baseCtId + '::' + activeLine;
+    state = getSopState(clientId, ym, lineKey);
+    if(!state.contractId) state.contractId = baseCtId;
+  }
   // 若從 A/B tab 點進來，自動進入步驟1（顯示規劃表或選線表單）
   if(activeLine && state.line===null) state.line = activeLine;
   if(activeLine && state.step === 0) state.step = 1;
@@ -8606,13 +8642,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
                     + '</div>'
                     + '<div id="sv-rj-wrap-'+r.id+'" style="display:none">'
                     + '<textarea id="sv-rj-note-'+r.id+'" rows="2" placeholder="退回原因（給帳號商參考）…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px;resize:vertical"></textarea>'
-                    + '<button class="btn btn-xs" style="margin-top:4px;color:#991B1B;border-color:#fca5a5" onclick="(function(){\''
-                    + 'const note=document.getElementById(\'sv-rj-note-'+r.id+'\')?.value.trim();\''
-                    + 'const rec=(DB.omRecords||[]).find(x=>x.id===\''+r.id+'\');\''
-                    + 'if(rec&&note){rec.rejectReason=note;syncToGAS(\'omRecords\',rec).catch(()=>{});}\''
-                    + 'omAdvanceStatus(\''+r.id+'\',\'待上刊\');\''
-                    + 'setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId()),200);\''
-                    + '})()">確認退回</button></div>'
+                    + '<button class="btn btn-xs" style="margin-top:4px;color:#991B1B;border-color:#fca5a5" onclick="(function(){var n=document.getElementById(\'sv-rj-note-'+r.id+'\')?.value.trim();;if(n){var rc=(DB.omRecords||[]).find(x=>x.id===\''+r.id+'\');if(rc){rc.rejectReason=n;if(!rc.reviewHistory)rc.reviewHistory=[];rc.reviewHistory.push({action:\'rejected\',by:\'planner\',at:new Date().toISOString(),note:n});syncToGAS(\'omRecords\',rc).catch(()=>{});}}omAdvanceStatus(\''+r.id+'\',\'待上刊\');setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId()),200);})()">確認退回</button></div>'
                   : '')
               : '<div style="font-size:11px;color:#92400E">等待帳號商回報…</div>')
             + '</div>';
