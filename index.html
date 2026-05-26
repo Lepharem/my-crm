@@ -2242,26 +2242,30 @@ function renderClientDashboard(){
     <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:16px;margin-bottom:16px">
       <div style="font-size:14px;font-weight:700;color:#92400E;margin-bottom:12px">📋 有 ${pendingConfirm.length} 篇切角待確認</div>
       ${pendingConfirm.map(r=>`
-        <div style="border:1px solid ${r.clientConfirmStatus==='confirmed'?'#86efac':r.clientConfirmStatus==='rejected'?'#fca5a5':'#fcd34d'};border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff">
+        <div id="client-task-card-${r.id}" style="border:1px solid ${r.clientConfirmStatus==='confirmed'?'#86efac':r.clientConfirmStatus==='rejected'?'#fca5a5':'#fcd34d'};border-radius:8px;padding:10px 12px;margin-bottom:8px;background:${r.clientConfirmStatus==='confirmed'?'#f0fdf4':'#fff'}">
           <div style="display:flex;align-items:flex-start;gap:8px">
             <div style="flex:1">
               <div style="font-size:12px;font-weight:500">${r.specType} ／ ${r.platform||'—'} ${r.section?'·'+r.section:''}</div>
               <div style="font-size:11px;color:#4a4845;margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${r.content||r.title||'（尚無內容）'}</div>
             </div>
-            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-              <button onclick="_clientConfirmTask('${r.id}','ok')" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ OK</button>
-              <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:6px 14px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✏️ 更動建議</button>
+            <div id="client-task-btns-${r.id}" style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+              ${r.clientConfirmStatus==='confirmed'
+                ? '<span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>'
+                : r.clientConfirmStatus==='rejected'
+                ? '<span style="font-size:11px;color:#991B1B;font-weight:600">✕ 已送出更動</span>'
+                : `<button onclick="_clientConfirmTask('${r.id}','ok')" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ OK</button>
+                   <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:6px 14px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✏️ 更動建議</button>`
+              }
             </div>
           </div>
-          <div id="client-suggest-wrap-${r.id}" style="display:${r.clientConfirmStatus==='rejected'?'block':'none'};margin-top:8px">
+          ${r.clientConfirmStatus==='rejected'&&r.clientNote?`<div style="font-size:11px;color:#92400E;margin-top:8px;padding:6px 8px;background:#fffbeb;border-radius:6px">💬 ${r.clientNote}</div>`:''}
+          <div id="client-suggest-wrap-${r.id}" style="display:none;margin-top:8px">
             <textarea id="client-note-${r.id}" placeholder="請填寫需要更動或改變的地方…" rows="3"
-              style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:12px;resize:vertical">${r.clientNote||''}</textarea>
+              style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:12px;resize:vertical"></textarea>
             <button onclick="_clientSubmitSuggestion('${r.id}')" style="margin-top:6px;padding:5px 12px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">送出更動建議</button>
           </div>
         </div>`).join('')}
-    </div>`:''}
-
-    <!-- 合約摘要卡片 -->
+    </div>`:''}  <!-- end pendingConfirm -->
     ${contracts.map(ct=>{
       const omRecs = (DB.omRecords||[]).filter(r=>r.contractId===ct.id&&(r.month||'').slice(0,7)===ym);
       const done   = omRecs.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
@@ -2482,8 +2486,8 @@ function _clientConfirmTask(taskId, action){
     if(!r.reviewHistory) r.reviewHistory=[];
     r.reviewHistory.push({action:'confirmed',by:'client_self',at:new Date().toISOString(),note:''});
     syncToGAS('omRecords',r).catch(()=>{});
-    // 只更新當前方塊 UI，不整頁重渲染（避免確認後方塊消失）
-    _clientUpdateTaskRow(taskId, r);
+    // 更新小卡 DOM（支援儀錶板 div 卡和合約頁 tr 兩種格式）
+    _clientUpdateTaskCard(taskId, r);
     // 同步刷新 SOP 頁（測試模式共用 DB）
     const sopEl=document.getElementById('page-sop-om');
     if(sopEl&&sopEl.classList.contains('active')){
@@ -2500,40 +2504,51 @@ function _clientConfirmTask(taskId, action){
   }
 }
 
-// 客戶頁：確認 → 收合顯示「已確認」；更動建議送出 → 收合顯示「已送出」
-function _clientUpdateTaskRow(taskId, r, keepOpen){
-  const row = document.getElementById('client-task-card-'+taskId);
-  if(!row) return;
+// 客戶頁：更新小卡 DOM，同時支援儀錶板 div 卡和合約頁 tr 卡
+function _clientUpdateTaskCard(taskId, r, keepOpen){
+  const card = document.getElementById('client-task-card-'+taskId);
+  if(!card) return;
   const cs = r.clientConfirmStatus;
-  const statusColor = ['已上刊','觀察中','完成'].includes(r.status)?'#166534':
-                      ['切角審核','切角確認'].includes(r.status)?'#5b21b6':
-                      r.status==='文稿審核'?'#1B4FD8':'#92400E';
-  const statusBg = ['已上刊','觀察中','完成'].includes(r.status)?'#dcfce7':
-                   ['切角審核','切角確認'].includes(r.status)?'#ede9fe':
-                   r.status==='文稿審核'?'#eff6ff':'#fef3c7';
-  const lastTd = row.querySelector('td:last-child');
-  if(!lastTd) return;
-  if(cs==='confirmed'){
-    // 收合：只顯示狀態徽章 + 已確認（狀態顏色依最新 r.status）
+
+  // 更新按鈕區：找 client-task-btns-{id}（儀錶板）或 td:last-child（合約頁）
+  const btnsEl = document.getElementById('client-task-btns-'+taskId);
+  if(btnsEl){
+    // 儀錶板 div 格式：替換按鈕區
+    if(cs==='confirmed'){
+      btnsEl.innerHTML = '<span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>';
+      card.style.background = '#f0fdf4';
+      card.style.borderColor = '#86efac';
+    } else if(cs==='rejected'){
+      btnsEl.innerHTML = '<span style="font-size:11px;color:#991B1B;font-weight:600">✕ 已送出更動</span>';
+      card.style.background = '#fef2f2';
+      card.style.borderColor = '#fca5a5';
+      // 展開更動建議 textarea
+      if(keepOpen){
+        const wrap = document.getElementById('client-suggest-wrap-'+taskId);
+        if(wrap) wrap.style.display = 'block';
+      }
+    }
+  } else {
+    // 合約頁 tr 格式：找 td:last-child
+    const lastTd = card.querySelector('td:last-child');
+    if(!lastTd) return;
     const _stColor = ['已上刊','觀察中','完成','待派帳號商'].includes(r.status)?'#166534':
                      ['切角審核','切角確認'].includes(r.status)?'#5b21b6':
                      r.status==='文稿審核'?'#1B4FD8':'#92400E';
     const _stBg    = ['已上刊','觀察中','完成','待派帳號商'].includes(r.status)?'#dcfce7':
                      ['切角審核','切角確認'].includes(r.status)?'#ede9fe':
                      r.status==='文稿審核'?'#eff6ff':'#fef3c7';
-    lastTd.innerHTML = '<span style="font-size:11px;background:'+_stBg+';color:'+_stColor+';padding:2px 8px;border-radius:12px">'+r.status+'</span><div style="font-size:10px;color:#166534;margin-top:3px">✓ 已確認</div>';
-    row.style.background = '#f0fdf4';
-  } else if(cs==='rejected'){
-    if(keepOpen){
-      // 保持展開：顯示更動已送出提示 + 客戶意見
-      lastTd.innerHTML = `<span style="font-size:11px;background:#fef3c7;color:#92400E;padding:2px 8px;border-radius:12px">${r.status}</span><div style="font-size:10px;color:#991B1B;margin-top:3px">✕ 更動建議已送出</div>${r.clientNote?`<div style="font-size:10px;color:#92400E;margin-top:2px;background:#fffbeb;border-radius:3px;padding:2px 5px">💬 ${r.clientNote.slice(0,40)}</div>`:''}`;
-      row.style.background = '#fef2f2';
-    } else {
-      lastTd.innerHTML = `<span style="font-size:11px;background:#fef3c7;color:#92400E;padding:2px 8px;border-radius:12px">${r.status}</span><div style="font-size:10px;color:#991B1B;margin-top:3px">✕ 已退回</div>`;
-      row.style.background = '#fef2f2';
+    if(cs==='confirmed'){
+      lastTd.innerHTML = '<span style="font-size:11px;background:'+_stBg+';color:'+_stColor+';padding:2px 8px;border-radius:12px">'+r.status+'</span><div style="font-size:10px;color:#166534;margin-top:3px">✓ 已確認</div>';
+      card.style.background = '#f0fdf4';
+    } else if(cs==='rejected'){
+      lastTd.innerHTML = '<span style="font-size:11px;background:#fef3c7;color:#92400E;padding:2px 8px;border-radius:12px">'+r.status+'</span><div style="font-size:10px;color:#991B1B;margin-top:3px">✕ 更動建議已送出</div>'+(r.clientNote?'<div style="font-size:10px;color:#92400E;margin-top:2px;background:#fffbeb;border-radius:3px;padding:2px 5px">💬 '+r.clientNote.slice(0,40)+'</div>':'');
+      card.style.background = '#fef2f2';
     }
   }
 }
+// 舊版相容別名
+function _clientUpdateTaskRow(taskId, r, keepOpen){ _clientUpdateTaskCard(taskId, r, keepOpen); }
 function _clientSubmitSuggestion(taskId){
   const r=(DB.omRecords||[]).find(x=>x.id===taskId);
   if(!r) return;
@@ -2547,7 +2562,7 @@ function _clientSubmitSuggestion(taskId){
   syncToGAS('omRecords',r).catch(()=>{});
   toast('更動建議已送出','success');
   // 更新方塊 UI 而非整頁重渲染
-  _clientUpdateTaskRow(taskId, r, true);  // keepOpen: 顯示已送出但不收合
+  _clientUpdateTaskCard(taskId, r, true);  // keepOpen: 顯示已送出保持展開
   // 隱藏 textarea 送出按鈕，但保留意見顯示
   const wrap=document.getElementById('client-suggest-wrap-'+taskId);
   if(wrap) wrap.style.display='none';
@@ -8270,10 +8285,10 @@ function renderSopFlow(clientId, contractId, ym){
           }).join('')
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
         + (thisMonthOm.length>0&&!thisMonthOm.some(r=>!r.clientConfirmStatus||r.clientConfirmStatus==='pending')
-          ? '<button class="btn btn-primary" style="flex:1" onclick="_sopStep2Complete(\''+clientId+'\',\\\''+contractId+'\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
+          ? '<button class="btn btn-primary" style="flex:1" onclick="_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
           : '')
         + (confirmed.length>0&&thisMonthOm.some(r=>r.clientConfirmStatus==='pending')
-          ? '<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep2PartialContinue(\''+clientId+'\',\\\''+contractId+'\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
+          ? '<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
         + '</div>';
     }  // if(state.step >= 2)
