@@ -2157,19 +2157,18 @@ function showClientInterface(){
   if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
   // 設定 clientId：支援 mock id（C001/C002）和 GAS 真實 id
   const _rawId = _userProfile?.id || '';
-  const _email = _userProfile?.email || _currentUser?.email || '';
-  // 先嘗試用 email 在 DB.clients 裡找對應的客戶（GAS 資料可能 id 不同）
+  // _userProfile 可能用 clientEmail（mock DB）或 email（GAS）
+  const _email = (_userProfile?.email || _userProfile?.clientEmail || _currentUser?.email || '').toLowerCase();
+  // 嘗試用 email 在 DB.clients 裡比對找到對應的客戶 id
   let _resolvedId = _rawId;
   if(_email){
     const byEmail = DB.clients.find(c=>
-      (c.clientEmail||c.email||'').toLowerCase()===_email.toLowerCase() ||
-      (c.contact&&c.contactPhone&&false) // 備用
+      (c.clientEmail||c.email||'').toLowerCase()===_email
     );
     if(byEmail) _resolvedId = byEmail.id;
   }
-  // 若用 _resolvedId 找不到合約，也試 _rawId
   window._clientId = _resolvedId || _rawId;
-  window._clientIdFallback = _rawId; // 備用 id
+  window._clientIdFallback = (_resolvedId !== _rawId) ? _rawId : '';
   _renderClientNav();
   _clientNavTo('dashboard');
 }
@@ -2799,17 +2798,22 @@ window.loadAllData = async function(){
     console.log('clients:', (data.clients||data.crm_clients||[]).length, 'contracts:', (data.contracts||data.crm_contracts||[]).length, 'contract_payments:', (data.contract_payments||data.fin_payments||[]).length);
 
     // clients（支援新舊 key 名稱）
+    // 注意：測試模式+客戶角色時，保留 mock DB 避免 id 不一致導致合約查不到
     const clientsRaw = data.clients || data.crm_clients || [];
-    if(clientsRaw.length) DB.clients = clientsRaw.filter(r => r.id && r.id !== 'id');
+    if(clientsRaw.length && !(_userRole==='client' && window._testMode)){
+      DB.clients = clientsRaw.filter(r => r.id && r.id !== 'id');
+    }
 
     // contracts（支援新舊 key）
     const contractsRaw = data.contracts || data.crm_contracts || [];
-    if(contractsRaw.length) DB.contracts = contractsRaw.filter(r => r.id && r.id !== 'id').map(r => ({
-      ...r,
-      // 正規化 status 中英文
-      status: r.status==='active'?'進行中':r.status==='closed'?'結案':r.status||'進行中',
-      clientId: r.clientId || r.client_id || '',
-    }));
+    if(contractsRaw.length && !(_userRole==='client' && window._testMode)){
+      DB.contracts = contractsRaw.filter(r => r.id && r.id !== 'id').map(r => ({
+        ...r,
+        // 正規化 status 中英文
+        status: r.status==='active'?'進行中':r.status==='closed'?'結案':r.status||'進行中',
+        clientId: r.clientId || r.client_id || '',
+      }));
+    }
 
     // receivables：GAS 回傳 contract_payments / fin_payments（平面列表），轉換成帶 payments[] 子陣列的格式
     const cpRaw = data.contract_payments || data.fin_payments || data.receivables || [];
@@ -3005,7 +3009,7 @@ window.loadAllData = async function(){
     // 若目前是客戶角色，DB.clients/contracts 可能已被更新
     // 重新用 email 比對找到正確的 clientId，並刷新側邊欄
     if(_userRole==='client'){
-      const _em = (_userProfile?.email||_currentUser?.email||'').toLowerCase();
+      const _em = (_userProfile?.email||_userProfile?.clientEmail||_currentUser?.email||'').toLowerCase();
       if(_em){
         const _fc = DB.clients.find(c=>(c.clientEmail||c.email||'').toLowerCase()===_em);
         if(_fc) window._clientId = _fc.id;
@@ -8584,7 +8588,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
           </div>`:r.status==='切角審核'?`<div>
             <div style="font-size:11px;background:#ede9fe;color:#5b21b6;border-radius:6px;padding:6px 10px;margin-bottom:8px">⏸ 已送客戶審核，等待回覆中…</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-              <button class="btn btn-sm btn-primary" onclick="(function(){const rec=(DB.omRecords||[]).find(x=>x.id==='${r.id}');if(rec){if(!rec.reviewHistory)rec.reviewHistory=[];rec.reviewHistory.push({action:'confirmed',by:'planner',at:new Date().toISOString(),note:''});syncToGAS('omRecords',rec).catch(()=>{});}omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);})()">✓ 客戶確認通過</button>
+              <button class="btn btn-sm btn-primary" onclick="(function(){const rec=(DB.omRecords||[]).find(x=>x.id==='${r.id}');if(rec){if(!rec.reviewHistory)rec.reviewHistory=[];rec.reviewHistory.push({action:'confirmed',by:'planner',at:new Date().toISOString(),note:''});rec.clientConfirmStatus='confirmed';syncToGAS('omRecords',rec).catch(()=>{});}omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);})()">✓ 客戶確認通過</button>
               <button class="btn btn-sm" style="background:#fff;color:#991B1B;border-color:#fca5a5" onclick="document.getElementById('sr-rj-${r.id}').style.display='block'">↩ 客戶要求修改</button>
             </div>
             <div id="sr-rj-${r.id}" style="display:none">
