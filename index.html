@@ -8391,6 +8391,9 @@ function renderSopFlow(clientId, contractId, ym, containerId){
         + (confirmed.length>0&&thisMonthOm.some(r=>r.clientConfirmStatus==='pending')
           ? '<button id="btn-s2-part" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById(\'btn-s2-part\').style.display=\'none\';_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
+        + (thisMonthOm.length>0&&!confirmed.length&&thisMonthOm.every(r=>r.clientConfirmStatus==='pending')
+          ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="document.getElementById(\'btn-s2-force\').style.display=\'none\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >→ 略過客戶回覆，直接進行步驟3</button>'
+          : '')
         + '</div>';
     }  // if(state.step >= 2)
   }  // if(state.line === 'A')
@@ -8497,14 +8500,14 @@ function renderSopFlow(clientId, contractId, ym, containerId){
             <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}${r.platform?' · '+r.platform:''}${r.section?' · '+r.section:''}</span>
             ${r.draftLink?`<a href="${r.draftLink}" target="_blank" class="btn btn-xs">稿件</a>`:''}
           </div>
-          ${r.clientNote?'<div style="background:#fff3f3;border-left:3px solid #dc2626;padding:5px 10px;margin-bottom:6px;font-size:11px;color:#991B1B">客戶意見：'+r.clientNote+'</div>':''}
+          ${(r.reviewHistory&&r.reviewHistory.length)?'<details open style="margin-bottom:8px"><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--text3);list-style:none">📋 往返記錄（'+r.reviewHistory.length+'次）</summary><div style="margin-top:4px">'+r.reviewHistory.map(h=>'<div style="padding:4px 8px;border-left:2px solid '+(h.action==='confirmed'?'#16a34a':h.action==='rejected'?'#dc2626':'#1D4ED8')+';margin-bottom:3px;font-size:11px;color:#4a4845"><span style="font-weight:600">'+(h.action==='confirmed'?'✓ 確認':h.action==='rejected'?'✕ 退回':'🔄 重送')+'</span> · '+(h.at||'').slice(0,10)+(h.note?'<div style="margin-top:2px">'+h.note+'</div>':'')+'</div>').join('')+'</div></details>':''}
           ${r.status==='文稿審核'?`<div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm" onclick="omAdvanceStatus('${r.id}','切角審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">→ 送客戶審核</button>
             <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">✓ 文稿直接通過</button>
           </div>`:r.status==='切角審核'?`<div>
             <div style="font-size:11px;background:#ede9fe;color:#5b21b6;border-radius:6px;padding:6px 10px;margin-bottom:8px">⏸ 已送客戶審核，等待回覆中…</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-              <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">✓ 客戶確認通過</button>
+              <button class="btn btn-sm btn-primary" onclick="(function(){const rec=(DB.omRecords||[]).find(x=>x.id==='${r.id}');if(rec){if(!rec.reviewHistory)rec.reviewHistory=[];rec.reviewHistory.push({action:'confirmed',by:'planner',at:new Date().toISOString(),note:''});syncToGAS('omRecords',rec).catch(()=>{});}omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);})()">✓ 客戶確認通過</button>
               <button class="btn btn-sm" style="background:#fff;color:#991B1B;border-color:#fca5a5" onclick="document.getElementById('sr-rj-${r.id}').style.display='block'">↩ 客戶要求修改</button>
             </div>
             <div id="sr-rj-${r.id}" style="display:none">
@@ -8512,7 +8515,12 @@ function renderSopFlow(clientId, contractId, ym, containerId){
               <button class="btn btn-xs" style="margin-top:4px;color:#991B1B;border-color:#fca5a5" onclick="(function(){
                 const note=document.getElementById('sr-rj-note-${r.id}')?.value.trim()||'';
                 const rec=(DB.omRecords||[]).find(x=>x.id==='${r.id}');
-                if(rec&&note){rec.rejectReason=note;syncToGAS('omRecords',rec).catch(()=>{});}
+                if(rec){
+                  if(!rec.reviewHistory) rec.reviewHistory=[];
+                  rec.reviewHistory.push({action:'rejected',by:'planner',at:new Date().toISOString(),note:note});
+                  rec.clientNote=note;
+                  syncToGAS('omRecords',rec).catch(()=>{});
+                }
                 omAdvanceStatus('${r.id}','文稿審核');
                 setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);
               })()">確認退回</button>
@@ -8527,6 +8535,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
       <div id="sop-review-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="this.style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
         ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="this.style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
+        ${reviewing.length>0&&reviewing.every(r=>r.status==='切角審核')&&!reviewed.length?`<button class="btn btn-sm" style="border-color:#7c3aed;color:#5b21b6;background:#f5f3ff" onclick="this.style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">→ 全部已送審，先進行下一步</button>`:''}
       </div>`;
   }
 
@@ -9023,6 +9032,7 @@ function _sopSubmitPlan(clientId, contractId, ym){
       writerId:'', writerName:'',
       vendorId:'', vendorName:'',
       status:'待規劃', clientConfirmStatus:'pending', clientNote:'',
+      sopLine:'A',
       publishDate:row.date||'', created_at:new Date().toISOString()
     };
     (DB.omRecords=DB.omRecords||[]).push(rec);
