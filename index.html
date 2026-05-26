@@ -4146,29 +4146,50 @@ function renderHome(){
       const hrRole2=(typeof window.myMember!=='undefined'&&window.myMember)?window.myMember.role:(_currentUser?.hrRole||'employee');
       let roleHtml='';
       // 企劃/staff：我的待辦、我有參與的合約
-      if(hrRole2==='employee'||hrRole2==='staff'){
-        const myName=_currentUser?.name||'';
-        const myContracts=DB.contracts.filter(c=>c.status==='進行中'&&(DB.specItems||[]).some(s=>s.contractId===c.id&&(s.owner===myName||s.assignee===myName)));
-        const draftWaiting=(DB.omRecords||[]).filter(r=>r.status==='文稿審核');
-        const clientRejected=(DB.notifications||[]).filter(n=>!n.done&&n.type==='clientRejected');
-        if(draftWaiting.length||myContracts.length){
-          roleHtml+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px;margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">🧑‍💻 我的待辦</div>
-            ${draftWaiting.length?`<div style="padding:8px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;margin-bottom:8px;font-size:13px;cursor:pointer" onclick="navTo('sop-om')">
-              ✍️ 有 <strong>${draftWaiting.length}</strong> 份稿件待審核
-            </div>`:''}
-            ${clientRejected.length?`<div style="padding:8px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;margin-bottom:8px;font-size:13px;cursor:pointer" onclick="navTo('sop-om')">
-              ✕ 有 <strong>${clientRejected.length}</strong> 筆切角被客戶退回，需修改
-            </div>`:''}
-            ${(DB.notifications||[]).filter(n=>!n.done&&(n.type==='draftSubmitted'||n.type==='clientRejected')).map(n=>`
-              <div style="padding:8px 12px;background:${n.type==='clientRejected'?'#fef2f2':'#f5f3ff'};border:1px solid ${n.type==='clientRejected'?'#fca5a5':'#c4b5fd'};border-radius:8px;margin-bottom:6px;font-size:12px;cursor:pointer" onclick="navTo('sop-om')">
-                ${n.type==='clientRejected'?'✕ 退回：':'📄 '}${n.msg}
-                ${n.type==='clientRejected'?'<span style="font-size:10px;color:#991B1B;margin-left:6px">需修改</span>':''}
-              </div>`).join('')}
-          </div>`;
-        }
+      // ── 即時從 DB.omRecords 計算各類待辦（完成後自動消失）──
+      const omAll = DB.omRecords||[];
+      // 稿件待企劃審核（文稿審核）
+      const draftReview = omAll.filter(r=>r.status==='文稿審核');
+      // 客戶審核中（切角審核）— 等客戶回覆
+      const clientAuditing = omAll.filter(r=>r.status==='切角審核');
+      // 客戶退回需修改（clientConfirmStatus=rejected）
+      const clientRejectedRecs = omAll.filter(r=>r.clientConfirmStatus==='rejected'&&['待規劃','切角確認'].includes(r.status));
+      // 客戶待確認切角（step2 pending）
+      const clientPending = omAll.filter(r=>r.clientConfirmStatus==='pending'&&['待規劃','切角確認'].includes(r.status));
+      // 待派帳號商
+      const needVendor = omAll.filter(r=>r.status==='待派帳號商');
+      // 寫手撰文中（派出去但未回稿）
+      const writingInProgress = omAll.filter(r=>r.status==='撰文中');
+
+      const hasTodo = draftReview.length||clientAuditing.length||clientRejectedRecs.length||clientPending.length||needVendor.length||writingInProgress.length;
+
+      const _taskRow=(r, icon, label, level)=>{
+        const cl = r.clientName||(DB.clients.find(c=>c.id===r.clientId)||{}).name||'—';
+        const lvlBg = level==='red'?'#fef2f2':level==='amber'?'#fffbeb':'#f0fdf4';
+        const lvlBd = level==='red'?'#fca5a5':level==='amber'?'#fcd34d':'#86efac';
+        const lvlTx = level==='red'?'#991B1B':level==='amber'?'#92400E':'#166534';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:${lvlBg};border:1px solid ${lvlBd};border-radius:7px;margin-bottom:5px;cursor:pointer;font-size:12px" onclick="navTo('sop-om')">
+          <span style="flex-shrink:0">${icon}</span>
+          <span style="font-weight:600;color:${lvlTx};min-width:80px;flex-shrink:0">${label}</span>
+          <span style="flex:1;color:#1a1917;font-weight:500">${cl}</span>
+          <span style="color:var(--text3);font-size:11px">${r.taskName||r.specType||''}</span>
+          ${r.writerName?`<span style="color:var(--text3);font-size:11px">✍️${r.writerName}</span>`:''}
+          <span style="color:var(--text3);font-size:10px">${(r.month||'').slice(0,7)}</span>
+        </div>`;
+      };
+
+      if(hasTodo){
+        roleHtml+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px;margin-bottom:12px">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">📋 SOP 待辦進度</div>
+          ${clientRejectedRecs.length?`<div style="font-size:11px;font-weight:600;color:#991B1B;margin:8px 0 4px">✕ 客戶退回，待修改（${clientRejectedRecs.length}）</div>${clientRejectedRecs.map(r=>_taskRow(r,'✕','待修改','red')).join('')}`:''}
+          ${clientPending.length?`<div style="font-size:11px;font-weight:600;color:#92400E;margin:8px 0 4px">⏳ 等客戶確認切角（${clientPending.length}）</div>${clientPending.map(r=>_taskRow(r,'⏳','待確認','amber')).join('')}`:''}
+          ${draftReview.length?`<div style="font-size:11px;font-weight:600;color:#1D4ED8;margin:8px 0 4px">📄 寫手已回稿，待企劃審核（${draftReview.length}）</div>${draftReview.map(r=>_taskRow(r,'📄','待審稿','amber')).join('')}`:''}
+          ${clientAuditing.length?`<div style="font-size:11px;font-weight:600;color:#5b21b6;margin:8px 0 4px">🔍 已送客戶審核，等待回覆（${clientAuditing.length}）</div>${clientAuditing.map(r=>_taskRow(r,'🔍','客審中','amber')).join('')}`:''}
+          ${needVendor.length?`<div style="font-size:11px;font-weight:600;color:#0f6e56;margin:8px 0 4px">🚀 文稿通過，待派帳號商（${needVendor.length}）</div>${needVendor.map(r=>_taskRow(r,'🚀','待派發','amber')).join('')}`:''}
+          ${writingInProgress.length?`<div style="font-size:11px;font-weight:600;color:var(--text3);margin:8px 0 4px">✍️ 寫手撰文中（${writingInProgress.length}）</div>${writingInProgress.map(r=>_taskRow(r,'✍️','撰文中','')).join('')}`:''}
+        </div>`;
       }
-      // 主管：組員通知（唯讀）
+      // 主管：額外顯示組員動態（DB.notifications 的靜態記錄，可手動清除）
       if(hrRole2==='manager'||hrRole2==='owner'){
         const draftNotices=(DB.notifications||[]).filter(n=>!n.done&&(
           n.type==='draftSubmitted'||n.type==='writersWorking'||n.type==='sopPendingClient'||
@@ -4178,11 +4199,11 @@ function renderHome(){
           roleHtml+=`<div style="background:var(--surface);border:1px solid #c4b5fd;border-radius:var(--r2);padding:14px 18px;margin-bottom:12px">
             <div style="font-size:11px;font-weight:600;color:#5b21b6;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">
               👔 組員動態 ${hrRole2==='owner'?'（全公司）':''}
-              ${hrRole2==='owner'?`<span style="float:right;font-weight:400;font-size:10px;cursor:pointer" onclick="_clearAllNotices()">全部標記已讀</span>`:'（唯讀）'}
+              <span style="float:right;font-weight:400;font-size:10px;cursor:pointer" onclick="_clearAllNotices()">全部清除</span>
             </div>
             ${draftNotices.slice(0,8).map(n=>`<div style="padding:7px 12px;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;margin-bottom:6px;font-size:12px;display:flex;align-items:center;gap:8px">
               <span style="flex:1">${n.type==='draftSubmitted'?'📄':n.type==='sopPendingClient'?'📋':n.type==='vendorReported'?'📣':'✍️'} ${n.msg}</span>
-              ${hrRole2==='owner'?`<button onclick="_dismissNotice('${n.id}')" style="background:none;border:none;color:#8a8680;cursor:pointer;font-size:11px">✕</button>`:''}
+              <button onclick="_dismissNotice('${n.id}')" style="background:none;border:none;color:#8a8680;cursor:pointer;font-size:11px">✕</button>
             </div>`).join('')}
           </div>`;
         }
