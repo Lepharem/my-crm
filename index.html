@@ -8241,7 +8241,16 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   const specs = DB.specItems.filter(s=>s.contractId===baseCtId&&(s.category==='口碑'||!s.category));
   // 開文規格（傳給規劃表使用，純回文不建行）
   const specsOpen = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name));
-  const thisMonthOm = (DB.omRecords||[]).filter(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym);
+  // thisMonthOm 只包含本線（A/B）的記錄，避免互相干擾
+  const _sopLine = state.line;  // 'A' | 'B' | null
+  const thisMonthOm = (DB.omRecords||[]).filter(r=>{
+    if(r.contractId!==baseCtId) return false;
+    if((r.month||'').slice(0,7)!==ym) return false;
+    // 線別過濾：若 state.line 已選，只取對應線的記錄
+    if(_sopLine==='A') return r.sopLine==='A'||!r.sopLine;
+    if(_sopLine==='B') return r.sopLine==='B';
+    return true; // 尚未選線：全部顯示（通常不到這裡）
+  });
 
   // 更新 sub title
   const subEl = document.getElementById('sop-om-sub');
