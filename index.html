@@ -1831,10 +1831,8 @@ function _renderWriterDashboard(){
   const tasks=_writerAllTasks;
   const pending=tasks.filter(t=>t.status==='撰文中');
   const reviewing=tasks.filter(t=>['文稿審核','切角審核'].includes(t.status));
-  const done=tasks.filter(t=>t.status==='待派帳號商');
-  // 依合約分組
-  const byContract={};
-  tasks.forEach(t=>{const k=t.contractId||'其他';if(!byContract[k])byContract[k]=[];byContract[k].push(t);});
+  // 已完稿：待派帳號商以後的所有狀態
+  const done=tasks.filter(t=>['待派帳號商','待上刊','待確認','已上刊','觀察中','完成'].includes(t.status));
   el.innerHTML=`
     <div style="margin-bottom:20px">
       <div style="font-size:18px;font-weight:700;color:#1a1917">我的工作台</div>
@@ -1857,6 +1855,7 @@ function _renderWriterDashboard(){
     ${window._testMode?`<div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#5b21b6">🧪 測試模式</div>`:''}
     ${pending.length?`<div style="font-size:12px;font-weight:600;color:#92400E;margin-bottom:8px">📝 待撰文（${pending.length}）</div>${pending.map(t=>_writerTaskCard(t)).join('')}`:''}
     ${reviewing.length?`<div style="font-size:12px;font-weight:600;color:#5b21b6;margin:14px 0 8px">🔍 審核中（${reviewing.length}）</div>${reviewing.map(t=>_writerTaskCard(t)).join('')}`:''}
+    ${done.length?`<details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:#166534;list-style:none;display:flex;align-items:center;gap:6px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">✓ 已完稿（${done.length}）<span style="font-size:10px;color:#8a8680;margin-left:auto">▼ 展開查看</span></summary><div style="margin-top:8px">${done.map(t=>_writerTaskCard(t)).join('')}</div></details>`:''}
     ${!tasks.length?`<div style="text-align:center;padding:40px;color:#8a8680">目前沒有進行中的任務</div>`:''}
   `;
 }
@@ -2175,8 +2174,7 @@ function _renderClientNav(){
   if(!el) return;
   const cl = _userProfile;
   if(!cl) return;
-  // 優先用快取，快取沒有才重查
-  const contracts = window._clientContracts || DB.contracts.filter(c=>c.clientId===(window._clientId||cl.id)&&c.status==='進行中');
+  const contracts = DB.contracts.filter(c=>c.clientId===(window._clientId||cl.id||'')&&c.status==='進行中');
   const navItemStyle = (id) => {
     const isActive = window._clientCurrentPage === id;
     return `display:block;padding:9px 16px;font-size:13px;cursor:pointer;color:${isActive?'#fff':'rgba(255,255,255,.65)'};background:${isActive?'rgba(255,255,255,.12)':'transparent'};border-left:3px solid ${isActive?'#38bdf8':'transparent'};transition:.15s;text-decoration:none`;
@@ -2212,7 +2210,7 @@ function renderClientDashboard(){
   if(!cl){ el.innerHTML='<div style="padding:40px;text-align:center;color:#8a8680">找不到客戶資料</div>'; return; }
 
   const _clId = window._clientId || cl.id || '';
-  const contracts = window._clientContracts || DB.contracts.filter(c=>c.clientId===_clId&&c.status==='進行中');
+  const contracts = DB.contracts.filter(c=>c.clientId===_clId&&c.status==='進行中');
   const ym = new Date().toISOString().slice(0,7);
   const allOm = (DB.omRecords||[]).filter(r=>r.clientId===_clId);
 
@@ -8251,12 +8249,14 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   if(contractId.includes('::A')){ activeLine='A'; baseCtId=contractId.replace('::A',''); }
   else if(contractId.includes('::B')){ activeLine='B'; baseCtId=contractId.replace('::B',''); }
   if(activeLine) window._sopActiveLine[baseCtId] = activeLine;
-  // 若 activeLine 為 null（直接傳 baseCtId 進來），從既有 state 推斷線別
+  // 若 activeLine 為 null，從 DB.sopState 直接查（不呼叫 getSopState 以免建立空 state）
   if(!activeLine){
-    const stA = getSopState(clientId, ym, baseCtId+'::A');
-    const stB = getSopState(clientId, ym, baseCtId+'::B');
-    if(stA.step > 0 || stA.line==='A') { activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
-    else if(stB.step > 0 || stB.line==='B') { activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
+    const ymStates = DB.sopState?.[clientId]?.[ym] || {};
+    const stA = ymStates[baseCtId+'::A'];
+    const stB = ymStates[baseCtId+'::B'];
+    if(stA && (stA.step > 0 || stA.line==='A')) { activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
+    else if(stB && (stB.step > 0 || stB.line==='B')) { activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
+    // 若兩邊都沒有，維持 null（顯示選線卡）
   }
   // lineKey 和 state 在 activeLine 確定後才計算
   const lineKey = baseCtId + '::' + (activeLine || (window._sopActiveLine[baseCtId]||'none'));
