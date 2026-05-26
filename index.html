@@ -2258,8 +2258,10 @@ function renderClientDashboard(){
               }
             </div>
           </div>
-          ${r.clientConfirmStatus==='rejected'&&r.clientNote?`<div style="font-size:11px;color:#92400E;margin-top:8px;padding:6px 8px;background:#fffbeb;border-radius:6px">💬 ${r.clientNote}</div>`:''}
-          <div id="client-suggest-wrap-${r.id}" style="display:none;margin-top:8px">
+          ${r.clientConfirmStatus==='rejected'&&r.clientNote
+            ? `<div style="margin-top:8px;padding:8px 10px;background:#fff3f3;border:1px solid #fca5a5;border-radius:6px;font-size:12px;color:#991B1B">💬 更動建議：${r.clientNote}</div>`
+            : ''}
+          <div id="client-suggest-wrap-${r.id}" style="display:${r.clientConfirmStatus==='rejected'&&!r.clientNote?'block':'none'};margin-top:8px">
             <textarea id="client-note-${r.id}" placeholder="請填寫需要更動或改變的地方…" rows="3"
               style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:12px;resize:vertical"></textarea>
             <button onclick="_clientSubmitSuggestion('${r.id}')" style="margin-top:6px;padding:5px 12px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">送出更動建議</button>
@@ -2556,7 +2558,8 @@ function _clientSubmitSuggestion(taskId){
   if(!note){ toast('請填寫更動建議'); return; }
   r.clientNote=note;
   r.clientConfirmStatus='rejected';
-  r.status='待規劃';
+  // 切角審核（文稿送審）退回 → 回到文稿審核讓企劃修改；切角規劃退回 → 待規劃
+  r.status = (r.status==='切角審核') ? '文稿審核' : '待規劃';
   if(!r.reviewHistory) r.reviewHistory=[];
   r.reviewHistory.push({action:'rejected',by:'client_self',at:new Date().toISOString(),note});
   syncToGAS('omRecords',r).catch(()=>{});
@@ -8110,31 +8113,58 @@ function getSopState(clientId, ym, contractId){
 function renderSopOmPage(){
   const ymEl = document.getElementById('sop-ym');
   const clientEl = document.getElementById('sop-client');
-  // 初始化
   if(ymEl && !ymEl.value) ymEl.value = new Date().toISOString().slice(0,7);
-  // 填充客戶下拉
+  // 填充客戶下拉（只列客戶，不含合約）
   if(clientEl){
     const cur = clientEl.value;
     clientEl.innerHTML = '<option value="">— 選擇客戶 —</option>';
+    const seenClients = new Set();
     DB.contracts.filter(c=>c.status==='進行中').forEach(ct=>{
+      if(seenClients.has(ct.clientId)) return;
+      seenClients.add(ct.clientId);
       const cl = DB.clients.find(c=>c.id===ct.clientId)||{};
       const opt = document.createElement('option');
-      opt.value = ct.clientId+'::'+ct.id; // clientId::contractId
-      opt.textContent = `${cl.name||'—'} (${ct.contractNo||ct.name})`;
+      opt.value = ct.clientId;
+      opt.textContent = cl.name||'—';
       if(opt.value===cur) opt.selected=true;
       clientEl.appendChild(opt);
     });
   }
   const ym = ymEl?.value;
-  const sel = clientEl?.value;
-  if(!ym || !sel){ document.getElementById('sop-om-content').innerHTML = '<div class="empty-state" style="padding:60px"><p>請選擇客戶與月份</p></div>'; return; }
-  const [clientId, contractId] = sel.split('::');
-  renderSopFlow(clientId, contractId, ym);
+  const clientId = clientEl?.value;
+  const el = document.getElementById('sop-om-content');
+  if(!ym || !clientId){ el.innerHTML = '<div class="empty-state" style="padding:60px"><p>請選擇客戶與月份</p></div>'; return; }
+
+  // 取該客戶所有進行中合約
+  const contracts = DB.contracts.filter(c=>c.clientId===clientId&&c.status==='進行中');
+  if(!contracts.length){ el.innerHTML = '<div class="empty-state" style="padding:60px"><p>此客戶無進行中合約</p></div>'; return; }
+
+  // 若只有一個合約，直接顯示
+  if(contracts.length===1){
+    renderSopFlow(clientId, contracts[0].id, ym);
+    return;
+  }
+
+  // 多個合約：顯示頁籤
+  const activeCtId = window._sopActiveContractId?.[clientId] || contracts[0].id;
+  const tabsHtml = contracts.map(ct=>{
+    const isActive = ct.id === activeCtId;
+    const state = getSopState(clientId, ym, ct.id);
+    const lineTag = state.line==='A'?'A':state.line==='B'?'B':'?';
+    return `<div onclick="window._sopActiveContractId=window._sopActiveContractId||{};window._sopActiveContractId['${clientId}']='${ct.id}';renderSopOmPage()"
+      style="padding:8px 16px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;border-bottom:2px solid ${isActive?'#1D4ED8':'transparent'};color:${isActive?'#1D4ED8':'var(--text3)'};transition:.15s">
+      ${ct.contractNo||ct.name}${state.line?` <span style="font-size:10px;background:${state.line==='A'?'#eff6ff':'#f0fdf4'};color:${state.line==='A'?'#1D4ED8':'#166534'};padding:1px 5px;border-radius:4px">${state.line}線</span>`:''}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<div style="border-bottom:1px solid var(--border);display:flex;gap:0;overflow-x:auto;background:#fff;sticky:top 0" id="sop-contract-tabs">${tabsHtml}</div>
+    <div id="sop-contract-body"></div>`;
+  renderSopFlow(clientId, activeCtId, ym, 'sop-contract-body');
 }
 
 // ── 主流程渲染 ──
-function renderSopFlow(clientId, contractId, ym){
-  const el = document.getElementById('sop-om-content');
+function renderSopFlow(clientId, contractId, ym, containerId){
+  const el = document.getElementById(containerId||'sop-om-content');
   if(!el) return;
   // contractId 有效性檢查
   if(!contractId){
@@ -8275,20 +8305,17 @@ function renderSopFlow(clientId, contractId, ym){
               +contentHtml+noteHtml
               +'</div>'
               +(cs==='pending'
-                ? '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
-                  +'<button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="_sopClientConfirm(\''+r.id+'\',\'confirmed\')">✓ 確認</button>'
-                  +'<button class="btn btn-xs" style="background:#fee2e2;color:#991B1B;border-color:#fca5a5" onclick="_sopClientConfirm(\''+r.id+'\',\'rejected\')">✕ 退回</button>'
-                  +'</div>'
+                ? '<button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="_sopClientConfirm(\''+r.id+'\',\'confirmed\')">✓ 確認</button>'
                 : '')
               +'</div>'
               +rejectForm+historyHtml+'</div>';
           }).join('')
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
         + (thisMonthOm.length>0&&!thisMonthOm.some(r=>!r.clientConfirmStatus||r.clientConfirmStatus==='pending')
-          ? '<button class="btn btn-primary" style="flex:1" onclick="_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
+          ? '<button class="btn btn-primary" style="flex:1" onclick="this.disabled=true;this.textContent=\'推進中…\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
           : '')
         + (confirmed.length>0&&thisMonthOm.some(r=>r.clientConfirmStatus==='pending')
-          ? '<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
+          ? '<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="this.disabled=true;this.textContent=\'推進中…\';_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
         + '</div>';
     }  // if(state.step >= 2)
@@ -8474,12 +8501,18 @@ function renderSopFlow(clientId, contractId, ym){
             + '<span style="font-size:11px;color:var(--text3)">'+(vc?.name||r.vendorName||'—')+'</span>'
             + '<span class="tag '+(OM_STATUS_COLOR[r.status]||'tag-gray')+'" style="font-size:10px">'+r.status+'</span></div>'
             + (isReported
-              ? '<div style="font-size:11px;color:#4a4845;display:flex;flex-wrap:wrap;gap:10px">'
+              ? '<div style="font-size:11px;color:#4a4845;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">'
                 + (r.publishDate?'<span>📅 '+r.publishDate.slice(0,10)+'</span>':'')
                 + (r.platform?'<span>📍 '+r.platform+(r.section?' · '+r.section:'')+'</span>':'')
                 + (r.account?'<span>👤 '+r.account+'</span>':'')
                 + (r.postLink?'<a href="'+r.postLink+'" target="_blank" style="color:#1B4FD8;font-weight:500">🔗 查看上文</a>':'')
                 + '</div>'
+                + (r.status==='待確認'
+                  ? '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+                    + '<button class="btn btn-xs btn-primary" onclick="omAdvanceStatus(\''+r.id+'\',\'已上刊\');setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\'),200)">✓ 確認上刊</button>'
+                    + '<button class="btn btn-xs" style="color:#991B1B;border-color:#fca5a5" onclick="omAdvanceStatus(\''+r.id+'\',\'待上刊\');setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\'),200)">↩ 退回修改</button>'
+                    + '</div>'
+                  : '')
               : '<div style="font-size:11px;color:#92400E">等待帳號商回報…</div>')
             + '</div>';
         }).join('')
@@ -8520,11 +8553,7 @@ function renderSopFlow(clientId, contractId, ym){
           <button class="btn btn-sm" onclick="renderSopFlow('${clientId}','${contractId}','${ym}')" style="font-size:11px">🔄 重整</button>
         </div>
       </div>
-      ${allDone?`<div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:var(--r);padding:20px;text-align:center;margin-bottom:16px">
-        <div style="font-size:28px;margin-bottom:8px">🎉</div>
-        <div style="font-size:15px;font-weight:600;color:#166534">${ym} 口碑月度作業全部完成！</div>
-        <div style="font-size:12px;color:#16a34a;margin-top:4px">共完成上刊 ${doneCount} 筆</div>
-      </div>`:''}
+      
       ${stepsHtml}
     </div>`;
 }
