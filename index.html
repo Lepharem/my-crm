@@ -8270,10 +8270,10 @@ function renderSopFlow(clientId, contractId, ym){
           }).join('')
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
         + (thisMonthOm.length>0&&!thisMonthOm.some(r=>!r.clientConfirmStatus||r.clientConfirmStatus==='pending')
-          ? '<button class="btn btn-primary" style="flex:1" onclick="_sopStep2Complete(\''+clientId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
+          ? '<button class="btn btn-primary" style="flex:1" onclick="_sopStep2Complete(\''+clientId+'\',\\\''+contractId+'\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
           : '')
         + (confirmed.length>0&&thisMonthOm.some(r=>r.clientConfirmStatus==='pending')
-          ? '<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep2PartialContinue(\''+clientId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
+          ? '<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStep2PartialContinue(\''+clientId+'\',\\\''+contractId+'\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
         + '</div>';
     }  // if(state.step >= 2)
@@ -8358,8 +8358,8 @@ function renderSopFlow(clientId, contractId, ym){
         </div>`;
       }).join('')}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${!needWriter.length&&hasWriter.length?`<button id="sop-writer-next-btn" class="btn btn-primary" style="flex:1" onclick="var b=document.getElementById('sop-writer-next-btn');if(b)b.style.display='none';_sopStepNext('${clientId}','${ym}')">✓ 全部指派完成，進行下一步</button>`:''}
-        ${hasWriter.length>0&&needWriter.length>0?`<button id="sop-writer-partial-btn" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="var b=document.getElementById('sop-writer-partial-btn');if(b)b.style.display='none';_sopStep3PartialContinue('${clientId}','${ym}')">⚡ 已指派部分（${hasWriter.length}筆），先進行下一步</button>`:''}
+        ${!needWriter.length&&hasWriter.length?`<button id="sop-writer-next-btn" class="btn btn-primary" style="flex:1" onclick="var b=document.getElementById('sop-writer-next-btn');if(b)b.style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部指派完成，進行下一步</button>`:''}
+        ${hasWriter.length>0&&needWriter.length>0?`<button id="sop-writer-partial-btn" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="var b=document.getElementById('sop-writer-partial-btn');if(b)b.style.display='none';_sopStep3PartialContinue('${clientId}','${contractId}','${ym}')">⚡ 已指派部分（${hasWriter.length}筆），先進行下一步</button>`:''}
       </div>`;
   }
 
@@ -8399,8 +8399,8 @@ function renderSopFlow(clientId, contractId, ym){
           <span class="tag tag-green" style="font-size:10px">✓ 文稿通過</span>
         </div>`).join('')}
       <div id="sop-review-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('sop-review-actions').style.display='none';_sopStepNext('${clientId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
-        ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById('sop-review-actions').style.display='none';_sopStepNext('${clientId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
+        ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('sop-review-actions').style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
+        ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById('sop-review-actions').style.display='none';_sopStepNext('${clientId}',','${contractId}''${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
       </div>`;
   }
 
@@ -8470,7 +8470,7 @@ function renderSopFlow(clientId, contractId, ym){
         }).join('')
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
       + (!needVendor.length&&hasVendor.length?'<div style="font-size:12px;color:#16a34a">✓ 所有任務均已指派帳號商</div>':'')
-      + (hasVendor.length>0&&needVendor.length>0?'<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext(\\\''+clientId+'\\\',\\\''+ym+'\\\')" id="sop-vendor-next-btn" >⚡ 已指派 '+hasVendor.length+' 筆，先進行下一步</button>':'')
+      + (hasVendor.length>0&&needVendor.length>0?'<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext(\\\''+clientId+'\\\',\\\''+contractId+'\\\',\\\''+ym+'\\\')" id="sop-vendor-next-btn" >⚡ 已指派 '+hasVendor.length+' 筆，先進行下一步</button>':'')
       + '</div>';
   }  // ← if(state.step >= vendorStep) 結尾
   // ── 組裝最終 HTML ──
@@ -8501,7 +8501,7 @@ function renderSopFlow(clientId, contractId, ym){
         </div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           ${totalCount?`<span style="font-size:12px;color:var(--text3)">共 ${totalCount} 筆任務 ／ 完成 ${doneCount} 筆</span>`:''}
-          ${state.line?`<button class="btn btn-sm" style="font-size:11px;color:var(--red);border-color:var(--red)" onclick="_sopReset('${clientId}','${ym}')">↺ 重置此月</button>`:''}
+          ${state.line?`<button class="btn btn-sm" style="font-size:11px;color:var(--red);border-color:var(--red)" onclick="_sopReset('${clientId}','${contractId}','${ym}')">↺ 重置此月</button>`:''}
           <button class="btn btn-sm" onclick="renderSopFlow('${clientId}','${contractId}','${ym}')" style="font-size:11px">🔄 重整</button>
         </div>
       </div>
@@ -8605,20 +8605,20 @@ function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state
             return `<tr style="border-bottom:1px solid var(--border);background:${idx%2?'var(--surface2)':'#fff'}">
               <td style="padding:6px 8px">
                 <input value="${row.taskName||''}" class="form-input" style="font-size:11px;padding:4px;width:100px;font-weight:600"
-                  data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+                  data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
                 ${!isMon&&!isG?`<div style="font-size:10px;color:var(--text3);margin-top:2px">${row.specType}</div>`:`<div style="font-size:10px;color:var(--text3);margin-top:2px">${row.specType}${row.weekNum?' · 第'+row.weekNum+'週':''}</div>`}
               </td>
-              <td style="padding:6px 8px"><input type="date" value="${row.date||''}" class="form-input" style="font-size:11px;padding:4px;width:120px" data-pi="${row.id}" data-f="date" onchange="_sopPlanEdit('${clientId}','${ym}',this)"></td>
-              <td style="padding:6px 8px">${(isMon||isG)?'<span style="color:var(--text3);font-size:11px">—</span>':`<select class="form-input" style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${ym}',this)"><option></option>${platformOpts.replace('>'+row.platform+'<',' selected>'+row.platform+'<')}</select>`}</td>
-              <td style="padding:6px 8px">${(isMon||isG)?'<span style="color:var(--text3);font-size:11px">—</span>':`<input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:11px;padding:4px;width:72px" data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${ym}',this)">`}</td>
+              <td style="padding:6px 8px"><input type="date" value="${row.date||''}" class="form-input" style="font-size:11px;padding:4px;width:120px" data-pi="${row.id}" data-f="date" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)"></td>
+              <td style="padding:6px 8px">${(isMon||isG)?'<span style="color:var(--text3);font-size:11px">—</span>':`<select class="form-input" style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)"><option></option>${platformOpts.replace('>'+row.platform+'<',' selected>'+row.platform+'<')}</select>`}</td>
+              <td style="padding:6px 8px">${(isMon||isG)?'<span style="color:var(--text3);font-size:11px">—</span>':`<input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:11px;padding:4px;width:72px" data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">`}</td>
               <td style="padding:6px 8px;text-align:center">${(isMon||isG)?'<span style="color:var(--text3);font-size:11px">—</span>':`<div style="display:inline-flex;align-items:center;gap:3px">
-                <button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center">−</button>
+                <button onclick="_sopReplyAdj('${clientId}','${contractId}','${ym}','${row.id}',-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center">−</button>
                 <span id="pi-reply-${row.id}" style="font-size:13px;font-weight:600;min-width:24px;text-align:center">${row.replyCount??0}</span>
-                <button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center">＋</button>
+                <button onclick="_sopReplyAdj('${clientId}','${contractId}','${ym}','${row.id}',1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center">＋</button>
               </div>`}</td>
-              <td style="padding:6px 8px">${cutAngleDocLink?`<a href="${cutAngleDocLink}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;white-space:nowrap;text-decoration:none">📄 切角DOC</a>`:`<textarea rows="2" placeholder="議題切角方向…" class="form-input" style="font-size:11px;padding:4px;width:100%;min-width:180px;resize:vertical" data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${ym}',this)">${row.cutAngle||''}</textarea>`}</td>
-              <td style="padding:6px 8px"><input value="${row.note||''}" placeholder="備註" class="form-input" style="font-size:11px;padding:4px;width:72px" data-pi="${row.id}" data-f="note" onchange="_sopPlanEdit('${clientId}','${ym}',this)"></td>
-              <td style="padding:6px 4px"><button onclick="_sopPlanDeleteRow('${clientId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button></td>
+              <td style="padding:6px 8px">${cutAngleDocLink?`<a href="${cutAngleDocLink}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;white-space:nowrap;text-decoration:none">📄 切角DOC</a>`:`<textarea rows="2" placeholder="議題切角方向…" class="form-input" style="font-size:11px;padding:4px;width:100%;min-width:180px;resize:vertical" data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">${row.cutAngle||''}</textarea>`}</td>
+              <td style="padding:6px 8px"><input value="${row.note||''}" placeholder="備註" class="form-input" style="font-size:11px;padding:4px;width:72px" data-pi="${row.id}" data-f="note" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)"></td>
+              <td style="padding:6px 4px"><button onclick="_sopPlanDeleteRow('${clientId}','${contractId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button></td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -8657,8 +8657,8 @@ function _sopIsReplyType(specType){
 }
 
 // ── 回文數調整按鈕 ──
-function _sopReplyAdj(clientId, ym, rowId, delta){
-  const state = getSopState(clientId, ym);
+function _sopReplyAdj(clientId, contractId, ym, rowId, delta){
+  const state = getSopState(clientId, ym, contractId);
   const row = state.planItems.find(r=>r.id===rowId);
   if(!row) return;
   row.replyCount = Math.max(0, (row.replyCount||0)+delta);
@@ -8708,15 +8708,15 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
         <span style="font-size:11px;font-weight:700;background:#e0e7ff;color:#3730a3;padding:3px 9px;border-radius:20px;flex-shrink:0">#${idx+1}</span>
         <input value="${row.taskName||''}" placeholder="任務名稱（可輸入主題）" class="form-input"
           style="font-size:12px;padding:5px 8px;flex:1;min-width:100px"
-          data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
-        <button onclick="_sopPlanDeleteRow('${clientId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;flex-shrink:0">✕</button>
+          data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
+        <button onclick="_sopPlanDeleteRow('${clientId}','${contractId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;flex-shrink:0">✕</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:3px">指派寫手 *</div>
           <select class="form-input" style="font-size:12px;width:100%"
             data-pi="${row.id}" data-f="writerId"
-            onchange="_sopDirectWriterChange('${clientId}','${ym}','${row.id}',this.value)">
+            onchange="_sopDirectWriterChange('${clientId}','${contractId}','${ym}','${row.id}',this.value)">
             <option value="">— 選擇寫手 —</option>${writerOpts.replace('value="'+row.writerId+'"','value="'+row.writerId+'" selected')}
           </select>
         </div>
@@ -8725,7 +8725,7 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
           ${row.writerId
             ? `<select class="form-input" style="font-size:12px;width:100%"
                 data-pi="${row.id}" data-f="specType"
-                onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+                onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
                 <option value="">— 選擇項目 —</option>${itemOpts}
               </select>`
             : `<div style="padding:8px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--text3)">請先選寫手</div>`
@@ -8736,24 +8736,24 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
         <div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:3px">論壇平台</div>
           <select class="form-input" style="font-size:12px;width:100%"
-            data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+            data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
             <option value="${row.platform||''}">${row.platform||'— 選擇 —'}</option>${platformOpts}
           </select>
         </div>
         <div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:3px">版塊</div>
           <input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:12px;width:100%"
-            data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+            data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;margin-bottom:8px">
         <div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:3px">回文數</div>
           <div style="display:inline-flex;align-items:center;gap:4px">
-            <button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',-1)"
+            <button onclick="_sopReplyAdj('${clientId}','${contractId}','${ym}','${row.id}',-1)"
               style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center">−</button>
             <span id="di-reply-${row.id}" style="font-size:14px;font-weight:700;min-width:28px;text-align:center">${row.replyCount||0}</span>
-            <button onclick="_sopReplyAdj('${clientId}','${ym}','${row.id}',1)"
+            <button onclick="_sopReplyAdj('${clientId}','${contractId}','${ym}','${row.id}',1)"
               style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center">＋</button>
           </div>
         </div>
@@ -8762,14 +8762,14 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
           ${cutAngleDocLink
             ? `<a href="${cutAngleDocLink}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 10px;text-decoration:none">📄 切角DOC</a>`
             : `<input value="${row.cutAngle||''}" placeholder="切角方向…" class="form-input" style="font-size:12px;width:100%"
-                data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${ym}',this)">`
+                data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">`
           }
         </div>
       </div>
       <div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:3px">備註</div>
         <input value="${row.note||''}" placeholder="備註（選填）" class="form-input" style="font-size:12px;width:100%"
-          data-pi="${row.id}" data-f="note" onchange="_sopPlanEdit('${clientId}','${ym}',this)">
+          data-pi="${row.id}" data-f="note" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
       </div>
     </div>`;
   };
@@ -8779,14 +8779,14 @@ function _renderSopDirectForm(clientId, contractId, ym, specs, state){
     ${rows.map((row,idx) => renderRow(row,idx)).join('')}
     ${!rows.length ? `<div style="text-align:center;padding:24px;border:2px dashed var(--border);border-radius:10px;color:var(--text3);margin-bottom:12px;font-size:13px">點擊「新增發文」開始建立任務</div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="_sopDirectAddRow('${clientId}','${ym}')">＋ 新增發文</button>
+      <button class="btn btn-primary" onclick="_sopDirectAddRow('${clientId}','${contractId}','${ym}')">＋ 新增發文</button>
       ${rows.length ? `<button class="btn btn-primary" style="background:#0f6e56" onclick="_sopSubmitDirect('${clientId}','${contractId}','${ym}')">⚡ 確認派發寫手</button>` : ''}
     </div>`;
 }
 
 // 直發線：選寫手後重繪（更新服務項目下拉）
-function _sopDirectWriterChange(clientId, ym, rowId, writerId){
-  const state = getSopState(clientId, ym);
+function _sopDirectWriterChange(clientId, contractId, ym, rowId, writerId){
+  const state = getSopState(clientId, ym, contractId);
   const row = state.planItems.find(r=>r.id===rowId);
   if(row){
     row.writerId = writerId;
@@ -8810,15 +8810,15 @@ function _sopToggleStep(num){
   if(body){ const hidden = body.style.display==='none'; body.style.display=hidden?'':'none'; if(arrow) arrow.style.transform=hidden?'':'rotate(-90deg)'; }
 }
 
-function _sopPlanEdit(clientId, ym, el){
-  const state = getSopState(clientId, ym);
+function _sopPlanEdit(clientId, contractId, ym, el){
+  const state = getSopState(clientId, ym, contractId);
   const id = el.dataset.pi, field = el.dataset.f;
   const row = state.planItems.find(r=>r.id===id);
   if(row) row[field] = el.value;
 }
 
-function _sopPlanDeleteRow(clientId, ym, rowId){
-  const state = getSopState(clientId, ym);
+function _sopPlanDeleteRow(clientId, contractId, ym, rowId){
+  const state = getSopState(clientId, ym, contractId);
   state.planItems = state.planItems.filter(r=>r.id!==rowId);
   const [cId,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
   const ymv = document.getElementById('sop-ym')?.value||ym;
@@ -8831,9 +8831,7 @@ function _sopPlanAddRow(clientId, ym, contractId){
   renderSopFlow(clientId,contractId,ym);
 }
 
-function _sopDirectAddRow(clientId, ym){
-  const [,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
-  const contractId = ctId || '';
+function _sopDirectAddRow(clientId, contractId, ym){
   const state = getSopState(clientId, ym, contractId);
   const newIdx = state.planItems.length + 1;
   state.planItems.push({
@@ -8998,27 +8996,16 @@ function _sopResubmitToClient(taskId){
   }
 }
 
-function _sopStep2Complete(clientId, ym){
-  const state = getSopState(clientId, ym);
+function _sopStep2Complete(clientId, contractId, ym){
+  const state = getSopState(clientId, ym, contractId);
   state.step = (state.line==='A') ? 3 : 2;
-  // 嘗試多個來源取 contractId
-  let ctId = state.contractId || '';
-  if(!ctId){
-    const sel = document.getElementById('sop-client')?.value || '::';
-    ctId = sel.split('::')[1] || '';
-  }
-  if(!ctId){
-    toast('找不到合約ID，請重新選擇客戶','error');
-    return;
-  }
-  renderSopFlow(clientId, ctId, ym);
+  renderSopFlow(clientId, contractId, ym);
 }
 
-function _sopStepNext(clientId, ym){
-  const state = getSopState(clientId, ym);
+function _sopStepNext(clientId, contractId, ym){
+  const state = getSopState(clientId, ym, contractId);
   state.step++;
-  const ctId = state.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
-  renderSopFlow(clientId, ctId, ym);
+  renderSopFlow(clientId, contractId, ym);
 }
 
 function _sopAssignWriter(taskId){
@@ -9039,13 +9026,13 @@ function _sopAssignWriter(taskId){
   setTimeout(()=>{ if(_cId&&_ctId&&ym) renderSopFlow(_cId,_ctId,ym); },200);
 }
 
-function _sopBatchAssignWriter(specType, clientId, ym){
+function _sopBatchAssignWriter(specType, clientId, contractId, ym){
   const key = specType.replace(/\s/g,'_');
   const writerId = document.getElementById('sw-batch-writer-'+key)?.value;
   const platform = document.getElementById('sw-batch-platform-'+key)?.value||'';
   const section  = document.getElementById('sw-batch-section-'+key)?.value||'';
   if(!writerId){ toast('請先選擇批次寫手'); return; }
-  const fl = DB.freelancers.find(f=>f.id===writerId);
+  const fl = (DB.freelancerPricing||DB.freelancers||[]).find(f=>f.id===writerId);
   const targets = (DB.omRecords||[]).filter(r=>
     r.clientId===clientId && (r.month||'').slice(0,7)===ym &&
     r.specType===specType && !r.writerId && ['待規劃','切角確認','待派寫手'].includes(r.status)
@@ -9058,26 +9045,22 @@ function _sopBatchAssignWriter(specType, clientId, ym){
     syncToGAS('omRecords',r).catch(()=>{});
   });
   toast(`✓ 已批次指派 ${targets.length} 筆給 ${fl?.name||''}`,'success');
-  const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
-  const _ctId=ctId||getSopState(clientId,ym)?.contractId||'';
-  setTimeout(()=>{ if(cId&&_ctId&&ym) renderSopFlow(cId,_ctId,ym); },200);
+  setTimeout(()=>renderSopFlow(clientId, contractId, ym), 200);
 }
 
-function _sopStep2PartialContinue(clientId, ym){
+function _sopStep2PartialContinue(clientId, contractId, ym){
   if(!confirm('確定先以已確認的部分繼續進行步驟3？未確認的任務狀態不變。')) return;
-  const state = getSopState(clientId, ym);
+  const state = getSopState(clientId, ym, contractId);
   state.step = 3;
   state.partialConfirm = true;
-  const ctId = state.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
-  renderSopFlow(clientId, ctId, ym);
+  renderSopFlow(clientId, contractId, ym);
 }
 
-function _sopStep3PartialContinue(clientId, ym){
+function _sopStep3PartialContinue(clientId, contractId, ym){
   if(!confirm('確定先以已指派的部分繼續進行步驟4？未指派的任務可繼續回來處理。')) return;
-  const state = getSopState(clientId, ym);
+  const state = getSopState(clientId, ym, contractId);
   state.step = 4;
-  const ctId = state.contractId || (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
-  renderSopFlow(clientId, ctId, ym);
+  renderSopFlow(clientId, contractId, ym);
 }
 
 function _sopSaveNote(taskId, inputId){
