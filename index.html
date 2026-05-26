@@ -8214,8 +8214,9 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   const lineKey = baseCtId + '::' + (window._sopActiveLine[baseCtId]||'none');
   const state = getSopState(clientId, ym, lineKey);
   if(activeLine && !state.contractId) state.contractId = baseCtId;
-  // 若 state 剛建立且有 activeLine，設定 line（但不設 step，讓用戶自己選）
+  // 若從 A/B tab 點進來，自動進入步驟1（顯示規劃表或選線表單）
   if(activeLine && state.line===null) state.line = activeLine;
+  if(activeLine && state.step === 0) state.step = 1;
   const contractId2 = baseCtId; // 後續用 contractId2 代替原 contractId
   // contractId（函式參數）邏輯上改為 baseCtId（去掉 ::A/::B 後綴）
   const ct = DB.contracts.find(c=>c.id===baseCtId)||{};
@@ -8268,7 +8269,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     s1Content = `
       <div style="font-size:12px;color:var(--text2);margin-bottom:14px">選擇本月執行方式：</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div onclick="_sopSelectLine('${clientId}','${contractId}','${ym}','A')"
+        <div onclick="_sopSelectLine('${clientId}','${contractId}','${ym}','A','${containerId||""}')"
           style="border:2px solid var(--border);border-radius:10px;padding:18px;cursor:pointer;transition:.15s;text-align:center"
           onmouseover="this.style.borderColor='#1D4ED8';this.style.background='#eff6ff'"
           onmouseout="this.style.borderColor='var(--border)';this.style.background=''">
@@ -8276,7 +8277,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
           <div style="font-size:14px;font-weight:700;color:#1D4ED8;margin-bottom:4px">A 線：規劃</div>
           <div style="font-size:11px;color:var(--text3)">需填專案規劃表<br>送交客戶確認後再派寫手</div>
         </div>
-        <div onclick="_sopSelectLine('${clientId}','${contractId}','${ym}','B')"
+        <div onclick="_sopSelectLine('${clientId}','${contractId}','${ym}','B','${containerId||""}')"
           style="border:2px solid var(--border);border-radius:10px;padding:18px;cursor:pointer;transition:.15s;text-align:center"
           onmouseover="this.style.borderColor='#0f6e56';this.style.background='#f0fdf4'"
           onmouseout="this.style.borderColor='var(--border)';this.style.background=''">
@@ -8470,8 +8471,8 @@ function renderSopFlow(clientId, contractId, ym, containerId){
             ${r.draftLink?`<a href="${r.draftLink}" target="_blank" class="btn btn-xs">📄 稿件</a>`:''}
           </div>
           ${r.status==='文稿審核'?`<div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-sm" onclick="omAdvanceStatus('${r.id}','切角審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}'),200)">→ 送客戶審核</button>
-            <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}'),200)">✓ 文稿直接通過</button>
+            <button class="btn btn-sm" onclick="omAdvanceStatus('${r.id}','切角審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">→ 送客戶審核</button>
+            <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">✓ 文稿直接通過</button>
           </div>`:r.status==='切角審核'?`<div>
             <div style="font-size:11px;background:#ede9fe;color:#5b21b6;border-radius:6px;padding:6px 10px;margin-bottom:8px">⏸ 已送客戶審核，等待回覆中…</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
@@ -8632,8 +8633,8 @@ function renderSopFlow(clientId, contractId, ym, containerId){
         </div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           ${totalCount?`<span style="font-size:12px;color:var(--text3)">共 ${totalCount} 筆任務 ／ 完成 ${doneCount} 筆</span>`:''}
-          ${state.line?`<button class="btn btn-sm" style="font-size:11px;color:var(--red);border-color:var(--red)" onclick="_sopReset('${clientId}','${contractId}','${ym}')">↺ 重置此月</button>`:''}
-          <button class="btn btn-sm" onclick="renderSopFlow('${clientId}','${contractId}','${ym}')" style="font-size:11px">🔄 重整</button>
+          ${state.line?`<button class="btn btn-sm" style="font-size:11px;color:var(--red);border-color:var(--red)" onclick="_sopReset('${clientId}','${baseCtId}::${currentLine||'none'}','${ym}','${containerId||''}')">↺ 重置此月</button>`:''}
+          <button class="btn btn-sm" onclick="renderSopFlow('${clientId}','${baseCtId}::${currentLine||'none'}','${ym}','${containerId||''}')" style="font-size:11px">🔄 重整</button>
         </div>
       </div>
       
@@ -8924,11 +8925,10 @@ function _sopDirectWriterChange(clientId, contractId, ym, rowId, writerId){
 }
 
 
-function _sopSelectLine(clientId, contractId, ym, line){
+function _sopSelectLine(clientId, contractId, ym, line, containerId){
   const state = getSopState(clientId, ym, contractId);
   state.line = line; state.step = 1;
-  const _sopCl=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(_sopCl);
-  renderSopFlow(clientId, contractId||ctId, ym);
+  renderSopFlow(clientId, contractId, ym, containerId||_sopGetContainerId());
 }
 
 function _sopToggleStep(num){
@@ -8955,7 +8955,7 @@ function _sopPlanDeleteRow(clientId, contractId, ym, rowId){
 function _sopPlanAddRow(clientId, ym, contractId){
   const state = getSopState(clientId, ym, contractId);
   state.planItems.push({id:'pi_'+Date.now(),specType:'',date:'',platform:'',section:'',replyRatio:5,cutAngle:'',imgLink:'',note:''});
-  renderSopFlow(clientId,contractId,ym);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 function _sopDirectAddRow(clientId, contractId, ym){
@@ -8967,7 +8967,7 @@ function _sopDirectAddRow(clientId, contractId, ym){
     taskName:'新任務#'+newIdx
   });
   if(!contractId){ toast('請先選擇客戶','error'); return; }
-  renderSopFlow(clientId, contractId, ym);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 // A 線：送交客戶確認 → 建立 omRecords + 狀態推進至步驟2
@@ -9004,7 +9004,7 @@ function _sopSubmitPlan(clientId, contractId, ym){
   // 儀錶板通知
   if(!DB.notifications) DB.notifications=[];
   DB.notifications.push({ type:'sopPendingClient', clientId, ym, msg:`${cl.name} ${ym} 專案規劃待客戶確認`, created:new Date().toISOString() });
-  renderSopFlow(clientId, contractId, ym);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 // B 線：直接派寫手 → 建立 omRecords + 狀態「撰文中」
@@ -9055,7 +9055,7 @@ function _sopSubmitDirect(clientId, contractId, ym){
   toast(`✓ 已建立 ${created} 筆任務，通知寫手中`,'success');
   if(!DB.notifications) DB.notifications=[];
   DB.notifications.push({ id:'SOP_B_'+Date.now(), type:'writersWorking', clientId, contractId, ym, msg:`${cl.name} ${ym} 寫手撰文中（${created} 筆）`, created:new Date().toISOString(), done:false });
-  renderSopFlow(clientId, contractId, ym);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 // A 線步驟2：企劃端逐筆確認（代客戶操作）
@@ -9194,7 +9194,7 @@ function _sopStep3PartialContinue(clientId, contractId, ym){
   if(!confirm('確定先以已指派的部分繼續進行步驟4？未指派的任務可繼續回來處理。')) return;
   const state = getSopState(clientId, ym, contractId);
   state.step = 4;
-  renderSopFlow(clientId, contractId, ym);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 function _sopSaveNote(taskId, inputId){
@@ -9238,11 +9238,11 @@ function _sopBatchAssignVendor(specType, clientId, ym, contractId){
   setTimeout(()=>renderSopFlow(cId,ctId||contractId,ymv),200);
 }
 
-function _sopReset(clientId, ym){
+function _sopReset(clientId, contractIdFull, ym, containerId){
   if(!confirm(`確定重置 ${ym} 的作業進度？（不會刪除已建立的口碑記錄）`)) return;
-  const ctId = _sopGetActiveContractId(document.getElementById('sop-client')?.value||'');
-  if(DB.sopState?.[clientId]?.[ym]?.[ctId]) delete DB.sopState[clientId][ym][ctId];
-  renderSopFlow(clientId, ctId, ym);
+  // contractIdFull 可能含 ::A 或 ::B，lineKey 就是這個
+  if(DB.sopState?.[clientId]?.[ym]?.[contractIdFull]) delete DB.sopState[clientId][ym][contractIdFull];
+  renderSopFlow(clientId, contractIdFull, ym, containerId||_sopGetContainerId());
 }
 
 function sopAssignWriter(taskId){_sopAssignWriter(taskId);}
