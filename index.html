@@ -1933,8 +1933,8 @@ async function submitWriterDraft(taskId){
       // 寫手回覆後，同步刷新 SOP 頁（企劃端即時看到狀態變更）
       const sopEl2=document.getElementById('page-sop-om');
       if(sopEl2&&sopEl2.classList.contains('active')){
-        const cId2=document.getElementById('sop-client')?.value?.split('::')?.[0];
-        const ctId2=document.getElementById('sop-client')?.value?.split('::')?.[1];
+        const cId2=document.getElementById('sop-client')?.value;
+        const ctId2=_sopGetActiveContractId(cId2);
         const sopYm2=document.getElementById('sop-ym')?.value;
         if(cId2&&ctId2&&sopYm2) setTimeout(()=>renderSopFlow(cId2,ctId2,sopYm2),200);
       }
@@ -2210,8 +2210,15 @@ function renderClientDashboard(){
   const ym = new Date().toISOString().slice(0,7);
   const allOm = (DB.omRecords||[]).filter(r=>r.clientId===cl.id);
 
-  // 待確認切角（客戶全合約）
-  const pendingConfirm = allOm.filter(r=>(r.clientConfirmStatus==='pending'||r.status==='切角審核')&&(r.month||'').slice(0,7)===ym);
+  // 待確認切角 + 已回覆（客戶全合約，本月）
+  // 顯示所有需要客戶互動的記錄，confirmed 以灰色保留在畫面上
+  const pendingConfirm = allOm.filter(r=>{
+    const inMonth=(r.month||'').slice(0,7)===ym;
+    if(!inMonth) return false;
+    // 需客戶互動：pending/rejected 或 切角審核（文稿過稿）
+    return r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||r.status==='切角審核';
+  });
+  const confirmedThisMonth = allOm.filter(r=>(r.month||'').slice(0,7)===ym&&r.clientConfirmStatus==='confirmed'&&(r.status==='切角確認'||r.status==='待派帳號商'||r.status==='切角審核'));
   // 本月整體上刊
   const thisMonthDone = allOm.filter(r=>(r.publishDate||r.date||'').slice(0,7)===ym&&['已上刊','觀察中','完成'].includes(r.status)).length;
   const thisMonthTotal = allOm.filter(r=>(r.month||'').slice(0,7)===ym).length;
@@ -2245,8 +2252,12 @@ function renderClientDashboard(){
         <div id="client-task-card-${r.id}" style="border:1px solid ${r.clientConfirmStatus==='confirmed'?'#86efac':r.clientConfirmStatus==='rejected'?'#fca5a5':'#fcd34d'};border-radius:8px;padding:10px 12px;margin-bottom:8px;background:${r.clientConfirmStatus==='confirmed'?'#f0fdf4':'#fff'}">
           <div style="display:flex;align-items:flex-start;gap:8px">
             <div style="flex:1">
+              <div style="font-size:11px;color:#8a8680;margin-bottom:2px">${r.status==='切角審核'?'📝 文稿審核':'✏️ 切角確認'}</div>
               <div style="font-size:12px;font-weight:500">${r.specType} ／ ${r.platform||'—'} ${r.section?'·'+r.section:''}</div>
-              <div style="font-size:11px;color:#4a4845;margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${r.content||r.title||'（尚無內容）'}</div>
+              ${r.status==='切角審核'
+                ? (r.draftLink?`<a href="${r.draftLink}" target="_blank" style="font-size:11px;color:#1B4FD8;margin-top:4px;display:inline-block">📄 查看稿件連結 ↗</a>`:'<div style="font-size:11px;color:#8a8680;margin-top:4px">（稿件連結待補）</div>')
+                : `<div style="font-size:11px;color:#4a4845;margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${r.content||r.title||'（尚無內容）'}</div>`
+              }
             </div>
             <div id="client-task-btns-${r.id}" style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
               ${r.clientConfirmStatus==='confirmed'
@@ -2431,6 +2442,20 @@ function renderClientContractPage(contractId){
       <div style="font-size:11px;color:#92400E;margin-top:2px">請在下方規格表中查看詳情並確認</div>
     </div>`:''}
 
+    <!-- 已確認記錄（本月，折疊顯示）-->
+    ${confirmedThisMonth.length?`<details style="margin-bottom:16px">
+      <summary style="cursor:pointer;font-size:12px;color:#8a8680;padding:8px 12px;background:#f8f7f5;border-radius:8px;list-style:none;display:flex;align-items:center;gap:6px">
+        ▶ 本月已確認 ${confirmedThisMonth.length} 筆切角（點開查看）
+      </summary>
+      <div style="margin-top:8px;padding:0 4px">
+        ${confirmedThisMonth.map(r=>`<div style="border:1px solid #86efac;border-radius:8px;padding:8px 12px;margin-bottom:6px;background:#f0fdf4;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>
+          <span style="font-size:12px;font-weight:500;flex:1">${r.specType} ／ ${r.platform||'—'}</span>
+          <span style="font-size:11px;color:#8a8680">${r.status}</span>
+        </div>`).join('')}
+      </div>
+    </details>`:''}
+
     <!-- 各規格執行追蹤表 -->
     ${specStats.map(s=>`<div style="background:#fff;border-radius:12px;border:1px solid #e8e6e1;margin-bottom:16px;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f8f7f5;border-bottom:1px solid #e8e6e1">
@@ -2493,8 +2518,8 @@ function _clientConfirmTask(taskId, action){
     // 同步刷新 SOP 頁（測試模式共用 DB）
     const sopEl=document.getElementById('page-sop-om');
     if(sopEl&&sopEl.classList.contains('active')){
-      const cId=document.getElementById('sop-client')?.value?.split('::')?.[0];
-      const ctId=document.getElementById('sop-client')?.value?.split('::')?.[1];
+      const cId=document.getElementById('sop-client')?.value;
+      const ctId=_sopGetActiveContractId(cId);
       const sopYm=document.getElementById('sop-ym')?.value;
       if(cId&&ctId&&sopYm) setTimeout(()=>renderSopFlow(cId,ctId,sopYm),100);
     }
@@ -2572,8 +2597,8 @@ function _clientSubmitSuggestion(taskId){
   // 同步刷新 SOP 頁（企劃端可見退回狀態）
   const sopEl=document.getElementById('page-sop-om');
   if(sopEl&&sopEl.classList.contains('active')){
-    const cId=document.getElementById('sop-client')?.value?.split('::')?.[0];
-    const ctId=document.getElementById('sop-client')?.value?.split('::')?.[1];
+    const cId=document.getElementById('sop-client')?.value;
+    const ctId=_sopGetActiveContractId(cId);
     const sopYm=document.getElementById('sop-ym')?.value;
     if(cId&&ctId&&sopYm) setTimeout(()=>renderSopFlow(cId,ctId,sopYm),100);
   }
@@ -2629,8 +2654,8 @@ async function submitVendorPost(taskId){
       // 刷新 SOP 頁
       const sopEl = document.getElementById('page-sop-om');
       if(sopEl && sopEl.classList.contains('active')){
-        const cId = document.getElementById('sop-client')?.value?.split('::')?.[0];
-        const ctId = document.getElementById('sop-client')?.value?.split('::')?.[1];
+        const cId = document.getElementById('sop-client')?.value;
+        const ctId = _sopGetActiveContractId(cId);
         const ym   = document.getElementById('sop-ym')?.value;
         if(cId && ctId && ym) renderSopFlow(cId,ctId,ym);
       }
@@ -6640,8 +6665,8 @@ function omAdvanceStatus(id, nextStatus){
   // 若 SOP 頁面正在顯示，同步刷新
   const sopEl = document.getElementById('page-sop-om');
   if(sopEl && sopEl.classList.contains('active')){
-    const cId = document.getElementById('sop-client')?.value?.split('::')?.[0];
-    const ctId = document.getElementById('sop-client')?.value?.split('::')?.[1];
+    const cId = document.getElementById('sop-client')?.value;
+    const ctId = _sopGetActiveContractId(cId);
     const ym   = document.getElementById('sop-ym')?.value;
     if(cId && ctId && ym) setTimeout(()=>renderSopFlow(cId,ctId,ym),150);
   } else {
@@ -6677,8 +6702,8 @@ async function confirmOmTask(id){
       // 同步刷新 SOP 頁（若正在顯示）
       const sopEl=document.getElementById('page-sop-om');
       if(sopEl&&sopEl.classList.contains('active')){
-        const cId=document.getElementById('sop-client')?.value?.split('::')?.[0];
-        const ctId=document.getElementById('sop-client')?.value?.split('::')?.[1];
+        const cId=document.getElementById('sop-client')?.value;
+        const ctId=_sopGetActiveContractId(cId);
         const ym=document.getElementById('sop-ym')?.value;
         if(cId&&ctId&&ym) setTimeout(()=>renderSopFlow(cId,ctId,ym),150);
       }
@@ -8836,7 +8861,7 @@ function _sopDirectWriterChange(clientId, contractId, ym, rowId, writerId){
     row.writerId = writerId;
     row.specType = ''; // 清空服務項目，讓使用者重選
   }
-  const [,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
+  const _sopCl=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(_sopCl);
   renderSopFlow(clientId, ctId, ym);
 }
 
@@ -8844,7 +8869,7 @@ function _sopDirectWriterChange(clientId, contractId, ym, rowId, writerId){
 function _sopSelectLine(clientId, contractId, ym, line){
   const state = getSopState(clientId, ym, contractId);
   state.line = line; state.step = 1;
-  const [,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
+  const _sopCl=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(_sopCl);
   renderSopFlow(clientId, contractId||ctId, ym);
 }
 
@@ -8864,7 +8889,7 @@ function _sopPlanEdit(clientId, contractId, ym, el){
 function _sopPlanDeleteRow(clientId, contractId, ym, rowId){
   const state = getSopState(clientId, ym, contractId);
   state.planItems = state.planItems.filter(r=>r.id!==rowId);
-  const [cId,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
+  const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
   const ymv = document.getElementById('sop-ym')?.value||ym;
   renderSopFlow(cId,ctId,ymv);
 }
@@ -9000,7 +9025,7 @@ function _sopClientConfirm(taskId, status){
   }
   syncToGAS('omRecords',r).catch(()=>{});
   // 刷新 SOP 頁
-  const [cId,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
+  const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
   const ym = document.getElementById('sop-ym')?.value||'';
   const _ctId = ctId || getSopState(cId||'', ym||'')?.contractId || '';
   if(cId&&_ctId&&ym) renderSopFlow(cId, _ctId, ym);
@@ -9031,9 +9056,8 @@ function _sopResubmitToClient(taskId){
   syncToGAS('omRecords',r).catch(()=>{});
   toast('已重新送交客戶確認','success');
   // 刷新
-  const [cId,ctId] = (document.getElementById('sop-client')?.value||'::').split('::');
   const ym = document.getElementById('sop-ym')?.value||'';
-  if(cId&&ctId&&ym) renderSopFlow(cId,ctId,ym);
+  if(r.clientId&&r.contractId&&ym) renderSopFlow(r.clientId,r.contractId,ym,_sopGetContainerId());
   // 同步刷新客戶頁
   if(_clientCurrentPage&&_clientCurrentPage!=='dashboard'){
     setTimeout(()=>renderClientContractPage(r.contractId),150);
@@ -9052,6 +9076,15 @@ function _sopStepNext(clientId, contractId, ym){
   renderSopFlow(clientId, contractId, ym);
 }
 
+function _sopGetActiveContractId(clientId){
+  // 取目前 sop 頁面顯示的合約 ID
+  if(!clientId) clientId = document.getElementById('sop-client')?.value||'';
+  return window._sopActiveContractId?.[clientId] ||
+    (DB.contracts.filter(c=>c.clientId===clientId&&c.status==='進行中')[0]?.id) || '';
+}
+function _sopGetContainerId(){
+  return document.getElementById('sop-contract-body') ? 'sop-contract-body' : 'sop-om-content';
+}
 function _sopAssignWriter(taskId){
   const writerId = document.getElementById('sw-writer-'+taskId)?.value;
   if(!writerId){ toast('請選擇寫手'); return; }
@@ -9064,10 +9097,9 @@ function _sopAssignWriter(taskId){
   const note=document.getElementById('sw-note-'+taskId)?.value; if(note) r.note=note;
   syncToGAS('omRecords',r).catch(()=>{});
   toast(`✓ 已指派 ${fl?.name||''}`,'success');
-  const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
   const ym=document.getElementById('sop-ym')?.value||'';
-  const _cId=cId||'', _ctId=ctId||getSopState(_cId,ym)?.contractId||'';
-  setTimeout(()=>{ if(_cId&&_ctId&&ym) renderSopFlow(_cId,_ctId,ym); },200);
+  const clientId=r.clientId||'', contractId=r.contractId||'';
+  setTimeout(()=>{ if(clientId&&contractId&&ym) renderSopFlow(clientId,contractId,ym,_sopGetContainerId()); },200);
 }
 
 function _sopBatchAssignWriter(specType, clientId, contractId, ym){
@@ -9123,7 +9155,7 @@ function _sopAssignVendor(taskId, contractId, ym){
   r.vendorId=vendorId; r.vendorName=vc?.name||''; r.status='待上刊';
   syncToGAS('omRecords',r).catch(()=>{});
   toast(`✓ 已指派 ${vc?.name||''}`,'success');
-  const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
+  const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
   const ymv=document.getElementById('sop-ym')?.value||ym;
   setTimeout(()=>renderSopFlow(cId,ctId||contractId,ymv),200);
 }
@@ -9143,21 +9175,21 @@ function _sopBatchAssignVendor(specType, clientId, ym, contractId){
     syncToGAS('omRecords',r).catch(()=>{});
   });
   toast(`✓ 已批次指派 ${targets.length} 筆給 ${vc?.name||''}`,'success');
-  const [cId,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
+  const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
   const ymv=document.getElementById('sop-ym')?.value||ym;
   setTimeout(()=>renderSopFlow(cId,ctId||contractId,ymv),200);
 }
 
 function _sopReset(clientId, ym){
   if(!confirm(`確定重置 ${ym} 的作業進度？（不會刪除已建立的口碑記錄）`)) return;
-  const ctId = (document.getElementById('sop-client')?.value||'::').split('::')[1] || '';
+  const ctId = _sopGetActiveContractId(document.getElementById('sop-client')?.value||'');
   if(DB.sopState?.[clientId]?.[ym]?.[ctId]) delete DB.sopState[clientId][ym][ctId];
   renderSopFlow(clientId, ctId, ym);
 }
 
 function sopAssignWriter(taskId){_sopAssignWriter(taskId);}
 function sopAssignVendor(taskId){
-  const [,ctId]=(document.getElementById('sop-client')?.value||'::').split('::');
+  const _sopCl2=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(_sopCl2);
   const ym=document.getElementById('sop-ym')?.value||'';
   _sopAssignVendor(taskId,ctId,ym);
 }
