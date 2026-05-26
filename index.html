@@ -2523,13 +2523,10 @@ function _clientConfirmTask(taskId, action){
     syncToGAS('omRecords',r).catch(()=>{});
     // 更新小卡 DOM（支援儀錶板 div 卡和合約頁 tr 兩種格式）
     _clientUpdateTaskCard(taskId, r);
-    // 同步刷新 SOP 頁（測試模式共用 DB）
+    // 刷新 SOP 頁（用 record 資料，不依賴 DOM 下拉，避免觸發客戶頁重渲染）
     const sopEl=document.getElementById('page-sop-om');
     if(sopEl&&sopEl.classList.contains('active')){
-      const cId=document.getElementById('sop-client')?.value;
-      const ctId=_sopGetActiveContractId(cId);
-      const sopYm=document.getElementById('sop-ym')?.value;
-      if(cId&&ctId&&sopYm) setTimeout(()=>renderSopFlow(cId,ctId,sopYm),100);
+      setTimeout(()=>_sopRefreshFromRecord(r), 150);
     }
     return;
   } else if(action==='suggest'){
@@ -2602,13 +2599,10 @@ function _clientSubmitSuggestion(taskId){
   // 隱藏 textarea 送出按鈕，但保留意見顯示
   const wrap=document.getElementById('client-suggest-wrap-'+taskId);
   if(wrap) wrap.style.display='none';
-  // 同步刷新 SOP 頁（企劃端可見退回狀態）
+  // 刷新 SOP 頁（用 record 資料）
   const sopEl=document.getElementById('page-sop-om');
   if(sopEl&&sopEl.classList.contains('active')){
-    const cId=document.getElementById('sop-client')?.value;
-    const ctId=_sopGetActiveContractId(cId);
-    const sopYm=document.getElementById('sop-ym')?.value;
-    if(cId&&ctId&&sopYm) setTimeout(()=>renderSopFlow(cId,ctId,sopYm),100);
+    setTimeout(()=>_sopRefreshFromRecord(r), 150);
   }
 }
 function _clientSaveNote(taskId, note){
@@ -8288,10 +8282,10 @@ function renderSopFlow(clientId, contractId, ym, containerId){
       </div>`;
   } else if(state.line === 'A' && state.step === 1){
     // A 線步驟1：顯示專案規劃表
-    s1Content = _renderSopPlanTable(clientId, contractId, ym, specsOpen, thisMonthOm, state);
+    s1Content = _renderSopPlanTable(clientId, baseCtId, ym, specsOpen, thisMonthOm, state);
   } else if(state.line === 'B' && state.step === 1){
     // B 線步驟1：直接選規格+寫手
-    s1Content = _renderSopDirectForm(clientId, contractId, ym, specs, state);
+    s1Content = _renderSopDirectForm(clientId, baseCtId, ym, specs, state);
   } else {
     // 已完成步驟1：摘要
     s1Content = `<div style="font-size:12px;color:#166534">✓ 已選擇 ${state.line==='A'?'A 線（規劃）':'B 線（直發）'}，本月共 ${totalCount} 筆任務</div>`;
@@ -9009,8 +9003,10 @@ function _sopSubmitPlan(clientId, contractId, ym){
 
 // B 線：直接派寫手 → 建立 omRecords + 狀態「撰文中」
 function _sopSubmitDirect(clientId, contractId, ym){
+  // contractId 可能帶 ::B 後綴，strip 成 baseCtId 後查 DB
+  const baseCtIdSD = contractId.includes('::')?contractId.split('::')[0]:contractId;
   const state = getSopState(clientId, ym, contractId);
-  const ct = DB.contracts.find(c=>c.id===contractId)||{};
+  const ct = DB.contracts.find(c=>c.id===baseCtIdSD)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
   const validRows = state.planItems.filter(row=>row.writerId && row.specType);
   const missingWriter = state.planItems.filter(row=>!row.writerId);
@@ -9030,7 +9026,7 @@ function _sopSubmitDirect(clientId, contractId, ym){
     const fl = DB.freelancers.find(f=>f.id===row.writerId);
     const id = genOmId(cl.name);
     const rec = {
-      id, contractId, clientId, clientName:cl.name||'',
+      id, contractId:baseCtIdSD, clientId, clientName:cl.name||'',
       month:ym, specType:row.specType,
       sopPlanItemId: row.id,   // 記錄 planItem id，防重複派發
       taskName:row.taskName||row.specType||'',
@@ -9082,15 +9078,9 @@ function _sopClientConfirm(taskId, status){
     });
   }
   syncToGAS('omRecords',r).catch(()=>{});
-  // 刷新 SOP 頁
-  const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
-  const ym = document.getElementById('sop-ym')?.value||'';
-  const _ctId = ctId || getSopState(cId||'', ym||'')?.contractId || '';
-  if(cId&&_ctId&&ym) renderSopFlow(cId, _ctId, ym);
-  // 同步刷新客戶頁（不離開當前頁面）
-  if(_clientCurrentPage&&_clientCurrentPage!=='dashboard'){
-    setTimeout(()=>renderClientContractPage(r.contractId),150);
-  }
+  // 刷新 SOP 頁（用 record 資料，不依賴 DOM 下拉）
+  _sopRefreshFromRecord(r);
+  // 客戶頁不需要重渲染（_clientUpdateTaskCard 已更新 DOM）
 }
 
 function _sopSaveClientNote(taskId, note){
@@ -9139,6 +9129,18 @@ function _sopGetActiveContractId(clientId){
   if(!clientId) clientId = document.getElementById('sop-client')?.value||'';
   return window._sopActiveContractId?.[clientId] ||
     (DB.contracts.filter(c=>c.clientId===clientId&&c.status==='進行中')[0]?.id) || '';
+}
+
+// 從任意 omRecord 取回 lineKey，並刷新對應的 SOP 頁
+function _sopRefreshFromRecord(r){
+  const ym = document.getElementById('sop-ym')?.value||'';
+  const cId = r.clientId||'';
+  const baseCtId = r.contractId||'';
+  if(!cId||!baseCtId||!ym) return;
+  // 取 activeLine（A 或 B）
+  const activeLine = window._sopActiveLine?.[baseCtId] || (r.sopLine==='B'?'B':'A');
+  const lineKey = baseCtId+'::'+activeLine;
+  renderSopFlow(cId, lineKey, ym, _sopGetContainerId());
 }
 function _sopGetContainerId(){
   return document.getElementById('sop-contract-body') ? 'sop-contract-body' : 'sop-om-content';
