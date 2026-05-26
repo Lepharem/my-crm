@@ -2269,10 +2269,18 @@ function renderClientDashboard(){
               }
             </div>
           </div>
-          ${r.clientConfirmStatus==='rejected'&&r.clientNote
-            ? `<div style="margin-top:8px;padding:8px 10px;background:#fff3f3;border:1px solid #fca5a5;border-radius:6px;font-size:12px;color:#991B1B">💬 更動建議：${r.clientNote}</div>`
+          ${(r.reviewHistory&&r.reviewHistory.length)
+            ? `<div style="margin-top:8px;border:1px solid #fcd34d;border-radius:6px;overflow:hidden">
+                ${r.reviewHistory.map(h=>`<div style="padding:6px 10px;border-bottom:1px solid #fef9ec;font-size:11px;background:${h.action==='confirmed'?'#f0fdf4':h.action==='resubmit'?'#eff6ff':'#fff3f3'}">
+                  <span style="font-weight:600;color:${h.action==='confirmed'?'#166534':h.action==='resubmit'?'#1D4ED8':'#991B1B'}">
+                    ${h.action==='confirmed'?'✓ 確認':h.action==='rejected'?'✕ 更動建議':h.action==='resubmit'?'🔄 企劃重送':'?'}
+                  </span>
+                  <span style="color:#8a8680;margin-left:6px">${(h.at||'').slice(0,10)}</span>
+                  ${h.note?`<div style="margin-top:3px;color:#1a1917">${h.note}</div>`:''}
+                </div>`).join('')}
+              </div>`
             : ''}
-          <div id="client-suggest-wrap-${r.id}" style="display:${r.clientConfirmStatus==='rejected'&&!r.clientNote?'block':'none'};margin-top:8px">
+          <div id="client-suggest-wrap-${r.id}" style="display:none;margin-top:8px">
             <textarea id="client-note-${r.id}" placeholder="請填寫需要更動或改變的地方…" rows="3"
               style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:12px;resize:vertical"></textarea>
             <button onclick="_clientSubmitSuggestion('${r.id}')" style="margin-top:6px;padding:5px 12px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">送出更動建議</button>
@@ -8191,18 +8199,31 @@ function renderSopOmPage(){
 function renderSopFlow(clientId, contractId, ym, containerId){
   const el = document.getElementById(containerId||'sop-om-content');
   if(!el) return;
-  // contractId 有效性檢查
   if(!contractId){
     el.innerHTML = '<div class="empty-state" style="padding:60px"><p style="color:var(--red)">找不到合約，請重新選擇客戶</p></div>';
     return;
   }
-  const state = getSopState(clientId, ym, contractId);  // 每次都更新 state.contractId
-  const ct = DB.contracts.find(c=>c.id===contractId)||{};
+  // ── A/B 線 key：同合約可並存 A、B 兩條獨立流程 ──
+  if(!window._sopActiveLine) window._sopActiveLine = {};
+  // 若 contractId 帶有 ::A 或 ::B 後綴，代表從子 tab 點選
+  let activeLine = null;
+  let baseCtId = contractId;
+  if(contractId.includes('::A')){ activeLine='A'; baseCtId=contractId.replace('::A',''); }
+  else if(contractId.includes('::B')){ activeLine='B'; baseCtId=contractId.replace('::B',''); }
+  if(activeLine) window._sopActiveLine[baseCtId] = activeLine;
+  const lineKey = baseCtId + '::' + (window._sopActiveLine[baseCtId]||'none');
+  const state = getSopState(clientId, ym, lineKey);
+  if(activeLine && !state.contractId) state.contractId = baseCtId;
+  // 若 state 剛建立且有 activeLine，設定 line（但不設 step，讓用戶自己選）
+  if(activeLine && state.line===null) state.line = activeLine;
+  const contractId2 = baseCtId; // 後續用 contractId2 代替原 contractId
+  // contractId（函式參數）邏輯上改為 baseCtId（去掉 ::A/::B 後綴）
+  const ct = DB.contracts.find(c=>c.id===baseCtId)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
-  const specs = DB.specItems.filter(s=>s.contractId===contractId&&(s.category==='口碑'||!s.category));
+  const specs = DB.specItems.filter(s=>s.contractId===baseCtId&&(s.category==='口碑'||!s.category));
   // 開文規格（傳給規劃表使用，純回文不建行）
   const specsOpen = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name));
-  const thisMonthOm = (DB.omRecords||[]).filter(r=>r.contractId===contractId&&(r.month||'').slice(0,7)===ym);
+  const thisMonthOm = (DB.omRecords||[]).filter(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym);
 
   // 更新 sub title
   const subEl = document.getElementById('sop-om-sub');
@@ -8453,9 +8474,19 @@ function renderSopFlow(clientId, contractId, ym, containerId){
             <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}'),200)">✓ 文稿直接通過</button>
           </div>`:r.status==='切角審核'?`<div>
             <div style="font-size:11px;background:#ede9fe;color:#5b21b6;border-radius:6px;padding:6px 10px;margin-bottom:8px">⏸ 已送客戶審核，等待回覆中…</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}'),200)">✓ 客戶確認通過</button>
-              <button class="btn btn-sm" style="background:#fff;color:#991B1B;border-color:#fca5a5" onclick="omAdvanceStatus('${r.id}','文稿審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}'),200)">↩ 客戶要求修改</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+              <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">✓ 客戶確認通過</button>
+              <button class="btn btn-sm" style="background:#fff;color:#991B1B;border-color:#fca5a5" onclick="document.getElementById('sr-rj-${r.id}').style.display='block'">↩ 客戶要求修改</button>
+            </div>
+            <div id="sr-rj-${r.id}" style="display:none">
+              <textarea id="sr-rj-note-${r.id}" rows="2" placeholder="修改意見（給寫手參考）…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px;resize:vertical"></textarea>
+              <button class="btn btn-xs" style="margin-top:4px;color:#991B1B;border-color:#fca5a5" onclick="(function(){
+                const note=document.getElementById('sr-rj-note-${r.id}')?.value.trim()||'';
+                const rec=(DB.omRecords||[]).find(x=>x.id==='${r.id}');
+                if(rec&&note){rec.rejectReason=note;syncToGAS('omRecords',rec).catch(()=>{});}
+                omAdvanceStatus('${r.id}','文稿審核');
+                setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);
+              })()">確認退回</button>
             </div></div>
           `:r.status==='撰文中'?`<div style="font-size:11px;color:var(--text3)">等待寫手完稿…</div>`:''}
         </div>`).join('')}
@@ -8533,10 +8564,19 @@ function renderSopFlow(clientId, contractId, ym, containerId){
                 + (r.postLink?'<a href="'+r.postLink+'" target="_blank" style="color:#1B4FD8;font-weight:500">🔗 查看上文</a>':'')
                 + '</div>'
                 + (r.status==='待確認'
-                  ? '<div style="display:flex;gap:6px;flex-wrap:wrap">'
-                    + '<button class="btn btn-xs btn-primary" onclick="omAdvanceStatus(\''+r.id+'\',\'已上刊\');setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\'),200)">✓ 確認上刊</button>'
-                    + '<button class="btn btn-xs" style="color:#991B1B;border-color:#fca5a5" onclick="omAdvanceStatus(\''+r.id+'\',\'待上刊\');setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\'),200)">↩ 退回修改</button>'
+                  ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+                    + '<button class="btn btn-xs btn-primary" onclick="omAdvanceStatus(\''+r.id+'\',\'已上刊\');setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId()),200)">✓ 確認上刊</button>'
+                    + '<button class="btn btn-xs" style="color:#991B1B;border-color:#fca5a5" onclick="document.getElementById(\'sv-rj-wrap-'+r.id+'\').style.display=\'block\'">↩ 退回修改</button>'
                     + '</div>'
+                    + '<div id="sv-rj-wrap-'+r.id+'" style="display:none">'
+                    + '<textarea id="sv-rj-note-'+r.id+'" rows="2" placeholder="退回原因（給帳號商參考）…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px;resize:vertical"></textarea>'
+                    + '<button class="btn btn-xs" style="margin-top:4px;color:#991B1B;border-color:#fca5a5" onclick="(function(){\''
+                    + 'const note=document.getElementById(\'sv-rj-note-'+r.id+'\')?.value.trim();\''
+                    + 'const rec=(DB.omRecords||[]).find(x=>x.id===\''+r.id+'\');\''
+                    + 'if(rec&&note){rec.rejectReason=note;syncToGAS(\'omRecords\',rec).catch(()=>{});}\''
+                    + 'omAdvanceStatus(\''+r.id+'\',\'待上刊\');\''
+                    + 'setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId()),200);\''
+                    + '})()">確認退回</button></div>'
                   : '')
               : '<div style="font-size:11px;color:#92400E">等待帳號商回報…</div>')
             + '</div>';
@@ -8564,9 +8604,27 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     // 尚未選線，只顯示步驟1
   }
 
+  // ── A/B 線子 tab ──
+  const currentLine = window._sopActiveLine?.[baseCtId];
+  const stateA = getSopState(clientId, ym, baseCtId+'::A');
+  const stateB = getSopState(clientId, ym, baseCtId+'::B');
+  const hasA = stateA.step > 0 || stateA.line==='A';
+  const hasB = stateB.step > 0 || stateB.line==='B';
+  const lineTabHtml = `<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;background:#fff;border-radius:var(--r) var(--r) 0 0;overflow:hidden">
+    <div onclick="renderSopFlow('${clientId}','${baseCtId}::A','${ym}','${containerId||'sop-om-content'}')"
+      style="padding:9px 20px;cursor:pointer;font-size:12px;font-weight:600;border-bottom:2px solid ${currentLine==='A'?'#1D4ED8':'transparent'};color:${currentLine==='A'?'#1D4ED8':'var(--text3)'};transition:.15s">
+      📋 A 線（規劃）${stateA.step>0?'<span style="font-size:10px;color:#1D4ED8;margin-left:4px">步驟'+stateA.step+'</span>':''}
+    </div>
+    <div onclick="renderSopFlow('${clientId}','${baseCtId}::B','${ym}','${containerId||'sop-om-content'}')"
+      style="padding:9px 20px;cursor:pointer;font-size:12px;font-weight:600;border-bottom:2px solid ${currentLine==='B'?'#0f6e56':'transparent'};color:${currentLine==='B'?'#0f6e56':'var(--text3)'};transition:.15s">
+      ⚡ B 線（直發）${stateB.step>0?'<span style="font-size:10px;color:#0f6e56;margin-left:4px">步驟'+stateB.step+'</span>':''}
+    </div>
+  </div>`;
+
   el.innerHTML = `
     <style>@keyframes sop-pulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.4)}70%{box-shadow:0 0 0 6px rgba(29,78,216,0)}}</style>
     <div style="padding:20px 24px">
+      ${lineTabHtml}
       <div style="background:var(--surface2);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div>
           <div style="font-size:13px;font-weight:600">${cl.name} ／ ${ym}</div>
@@ -9067,13 +9125,13 @@ function _sopResubmitToClient(taskId){
 function _sopStep2Complete(clientId, contractId, ym){
   const state = getSopState(clientId, ym, contractId);
   state.step = (state.line==='A') ? 3 : 2;
-  renderSopFlow(clientId, contractId, ym);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 function _sopStepNext(clientId, contractId, ym){
   const state = getSopState(clientId, ym, contractId);
   state.step++;
-  renderSopFlow(clientId, contractId, ym);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 function _sopGetActiveContractId(clientId){
@@ -9129,7 +9187,7 @@ function _sopStep2PartialContinue(clientId, contractId, ym){
   const state = getSopState(clientId, ym, contractId);
   state.step = 3;
   state.partialConfirm = true;
-  renderSopFlow(clientId, contractId, ym);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 function _sopStep3PartialContinue(clientId, contractId, ym){
