@@ -2979,7 +2979,9 @@ window.loadAllData = async function(){
     if(fbTaxRaw.length) {
       DB.fbTax = {};
       fbTaxRaw.filter(r => r.id && r.date).forEach(r => {
-        DB.fbTax[r.date] = { id: r.id, amount: Number(r.amount) || 0, note: r.note || '' };
+        // 支援單日多筆：date → [記錄, ...]
+        if(!DB.fbTax[r.date]) DB.fbTax[r.date] = [];
+        DB.fbTax[r.date].push({ id: r.id, amount: Number(r.amount) || 0, note: r.note || '' });
       });
     } else if(!DB.fbTax) {
       DB.fbTax = {};
@@ -8300,7 +8302,7 @@ function getSopState(clientId, ym, contractId){
       const existRecs = (DB.omRecords||[]).filter(r=>
         r.contractId===(ctKey.includes('::')?ctKey.split('::')[0]:ctKey) &&
         (r.month||'').slice(0,7)===ym &&
-        (ctKey.includes('::A') ? r.sopLine==='A'||!r.sopLine :
+        (ctKey.includes('::A') ? r.sopLine==='A' :
          ctKey.includes('::B') ? r.sopLine==='B' : true)
       );
       if(existRecs.length){
@@ -8446,10 +8448,13 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   const thisMonthOm = (DB.omRecords||[]).filter(r=>{
     if(r.contractId!==baseCtId) return false;
     if((r.month||'').slice(0,7)!==ym) return false;
-    // 線別過濾：若 state.line 已選，只取對應線的記錄
-    if(_sopLine==='A') return r.sopLine==='A'||!r.sopLine;
+    // 線別過濾：嚴格比對 sopLine，避免多合約記錄互相混入
+    // 空字串 sopLine 視為 A 線（相容舊記錄，但仍需先有 baseCtId 比對通過）
+    // sopLine 必須明確符合，空值記錄不混入已選線的視圖
+    if(_sopLine==='A') return r.sopLine==='A';
     if(_sopLine==='B') return r.sopLine==='B';
-    return true; // 尚未選線：全部顯示（通常不到這裡）
+    // 尚未選線（顯示全部，含無 sopLine 的舊記錄）
+    return true;
   });
 
   // 更新 sub title
@@ -11655,13 +11660,21 @@ function fbTaxLoad() {
 }
 
 // ── 寫入：同步到 GAS + 更新 DB.fbTax ──
-async function fbTaxSave(date, amount, note) {
+async function fbTaxSave(date, amount, note, existingId) {
   if (!DB.fbTax) DB.fbTax = {};
-  const existing = DB.fbTax[date];
-  const payload  = { date, amount, note: note || '', ...(existing ? { id: existing.id } : {}) };
+  if (!DB.fbTax[date]) DB.fbTax[date] = [];
+  const payload = { date, amount, note: note || '', ...(existingId ? { id: existingId } : {}) };
   try {
     const res = await gasApi('saveFbTax', payload);
-    DB.fbTax[date] = { id: res.id || existing?.id || '', amount, note: note || '' };
+    const savedId = (res.data?.id) || res.id || existingId || '';
+    if (existingId) {
+      // 更新現有筆
+      const rec = DB.fbTax[date].find(r => r.id === existingId);
+      if (rec) { rec.amount = amount; rec.note = note || ''; }
+    } else {
+      // 新增筆
+      DB.fbTax[date].push({ id: savedId, amount, note: note || '' });
+    }
   } catch(e) {
     console.error('fbTaxSave failed', e);
     toast('儲存失敗：' + e.message, 'error');
@@ -11669,14 +11682,23 @@ async function fbTaxSave(date, amount, note) {
 }
 
 // ── 刪除：同步到 GAS + 從 DB.fbTax 移除 ──
-async function fbTaxDelete(date) {
-  const existing = DB.fbTax?.[date];
-  if (!existing?.id) { delete DB.fbTax[date]; return; }
-  try {
-    await gasApi('deleteFbTax', { id: existing.id });
+async function fbTaxDelete(date, recordId) {
+  if (!DB.fbTax?.[date]) return;
+  if (!recordId) {
+    // 刪整天（相容舊邏輯）
+    for (const rec of DB.fbTax[date]) {
+      if (rec.id) await gasApi('deleteFbTax', { id: rec.id }).catch(()=>{});
+    }
     delete DB.fbTax[date];
+    return;
+  }
+  const rec = DB.fbTax[date].find(r => r.id === recordId);
+  if (!rec) return;
+  try {
+    if (rec.id) await gasApi('deleteFbTax', { id: rec.id });
+    DB.fbTax[date] = DB.fbTax[date].filter(r => r.id !== recordId);
+    if (!DB.fbTax[date].length) delete DB.fbTax[date];
   } catch(e) {
-    console.error('fbTaxDelete failed', e);
     toast('刪除失敗：' + e.message, 'error');
   }
 }
@@ -11712,21 +11734,31 @@ function fbTaxAddDays(dateStr, n) {
   return fbTaxDateStr(d);
 }
 function fbTaxWeekStart(dateStr) {
-  // FB結算週：週二開始，週一結束（週四結算上一個完整區間）
-  // ex: 5/28(Thu) → 結算 5/19(Tue)~5/25(Mon)
+  // 給定任意日期，找其所在結算週的起點（週二）
   const d = new Date(dateStr + 'T00:00:00');
   const dow = d.getDay(); // 0=Sun,1=Mon,2=Tue,...
-  // JS getDay: 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
-  // 距「本區間週二」的天數：Tue=0, Wed=1, Thu=2, Fri=3, Sat=4, Sun=5, Mon=6
   const daysSinceTue = dow === 0 ? 5 : dow === 1 ? 6 : dow - 2;
   const thisWeekTue = new Date(d);
   thisWeekTue.setDate(d.getDate() - daysSinceTue);
-  // 上一個完整區間的週二（再往前7天）
-  const prevWeekTue = new Date(thisWeekTue);
-  prevWeekTue.setDate(thisWeekTue.getDate() - 7);
-  return fbTaxDateStr(prevWeekTue);
+  return fbTaxDateStr(thisWeekTue);
 }
-// FB結算週：週區間為週二~週一（共7天）
+function fbTaxCurrentBillingWeek() {
+  // 固定顯示上一個完整結算週（週二開始，週一結束）
+  // 「本週」以週二為起點；今天不管幾號，都顯示「本週週二之前」的那一週
+  // ex: 5/26(Tue)~6/1(Mon) 是本週，5/19(Tue)~5/25(Mon) 是上週 = 固定顯示對象
+  // 只有過了下一個週二（6/2），才切換到 5/26~6/1
+  const today = new Date();
+  const dow = today.getDay(); // 0=Sun,1=Mon,2=Tue,...
+  // JS: 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+  // 距「本週週二」幾天：Tue=0,Wed=1,Thu=2,Fri=3,Sat=4,Sun=5,Mon=6
+  const daysSinceTue = dow === 0 ? 5 : dow === 1 ? 6 : dow - 2;
+  const thisWeekTue = new Date(today);
+  thisWeekTue.setDate(today.getDate() - daysSinceTue);
+  // 上週週二（往前7天）
+  const lastWeekTue = new Date(thisWeekTue);
+  lastWeekTue.setDate(thisWeekTue.getDate() - 7);
+  return fbTaxDateStr(lastWeekTue);
+}
 function fbTaxWeekEnd(weekStartStr) {
   return fbTaxAddDays(weekStartStr, 6); // 週二+6 = 週一
 }
@@ -11745,11 +11777,12 @@ function fbTaxDisplayDate(dateStr) {
 let _fbTaxViewWeek = null;
 
 function fbTaxGoToday() {
-  _fbTaxViewWeek = fbTaxWeekStart(fbTaxDateStr(new Date()));
+  _fbTaxViewWeek = fbTaxCurrentBillingWeek();
   renderFbTax();
 }
 function fbTaxChangeWeek(delta) {
-  if (!_fbTaxViewWeek) _fbTaxViewWeek = fbTaxWeekStart(fbTaxDateStr(new Date()));
+  // FB結算週固定為：上週二到本週一（不依今天動態調整顯示）
+  if (!_fbTaxViewWeek) _fbTaxViewWeek = fbTaxCurrentBillingWeek();
   _fbTaxViewWeek = fbTaxAddDays(_fbTaxViewWeek, delta * 7);
   renderFbTax();
 }
@@ -11759,7 +11792,7 @@ function renderFbTax() {
   const el = document.getElementById('fb-tax-content');
   if (!el) return;
 
-  if (!_fbTaxViewWeek) _fbTaxViewWeek = fbTaxWeekStart(fbTaxDateStr(new Date()));
+  if (!_fbTaxViewWeek) _fbTaxViewWeek = fbTaxCurrentBillingWeek();
 
   const data     = fbTaxLoad(); // DB.fbTax: { date: { id, amount, note } }
   const todayStr = fbTaxDateStr(new Date());
@@ -11777,37 +11810,55 @@ function renderFbTax() {
 
   const weekHTMLs = weeks.map(({ label, start }) => {
     const days = Array.from({ length: 7 }, (_, i) => fbTaxAddDays(start, i));
-    const weekTotal = days.reduce((s, d) => s + (Number(data[d]?.amount) || 0), 0);
+    const weekTotal = days.reduce((s, d) => {
+      const recs = Array.isArray(data[d]) ? data[d] : (data[d] ? [data[d]] : []);
+      return s + recs.reduce((a,r)=>a+Number(r.amount||0),0);
+    }, 0);
     const weekTax   = Math.round(weekTotal * FB_TAX_RATE);
     const endDate   = days[6]; // 週一
 
     const dayRows = days.map(d => {
-      const rec    = data[d];
-      const amt    = rec ? rec.amount : '';
-      const note   = rec ? rec.note  : '';
-      const tax    = amt !== '' && Number(amt) > 0 ? Math.round(Number(amt) * FB_TAX_RATE) : '';
+      const recs     = Array.isArray(data[d]) ? data[d] : (data[d] ? [data[d]] : []);
+      const dayTotal = recs.reduce((s,r)=>s+Number(r.amount||0),0);
+      const dayTax   = dayTotal > 0 ? Math.round(dayTotal * FB_TAX_RATE) : 0;
       const isToday  = d === todayStr;
       const isFuture = d > todayStr;
       const bgStyle  = isToday ? 'background:#fffbeb;' : '';
-      return `<tr style="${bgStyle}${isFuture ? 'opacity:.5;' : ''}">
-        <td style="font-size:13px;white-space:nowrap;padding:9px 12px;${isToday ? 'font-weight:600;color:var(--accent)' : ''}">${fbTaxDisplayDate(d)}${isToday ? ' <span style="font-size:10px;background:var(--accent);color:#fff;border-radius:3px;padding:1px 5px;vertical-align:middle">今天</span>' : ''}</td>
-        <td style="padding:6px 8px">
-          <input type="number" min="0" step="1"
-            style="width:120px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:var(--font);text-align:right;background:${isFuture ? 'var(--surface2)' : 'var(--surface)'}"
-            value="${amt !== '' ? amt : ''}"
-            placeholder="0"
-            ${isFuture ? 'disabled' : ''}
-            data-date="${d}"
-            oninput="fbTaxInputChange(this)"
-          >
-        </td>
-        <td style="text-align:right;padding:9px 14px;font-size:13px;font-variant-numeric:tabular-nums;color:${tax ? 'var(--amber)' : 'var(--text3)'}">
-          ${tax !== '' ? fbTaxFmt(tax) : '—'}
-        </td>
-        <td style="text-align:right;padding:9px 14px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--text2)">
-          ${amt !== '' && Number(amt) > 0 ? fbTaxFmt(Number(amt)) : '—'}
-        </td>
-      </tr>`;
+      // 每筆記錄一列
+      const recRows = recs.map((rec,idx) => `
+        <tr style="${bgStyle}">
+          <td style="padding:3px 12px;font-size:11px;color:var(--text3)">${idx===0?fbTaxDisplayDate(d)+(isToday?' <span style="font-size:10px;background:var(--accent);color:#fff;border-radius:3px;padding:1px 5px">今天</span>':''):''}</td>
+          <td style="padding:3px 8px;display:flex;align-items:center;gap:6px">
+            <input type="number" min="0" step="1"
+              style="width:110px;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:var(--font);text-align:right"
+              value="${rec.amount||''}" placeholder="0"
+              data-date="${d}" data-recid="${rec.id||''}"
+              oninput="fbTaxInputChange(this)"
+            >
+            <input type="text" placeholder="備註" value="${rec.note||''}"
+              style="width:90px;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px"
+              data-date="${d}" data-recid="${rec.id||''}"
+              onchange="fbTaxNoteChange(this)"
+            >
+            <button onclick="fbTaxDeleteRec('${d}','${rec.id||''}')" title="刪除此筆"
+              style="padding:3px 7px;background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:var(--r);cursor:pointer;font-size:12px">✕</button>
+          </td>
+          <td style="text-align:right;padding:3px 14px;font-size:12px;color:var(--amber)">${rec.amount>0?fbTaxFmt(Math.round(Number(rec.amount)*FB_TAX_RATE)):'—'}</td>
+          <td style="text-align:right;padding:3px 14px;font-size:12px;color:var(--text2)">${rec.amount>0?fbTaxFmt(Number(rec.amount)):'—'}</td>
+        </tr>`).join('');
+      // 新增按鈕列
+      const addBtn = isFuture ? '' : `
+        <tr style="${bgStyle}">
+          <td style="padding:3px 12px">${recs.length===0?`<span style="font-size:13px;color:var(--text3)">${fbTaxDisplayDate(d)}${isToday?' <span style="font-size:10px;background:var(--accent);color:#fff;border-radius:3px;padding:1px 5px">今天</span>':''}</span>`:''}${recs.length===0?'':''}</td>
+          <td style="padding:3px 8px">
+            <button onclick="fbTaxAddRec('${d}')"
+              style="padding:4px 10px;background:none;border:1px dashed var(--border2);color:var(--text3);border-radius:var(--r);cursor:pointer;font-size:12px">＋ 新增一筆</button>
+          </td>
+          <td colspan="2" style="text-align:right;padding:3px 14px;font-size:12px;color:var(--text2)">
+            ${recs.length>1?`小計 ${fbTaxFmt(dayTax)}`:''}
+          </td>
+        </tr>`;
+      return recRows + addBtn;
     }).join('');
 
     return `<div class="card" style="margin-bottom:16px">
@@ -11918,9 +11969,37 @@ function renderFbTax() {
   `;
 }
 
+function fbTaxAddRec(date) {
+  if (!DB.fbTax) DB.fbTax = {};
+  if (!DB.fbTax[date]) DB.fbTax[date] = [];
+  // 新增一筆空白記錄（id 暫為空，save 後填入）
+  DB.fbTax[date].push({ id: '', amount: 0, note: '' });
+  renderFbTax();
+  // 聚焦最新的 input
+  setTimeout(() => {
+    const inputs = document.querySelectorAll(`input[data-date="${date}"]`);
+    if (inputs.length) inputs[inputs.length-1].focus();
+  }, 100);
+}
+async function fbTaxDeleteRec(date, recId) {
+  await fbTaxDelete(date, recId || undefined);
+  renderFbTax();
+}
+async function fbTaxNoteChange(input) {
+  const date  = input.dataset.date;
+  const recId = input.dataset.recid;
+  const note  = input.value.trim();
+  const recs  = DB.fbTax?.[date] || [];
+  const rec   = recId ? recs.find(r=>r.id===recId) : recs[0];
+  if (rec) {
+    rec.note = note;
+    await fbTaxSave(date, rec.amount, note, rec.id||undefined);
+  }
+}
 function fbTaxInputChange(input) {
-  const date = input.dataset.date;
-  const val  = parseFloat(input.value);
+  const date  = input.dataset.date;
+  const recId = input.dataset.recid;
+  const val   = parseFloat(input.value);
   if (!date) return;
 
   // 即時更新該列稅額顯示（不等 GAS，先算給你看）
@@ -11935,12 +12014,14 @@ function fbTaxInputChange(input) {
   // Debounce 500ms 後才寫入 GAS（避免每按一鍵就送一次請求）
   clearTimeout(window._fbTaxTimer);
   window._fbTaxTimer = setTimeout(async () => {
+    const recs = DB.fbTax?.[date] || [];
+    const rec  = recId ? recs.find(r=>r.id===recId) : recs[0];
     if (isNaN(val) || val <= 0) {
-      if (DB.fbTax?.[date]) {
-        await fbTaxDelete(date);
-      }
+      if (rec?.id) await fbTaxDelete(date, rec.id);
+      else if (rec) { DB.fbTax[date] = recs.filter(r=>r!==rec); renderFbTax(); }
     } else {
-      await fbTaxSave(date, Math.round(val), '');
+      if (rec) rec.amount = Math.round(val);
+      await fbTaxSave(date, Math.round(val), rec?.note||'', rec?.id||undefined);
     }
     // 重算週小計
     renderFbTax();
