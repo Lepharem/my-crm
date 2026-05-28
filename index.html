@@ -2305,7 +2305,10 @@ function renderClientDashboard(){
                  ? `<button onclick="_clientConfirmTask('${r.id}','ok')" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ OK</button>
                     <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:6px 14px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✏️ 更動建議</button>`
                  : cs==='rejected'
-                 ? '<span style="font-size:11px;color:#991B1B;font-weight:600">✕ 已送出更動</span>'
+                 ? `<div>
+                      <div style="font-size:11px;color:#991B1B;font-weight:600;margin-bottom:4px">✕ 已送出更動，等待企劃調整</div>
+                      <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:4px 10px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:11px;cursor:pointer">✏️ 補充意見</button>
+                    </div>`
                  : '<span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>'
                }
              </div>
@@ -8356,11 +8359,12 @@ function renderSopOmPage(){
   const clientId = clientEl?.value;
   const el = document.getElementById('sop-om-content');
   if(!ym || !clientId){ el.innerHTML = '<div class="empty-state" style="padding:60px"><p>請選擇客戶與月份</p></div>'; return; }
-  // 切換客戶時，清除所有選線記憶（讓新客戶的合約重新出現選線卡）
+  // 切換客戶時，清除舊客戶的合約選線記憶（讓新客戶合約重新出現選線卡）
+  // 不清除新客戶本身的記憶（若已選過仍保持）
   if(window._sopLastClient && window._sopLastClient !== clientId){
-    window._sopUserChoseLine = {};
-    window._sopActiveContractId = window._sopActiveContractId || {};
-    delete window._sopActiveContractId[clientId];
+    // 找舊客戶的合約，清除其 _sopUserChoseLine
+    const oldContracts = (DB.contracts||[]).filter(c=>c.clientId===window._sopLastClient);
+    oldContracts.forEach(c=>{ delete window._sopUserChoseLine?.[c.id]; });
   }
   window._sopLastClient = clientId;
 
@@ -8580,13 +8584,13 @@ function renderSopFlow(clientId, contractId, ym, containerId){
               +rejectForm+historyHtml+'</div>';
           }).join('')
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
-        + (s2Records.length>0&&!s2Records.some(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus)
+        + (s2Records.length>0&&!s2Records.some(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
           ? '<button id="btn-s2-done" class="btn btn-primary" style="flex:1" onclick="document.getElementById(\'btn-s2-done\').style.display=\'none\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
           : '')
-        + (confirmed.length>0&&s2Records.some(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus)
+        + (confirmed.length>0&&s2Records.some(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
           ? '<button id="btn-s2-part" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById(\'btn-s2-part\').style.display=\'none\';_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
-        + (s2Records.length>0&&!confirmed.length&&s2Records.every(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus)
+        + (s2Records.length>0&&!confirmed.length&&s2Records.every(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
           ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="document.getElementById(\'btn-s2-force\').style.display=\'none\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >→ 略過客戶回覆，直接進行步驟3</button>'
           : '')
         + '</div>';
@@ -9233,17 +9237,20 @@ function _sopSubmitPlan(clientId, contractId, ym){
   if(!state.planItems.length){ toast('規格表尚無任務，請確認合約規格已設定'); return; }
   const ct = DB.contracts.find(c=>c.id===baseCtIdSP)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
-  // 防重複：查已有記錄的 specType+month 組合，避免同一規格重複送出
-  const existingKey = new Set(
-    (DB.omRecords||[])
-      .filter(r=>r.contractId===baseCtIdSP&&(r.month||'').slice(0,7)===ym&&r.sopLine==='A')
-      .map(r=>(r.sopPlanItemId||r.specType+'_'+r.taskName))
+  // 防重複：用 taskName+specType 比對（比 sopPlanItemId 更可靠）
+  const existingA = (DB.omRecords||[]).filter(
+    r=>r.contractId===baseCtIdSP&&(r.month||'').slice(0,7)===ym&&r.sopLine==='A'
   );
+  const existingKeys = new Set(existingA.map(r=>
+    (r.sopPlanItemId&&r.sopPlanItemId!=='')?r.sopPlanItemId:(r.taskName+'__'+r.specType)
+  ));
   let created = 0;
   state.planItems.forEach(row=>{
     if(!row.specType) return;
-    const rowKey = row.id || (row.specType+'_'+row.taskName);
-    if(existingKey.has(rowKey)) return; // 已有此筆，跳過
+    // 同時用 row.id 和 taskName+specType 比對，任一命中就跳過
+    const keyById = row.id||'';
+    const keyByName = (row.taskName||row.specType)+'__'+row.specType;
+    if((keyById && existingKeys.has(keyById)) || existingKeys.has(keyByName)) return;
     const id = genOmId(cl.name);
     const rec = {
       id, contractId:baseCtIdSP, clientId, clientName:cl.name||'',
@@ -11869,7 +11876,7 @@ function renderFbTax() {
                 value="" placeholder="0" ${isFuture?'disabled':''}
                 data-date="${d}" data-recid=""
                 oninput="fbTaxInputChange(this)">
-              <button onclick="fbTaxAddRec('${d}')" title="新增一筆"
+              <button onclick="fbTaxAddRec('${d}')" title="新增一筆" data-add-row="1"
                 style="padding:5px 8px;background:none;border:1px dashed var(--border2);color:var(--text3);border-radius:var(--r);cursor:pointer;font-size:12px;white-space:nowrap" ${isFuture?'disabled':''}>＋</button>
             </td>
             <td style="text-align:right;padding:9px 14px;font-size:13px;color:var(--text3)">—</td>
@@ -12013,15 +12020,58 @@ function renderFbTax() {
 function fbTaxAddRec(date) {
   if (!DB.fbTax) DB.fbTax = {};
   if (!DB.fbTax[date]) DB.fbTax[date] = [];
-  // 用臨時 id 避免多筆 id='' 互相干擾
   const tempId = '_tmp_' + Date.now();
-  DB.fbTax[date].push({ id: tempId, amount: 0, note: '' });
-  renderFbTax();
-  // 聚焦最新的 input（type=number 的最後一個）
-  setTimeout(() => {
-    const inputs = document.querySelectorAll(`input[type="number"][data-date="${date}"]`);
-    if (inputs.length) { inputs[inputs.length-1].focus(); inputs[inputs.length-1].value = ''; }
-  }, 80);
+  const newRec = { id: tempId, amount: 0, note: '' };
+  DB.fbTax[date].push(newRec);
+  // 只插入新 tr，不重繪整個表（避免清空其他格已填的值）
+  const tbody = document.querySelector(`tbody[data-date-tbody="${date}"]`);
+  if (tbody) {
+    const idx = DB.fbTax[date].length - 1;
+    const newTr = document.createElement('tr');
+    newTr.innerHTML = `<td style="padding:3px 12px;font-size:11px;color:var(--text3)"></td>
+      <td style="padding:3px 8px;display:flex;align-items:center;gap:6px">
+        <input type="number" min="0" step="1"
+          style="width:120px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:var(--font);text-align:right"
+          value="" placeholder="0"
+          data-date="${date}" data-recid="${tempId}"
+          oninput="fbTaxInputChange(this)">
+        <button onclick="fbTaxDeleteRec('${date}','${tempId}')" title="刪除此筆"
+          style="padding:4px 7px;background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:var(--r);cursor:pointer;font-size:12px">✕</button>
+      </td>
+      <td style="text-align:right;padding:3px 14px;font-size:13px;color:var(--text3)">—</td>
+      <td style="text-align:right;padding:3px 14px;font-size:13px;color:var(--text3)">—</td>`;
+    // 插在最後一個 ＋ 按鈕列之前（或直接 append）
+    const addBtnRow = tbody.querySelector('[data-add-row]');
+    if (addBtnRow) tbody.insertBefore(newTr, addBtnRow);
+    else tbody.appendChild(newTr);
+    newTr.querySelector('input[type="number"]').focus();
+  } else {
+    // 用最後一個同日期 input 的 tr 定位插入
+    const lastInput = [...document.querySelectorAll(`input[data-date="${date}"]`)].pop();
+    const lastTr = lastInput?.closest('tr');
+    if (lastTr && lastTr.parentNode) {
+      const newTr = document.createElement('tr');
+      newTr.innerHTML = `<td style="padding:3px 12px"></td>
+        <td style="padding:3px 8px;display:flex;align-items:center;gap:6px">
+          <input type="number" min="0" step="1"
+            style="width:120px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:var(--font);text-align:right"
+            value="" placeholder="0" data-date="${date}" data-recid="${tempId}"
+            oninput="fbTaxInputChange(this)">
+          <button onclick="fbTaxDeleteRec('${date}','${tempId}')" title="刪除"
+            style="padding:4px 7px;background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:var(--r);cursor:pointer;font-size:12px">✕</button>
+        </td>
+        <td style="text-align:right;padding:3px 14px;color:var(--text3)">—</td>
+        <td style="text-align:right;padding:3px 14px;color:var(--text3)">—</td>`;
+      lastTr.after(newTr);
+      newTr.querySelector('input[type="number"]').focus();
+    } else {
+      renderFbTax();
+      setTimeout(() => {
+        const inputs = document.querySelectorAll(`input[type="number"][data-date="${date}"]`);
+        if (inputs.length) inputs[inputs.length-1].focus();
+      }, 80);
+    }
+  }
 }
 async function fbTaxDeleteRec(date, recId) {
   if (!recId) { renderFbTax(); return; }
