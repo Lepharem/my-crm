@@ -1678,10 +1678,14 @@ async function handleCredential(response){
   // loadAllData 完成後，渲染首頁
   const finishLogin = () => {
     if(typeof window.myMember === 'undefined') window.myMember = null;
-    if(!window.myMember || !window.myMember.role){
-      // loadAllData 後 HR 模組的 D.members 已填入
-      const memberList = (typeof window.D !== 'undefined' ? window.D.members : null) || [];
-      window.myMember = memberList.find(m => m.email && m.email.toLowerCase() === email.toLowerCase()) || null;
+    // 永遠用 D.members 的完整資料覆蓋（確保 super_admin、active 等所有欄位都在）
+    const memberList = (typeof window.D !== 'undefined' ? window.D.members : null) || [];
+    const fullMember = memberList.find(m => m.email && m.email.toLowerCase() === email.toLowerCase());
+    if(fullMember){
+      // 若 myMember 已有（getMyRole 回傳的），合併完整欄位
+      window.myMember = { ...(window.myMember||{}), ...fullMember };
+    } else if(!window.myMember || !window.myMember.role){
+      window.myMember = null;
     }
     if(window.myMember && !_currentUser.hrRole){
       _currentUser.hrRole = window.myMember.role || 'employee';
@@ -1920,6 +1924,7 @@ async function submitWriterDraft(taskId){
         rec.status='文稿審核';
         rec.draftLink=link;
         rec.draftSubmittedAt=new Date().toISOString();
+        rec.writingDoneDate=new Date().toISOString().slice(0,10);
       }
       // 加入通知到 DB.notifications
       if(!DB.notifications) DB.notifications=[];
@@ -2612,7 +2617,8 @@ function _clientSubmitSuggestion(taskId){
   const note=document.getElementById('client-note-'+taskId)?.value.trim()||'';
   if(!note){ toast('請填寫更動建議'); return; }
   r.clientNote=note;
-  r.clientConfirmStatus='rejected';
+  r.clientFeedback=note;
+  r.clientFeedbackAt=new Date().toISOString();
   // 切角審核（文稿送審）退回 → 回到文稿審核讓企劃修改；切角規劃退回 → 待規劃
   r.status = (r.status==='切角審核') ? '文稿審核' : '待規劃';
   if(!r.reviewHistory) r.reviewHistory=[];
@@ -2868,7 +2874,21 @@ window.loadAllData = async function(){
 
     // om / social / ad（支援新舊 key）
     const omRaw = data.om_records || data.ops_om_records || [];
-    if(omRaw.length) DB.omRecords = omRaw.filter(r => r.id);
+    if(omRaw.length) DB.omRecords = omRaw.filter(r => r.id).map(r => {
+      // 反序列化 JSON 欄位
+      if(typeof r.reviewHistory === 'string' && r.reviewHistory){
+        try { r.reviewHistory = JSON.parse(r.reviewHistory); } catch(e){ r.reviewHistory = []; }
+      } else if(!Array.isArray(r.reviewHistory)){ r.reviewHistory = []; }
+      if(typeof r.screenshotLinks === 'string' && r.screenshotLinks){
+        try { r.screenshotLinks = JSON.parse(r.screenshotLinks); } catch(e){ r.screenshotLinks = []; }
+      } else if(!Array.isArray(r.screenshotLinks)){ r.screenshotLinks = []; }
+      // GAS 欄位對應：clientFeedback → clientNote（若 clientNote 為空才用）
+      if(r.clientFeedback && !r.clientNote) r.clientNote = r.clientFeedback;
+      // GAS 欄位對應：qty → replyCount
+      if(r.qty && !r.replyCount) r.replyCount = r.qty;
+      // GAS 欄位對應：writingDoneDate（已有）
+      return r;
+    });
     const soRaw = data.social_records || data.ops_social_records || [];
     if(soRaw.length) DB.socialRecords = soRaw.filter(r => r.id);
     else if(!DB.socialRecords) DB.socialRecords = [];
@@ -3116,6 +3136,13 @@ function updateSpecDoneCount(specId){
 
 // ── 同步函式（給前端各處呼叫）──
 window.syncToGAS = async function(collection, obj){
+  // 序列化需要 JSON 存儲的欄位（GAS 試算表只能存字串）
+  if(collection === 'omRecords' && obj){
+    const payload = {...obj};
+    if(Array.isArray(payload.reviewHistory)) payload.reviewHistory = JSON.stringify(payload.reviewHistory);
+    if(Array.isArray(payload.screenshotLinks)) payload.screenshotLinks = JSON.stringify(payload.screenshotLinks);
+    obj = payload;
+  }
   const actionMap = {
     clients: 'saveClient',
     contracts: 'saveContract',
@@ -8259,12 +8286,52 @@ function getSopState(clientId, ym, contractId){
   if(!DB.sopState) DB.sopState = {};
   if(!DB.sopState[clientId]) DB.sopState[clientId] = {};
   if(!DB.sopState[clientId][ym]) DB.sopState[clientId][ym] = {};
-  // 用 contractId 作為 key，讓同一客戶同一月份可同時有多條獨立流程（A線+多條B線）
   const ctKey = contractId || '__unknown__';
-  if(!DB.sopState[clientId][ym][ctKey]) DB.sopState[clientId][ym][ctKey] = { line:null, step:0, clientConfirmed:false, planItems:[], contractId: ctKey };
-  // 確保 contractId 有存
+  if(!DB.sopState[clientId][ym][ctKey]){
+    // 嘗試從 localStorage 恢復草稿
+    const draftKey = 'sopDraft_'+clientId+'_'+ym+'_'+ctKey;
+    let restored = null;
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if(saved) restored = JSON.parse(saved);
+    } catch(e){}
+    if(!restored){
+      // 從 DB.omRecords 反推 step 和 line
+      const existRecs = (DB.omRecords||[]).filter(r=>
+        r.contractId===(ctKey.includes('::')?ctKey.split('::')[0]:ctKey) &&
+        (r.month||'').slice(0,7)===ym &&
+        (ctKey.includes('::A') ? r.sopLine==='A'||!r.sopLine :
+         ctKey.includes('::B') ? r.sopLine==='B' : true)
+      );
+      if(existRecs.length){
+        const statuses = existRecs.map(r=>r.status);
+        const hasVendor = statuses.some(s=>['待上刊','待確認','已上刊','觀察中','完成'].includes(s));
+        const hasReview = statuses.some(s=>['文稿審核','切角審核','待派帳號商'].includes(s));
+        const hasWriter = statuses.some(s=>s==='撰文中');
+        const hasPlan   = statuses.some(s=>['待規劃','切角確認'].includes(s));
+        const sopLine   = ctKey.includes('::B') ? 'B' : (existRecs[0]?.sopLine||'A');
+        const inferStep = hasVendor ? (sopLine==='A'?5:3) : hasReview ? (sopLine==='A'?4:2) : hasWriter ? (sopLine==='A'?3:2) : hasPlan ? 2 : 1;
+        restored = { line:sopLine, step:inferStep, clientConfirmed:false, planItems:[], contractId:ctKey };
+      }
+    }
+    DB.sopState[clientId][ym][ctKey] = restored || { line:null, step:0, clientConfirmed:false, planItems:[], contractId: ctKey };
+  }
   if(contractId) DB.sopState[clientId][ym][ctKey].contractId = contractId;
   return DB.sopState[clientId][ym][ctKey];
+}
+
+// 儲存草稿到 localStorage（在規劃表渲染後呼叫）
+function _saveSopDraft(clientId, ym, lineKey){
+  try {
+    const state = DB.sopState?.[clientId]?.[ym]?.[lineKey];
+    if(!state) return;
+    localStorage.setItem('sopDraft_'+clientId+'_'+ym+'_'+lineKey, JSON.stringify(state));
+  } catch(e){}
+}
+
+// 清除草稿（送出後呼叫）
+function _clearSopDraft(clientId, ym, lineKey){
+  try { localStorage.removeItem('sopDraft_'+clientId+'_'+ym+'_'+lineKey); } catch(e){}
 }
 
 function renderSopOmPage(){
@@ -8448,9 +8515,11 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   } else if(state.line === 'A' && state.step === 1){
     // A 線步驟1：顯示專案規劃表
     s1Content = _renderSopPlanTable(clientId, lineKey, ym, specsOpen, thisMonthOm, state);
+    _saveSopDraft(clientId, ym, lineKey); // 自動存草稿
   } else if(state.line === 'B' && state.step === 1){
     // B 線步驟1：直接選規格+寫手
     s1Content = _renderSopDirectForm(clientId, lineKey, ym, specs, state);
+    _saveSopDraft(clientId, ym, lineKey); // 自動存草稿
   } else {
     // 已完成步驟1：摘要
     s1Content = `<div style="font-size:12px;color:#166534">✓ 已選擇 ${state.line==='A'?'A 線（規劃）':'B 線（直發）'}，本月共 ${totalCount} 筆任務</div>`;
@@ -9170,6 +9239,7 @@ function _sopSubmitPlan(clientId, contractId, ym){
     created++;
   });
   state.step = 2;
+  _clearSopDraft(clientId, ym, contractId); // 送出後清除草稿
   toast(`✓ 已建立 ${created} 筆任務，等待客戶確認`,'success');
   // 儀錶板通知
   if(!DB.notifications) DB.notifications=[];
@@ -9224,6 +9294,7 @@ function _sopSubmitDirect(clientId, contractId, ym){
   });
   // 推進至步驟2（等待寫手）
   state.step = 2;
+  _clearSopDraft(clientId, ym, contractId); // 送出後清除草稿
   toast(`✓ 已建立 ${created} 筆任務，通知寫手中`,'success');
   if(!DB.notifications) DB.notifications=[];
   DB.notifications.push({ id:'SOP_B_'+Date.now(), type:'writersWorking', clientId, contractId, ym, msg:`${cl.name} ${ym} 寫手撰文中（${created} 筆）`, created:new Date().toISOString(), done:false });
@@ -9237,6 +9308,9 @@ function _sopClientConfirm(taskId, status){
   r.clientConfirmStatus = status;
   if(status==='confirmed'){
     r.status = '切角確認';
+    r.cutAngleDate = new Date().toISOString().slice(0,10); // 切角確認日期
+    r.confirmedAt = new Date().toISOString();
+    r.confirmedBy = 'client';
     // 加修正歷程（不清除，做為來回紀錄）
     if(!r.reviewHistory) r.reviewHistory=[];
     r.reviewHistory.push({action:'confirmed',by:'client',at:new Date().toISOString(),note:r.clientNote||''});
@@ -9323,6 +9397,7 @@ function _sopAssignWriter(taskId){
   const r=(DB.omRecords||[]).find(x=>x.id===taskId); if(!r) return;
   const fl=DB.freelancers.find(f=>f.id===writerId);
   r.writerId=writerId; r.writerName=fl?.name||''; r.status='撰文中';
+  r.assignDate = new Date().toISOString().slice(0,10); // 派發日期
   // 讀取個別欄位
   const platform=document.getElementById('sw-platform-'+taskId)?.value; if(platform) r.platform=platform;
   const section=document.getElementById('sw-section-'+taskId)?.value; if(section) r.section=section;
@@ -9348,6 +9423,7 @@ function _sopBatchAssignWriter(specType, clientId, contractId, ym){
   if(!targets.length){ toast('此規格無待指派任務'); return; }
   targets.forEach(r=>{
     r.writerId=writerId; r.writerName=fl?.name||''; r.status='撰文中';
+    r.assignDate = new Date().toISOString().slice(0,10);
     if(platform) r.platform=platform;
     if(section)  r.section=section;
     syncToGAS('omRecords',r).catch(()=>{});
