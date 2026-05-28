@@ -8405,30 +8405,17 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     el.innerHTML = '<div class="empty-state" style="padding:60px"><p style="color:var(--red)">找不到合約，請重新選擇客戶</p></div>';
     return;
   }
-  // ── A/B 線 key：同合約可並存 A、B 兩條獨立流程 ──
+  // ── A/B 線 key：只有 contractId 明確帶 ::A 或 ::B 才設線 ──
+  // 切換客戶/合約 tab 時一律顯示選線卡，用戶明確點擊才算開始
   if(!window._sopActiveLine) window._sopActiveLine = {};
-  // 若 contractId 帶有 ::A 或 ::B 後綴，代表從子 tab 點選
   let activeLine = null;
   let baseCtId = contractId;
   if(contractId.includes('::A')){ activeLine='A'; baseCtId=contractId.replace('::A',''); }
   else if(contractId.includes('::B')){ activeLine='B'; baseCtId=contractId.replace('::B',''); }
+  // 明確點選才記住，其餘情況不讀記憶（確保每次切換合約都顯示選線卡）
   if(activeLine) window._sopActiveLine[baseCtId] = activeLine;
-  // 若 activeLine 為 null，判斷是否有既有進度
-  if(!activeLine){
-    // 1. 優先用 _sopActiveLine 記憶（本次 session 用戶已選過）
-    if(window._sopActiveLine[baseCtId]){
-      activeLine = window._sopActiveLine[baseCtId];
-    } else {
-      // 2. 查 DB.omRecords 是否有此合約本月的記錄（真正有資料才自動帶入）
-      const existOmA = (DB.omRecords||[]).some(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym&&r.sopLine==='A');
-      const existOmB = (DB.omRecords||[]).some(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym&&r.sopLine==='B');
-      if(existOmA){ activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
-      else if(existOmB){ activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
-      // 3. 若完全沒有記錄 → activeLine 保持 null → 顯示選線卡
-    }
-  }
-  // lineKey 和 state 在 activeLine 確定後才計算
-  const lineKey = baseCtId + '::' + (activeLine || (window._sopActiveLine[baseCtId]||'none'));
+  // lineKey：activeLine 有值用它，否則 'none'（顯示選線卡，不讀記憶）
+  const lineKey = baseCtId + '::' + (activeLine || 'none');
   // 重新指向 lineKey，確保所有 ${contractId} 插值都用正確的 lineKey
   contractId = lineKey;
   let state = getSopState(clientId, ym, lineKey);
@@ -8842,17 +8829,24 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     stepsHtml += stepCard(3, '指派帳號商', svStatus, svContent, true);
   } else {
     // 尚未選線：顯示選線提示卡
-    stepsHtml = `<div style="background:#f8f7f5;border:2px dashed var(--border);border-radius:var(--r2);padding:28px 24px;text-align:center">
-      <div style="font-size:15px;font-weight:700;color:#1a1917;margin-bottom:6px">請選擇本月作業模式</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:20px">點選上方 A 線或 B 線 tab 開始，選擇後不可中途切換</div>
-      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-        <button onclick="renderSopFlow('${clientId}','${baseCtId}::A','${ym}','${containerId}')"
-          style="padding:12px 28px;background:#eff6ff;border:2px solid #93c5fd;border-radius:var(--r2);cursor:pointer;font-size:14px;font-weight:600;color:#1D4ED8">
-          📋 A 線（規劃）<br><span style="font-size:11px;font-weight:400;color:#1D4ED8;opacity:.8">先送客戶確認切角，再指派寫手</span>
+    // 查 DB.omRecords 提示哪條線有現有記錄
+    const _hasA = (DB.omRecords||[]).some(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym&&r.sopLine==='A');
+    const _hasB = (DB.omRecords||[]).some(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym&&r.sopLine==='B');
+    stepsHtml = `<div style="background:#f8f7f5;border:2px dashed var(--border);border-radius:var(--r2);padding:32px 24px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#1a1917;margin-bottom:6px">請選擇本月作業線</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:24px">${ct.contractNo||ct.name} ／ ${ym}</div>
+      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+        <button onclick="renderSopFlow('${clientId}','${baseCtId}::A','${ym}','${containerId||_sopGetContainerId()}')"
+          style="padding:16px 32px;background:#eff6ff;border:2px solid ${_hasA?'#1D4ED8':'#93c5fd'};border-radius:var(--r2);cursor:pointer;text-align:left;min-width:200px">
+          <div style="font-size:15px;font-weight:700;color:#1D4ED8">📋 A 線（規劃）</div>
+          <div style="font-size:11px;color:#1D4ED8;opacity:.8;margin-top:4px">先送客戶確認切角，再指派寫手</div>
+          ${_hasA?'<div style="margin-top:8px;font-size:11px;background:#1D4ED8;color:#fff;border-radius:4px;padding:2px 8px;display:inline-block">本月已有記錄</div>':''}
         </button>
-        <button onclick="renderSopFlow('${clientId}','${baseCtId}::B','${ym}','${containerId}')"
-          style="padding:12px 28px;background:#f0fdf4;border:2px solid #86efac;border-radius:var(--r2);cursor:pointer;font-size:14px;font-weight:600;color:#166534">
-          ⚡ B 線（直發）<br><span style="font-size:11px;font-weight:400;color:#166534;opacity:.8">直接指派寫手，快速執行</span>
+        <button onclick="renderSopFlow('${clientId}','${baseCtId}::B','${ym}','${containerId||_sopGetContainerId()}')"
+          style="padding:16px 32px;background:#f0fdf4;border:2px solid ${_hasB?'#0f6e56':'#86efac'};border-radius:var(--r2);cursor:pointer;text-align:left;min-width:200px">
+          <div style="font-size:15px;font-weight:700;color:#166534">⚡ B 線（直發）</div>
+          <div style="font-size:11px;color:#166534;opacity:.8;margin-top:4px">直接指派寫手，快速執行</div>
+          ${_hasB?'<div style="margin-top:8px;font-size:11px;background:#0f6e56;color:#fff;border-radius:4px;padding:2px 8px;display:inline-block">本月已有記錄</div>':''}
         </button>
       </div>
     </div>`;
@@ -11997,14 +11991,15 @@ function renderFbTax() {
 function fbTaxAddRec(date) {
   if (!DB.fbTax) DB.fbTax = {};
   if (!DB.fbTax[date]) DB.fbTax[date] = [];
-  // 新增一筆空白記錄（id 暫為空，save 後填入）
-  DB.fbTax[date].push({ id: '', amount: 0, note: '' });
+  // 用臨時 id 避免多筆 id='' 互相干擾
+  const tempId = '_tmp_' + Date.now();
+  DB.fbTax[date].push({ id: tempId, amount: 0, note: '' });
   renderFbTax();
-  // 聚焦最新的 input
+  // 聚焦最新的 input（type=number 的最後一個）
   setTimeout(() => {
-    const inputs = document.querySelectorAll(`input[data-date="${date}"]`);
-    if (inputs.length) inputs[inputs.length-1].focus();
-  }, 100);
+    const inputs = document.querySelectorAll(`input[type="number"][data-date="${date}"]`);
+    if (inputs.length) { inputs[inputs.length-1].focus(); inputs[inputs.length-1].value = ''; }
+  }, 80);
 }
 async function fbTaxDeleteRec(date, recId) {
   await fbTaxDelete(date, recId || undefined);
@@ -12040,13 +12035,31 @@ function fbTaxInputChange(input) {
   clearTimeout(window._fbTaxTimer);
   window._fbTaxTimer = setTimeout(async () => {
     const recs = DB.fbTax?.[date] || [];
-    const rec  = recId ? recs.find(r=>r.id===recId) : recs[0];
+    // recId 可能是真實 GAS id 或 _tmp_xxx 臨時 id
+    const rec = recs.find(r=>r.id===recId) || (recs.length===1?recs[0]:null);
+    if (!rec) return;
     if (isNaN(val) || val <= 0) {
-      if (rec?.id) await fbTaxDelete(date, rec.id);
-      else if (rec) { DB.fbTax[date] = recs.filter(r=>r!==rec); renderFbTax(); }
+      // 清空：若是臨時 id，直接從陣列移除；若是真實 id，呼叫 GAS 刪除
+      if (rec.id && !rec.id.startsWith('_tmp_')) {
+        await fbTaxDelete(date, rec.id);
+      } else {
+        DB.fbTax[date] = recs.filter(r=>r!==rec);
+        if (!DB.fbTax[date].length) delete DB.fbTax[date];
+        renderFbTax();
+      }
     } else {
-      if (rec) rec.amount = Math.round(val);
-      await fbTaxSave(date, Math.round(val), rec?.note||'', rec?.id||undefined);
+      rec.amount = Math.round(val);
+      // 若是臨時 id，save 後會拿到真實 id，更新 rec.id
+      if (rec.id && !rec.id.startsWith('_tmp_')) {
+        await fbTaxSave(date, Math.round(val), rec.note||'', rec.id);
+      } else {
+        // 新筆：save 後更新 id
+        if(!DB.fbTax[date]) DB.fbTax[date]=[];
+        const idx = DB.fbTax[date].indexOf(rec);
+        await fbTaxSave(date, Math.round(val), rec.note||'', undefined);
+        // fbTaxSave 已 push 新記錄，移除臨時的
+        DB.fbTax[date].splice(idx, 1);
+      }
     }
     // 重算週小計
     renderFbTax();
