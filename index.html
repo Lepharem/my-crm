@@ -8390,10 +8390,11 @@ function renderSopOmPage(){
 
   el.innerHTML = `<div style="border-bottom:1px solid var(--border);display:flex;gap:0;overflow-x:auto;background:#fff;sticky:top 0" id="sop-contract-tabs">${tabsHtml}</div>
     <div id="sop-contract-body"></div>`;
-  // 傳帶線別後綴的 key，確保渲染正確的 A/B 線（不被偵測邏輯覆蓋）
-  const activeLine4Page = window._sopActiveLine?.[activeCtId];
-  const contractId4Page = activeLine4Page ? activeCtId+'::'+activeLine4Page : activeCtId;
-  renderSopFlow(clientId, contractId4Page, ym, 'sop-contract-body');
+  // 切換合約 tab 時，一律傳 baseCtId（無後綴），讓 renderSopFlow 自行判斷：
+  // - 若 DB.omRecords 有此合約本月的記錄 → 自動帶入對應線
+  // - 若完全沒有記錄 → 顯示選線卡（用戶選擇 A 或 B）
+  // - 若 _sopActiveLine 有記憶（用戶本次 session 選過）→ 帶入記憶
+  renderSopFlow(clientId, activeCtId, ym, 'sop-contract-body');
 }
 
 // ── 主流程渲染 ──
@@ -8412,19 +8413,18 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   if(contractId.includes('::A')){ activeLine='A'; baseCtId=contractId.replace('::A',''); }
   else if(contractId.includes('::B')){ activeLine='B'; baseCtId=contractId.replace('::B',''); }
   if(activeLine) window._sopActiveLine[baseCtId] = activeLine;
-  // 若 activeLine 為 null，先查 _sopActiveLine 記憶，再從 DB.sopState 推斷
+  // 若 activeLine 為 null，判斷是否有既有進度
   if(!activeLine){
-    // 優先使用 _sopActiveLine 的記憶（用戶上次選的線）
+    // 1. 優先用 _sopActiveLine 記憶（本次 session 用戶已選過）
     if(window._sopActiveLine[baseCtId]){
       activeLine = window._sopActiveLine[baseCtId];
     } else {
-      // 否則從 DB.sopState 直接查（不呼叫 getSopState 以免建立空 state）
-      const ymStates = DB.sopState?.[clientId]?.[ym] || {};
-      const stA = ymStates[baseCtId+'::A'];
-      const stB = ymStates[baseCtId+'::B'];
-      if(stA && (stA.step > 0 || stA.line==='A')) { activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
-      else if(stB && (stB.step > 0 || stB.line==='B')) { activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
-      // 若兩邊都沒有，維持 null（顯示選線卡）
+      // 2. 查 DB.omRecords 是否有此合約本月的記錄（真正有資料才自動帶入）
+      const existOmA = (DB.omRecords||[]).some(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym&&r.sopLine==='A');
+      const existOmB = (DB.omRecords||[]).some(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym&&r.sopLine==='B');
+      if(existOmA){ activeLine='A'; window._sopActiveLine[baseCtId]='A'; }
+      else if(existOmB){ activeLine='B'; window._sopActiveLine[baseCtId]='B'; }
+      // 3. 若完全沒有記錄 → activeLine 保持 null → 顯示選線卡
     }
   }
   // lineKey 和 state 在 activeLine 確定後才計算
@@ -8841,7 +8841,21 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     stepsHtml += stepCard(2, '文稿審核', srStatus, srContent);
     stepsHtml += stepCard(3, '指派帳號商', svStatus, svContent, true);
   } else {
-    // 尚未選線，只顯示步驟1
+    // 尚未選線：顯示選線提示卡
+    stepsHtml = `<div style="background:#f8f7f5;border:2px dashed var(--border);border-radius:var(--r2);padding:28px 24px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#1a1917;margin-bottom:6px">請選擇本月作業模式</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:20px">點選上方 A 線或 B 線 tab 開始，選擇後不可中途切換</div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <button onclick="renderSopFlow('${clientId}','${baseCtId}::A','${ym}','${containerId}')"
+          style="padding:12px 28px;background:#eff6ff;border:2px solid #93c5fd;border-radius:var(--r2);cursor:pointer;font-size:14px;font-weight:600;color:#1D4ED8">
+          📋 A 線（規劃）<br><span style="font-size:11px;font-weight:400;color:#1D4ED8;opacity:.8">先送客戶確認切角，再指派寫手</span>
+        </button>
+        <button onclick="renderSopFlow('${clientId}','${baseCtId}::B','${ym}','${containerId}')"
+          style="padding:12px 28px;background:#f0fdf4;border:2px solid #86efac;border-radius:var(--r2);cursor:pointer;font-size:14px;font-weight:600;color:#166534">
+          ⚡ B 線（直發）<br><span style="font-size:11px;font-weight:400;color:#166534;opacity:.8">直接指派寫手，快速執行</span>
+        </button>
+      </div>
+    </div>`;
   }
 
   // ── A/B 線子 tab ──
@@ -11726,10 +11740,12 @@ async function fbTaxMigrateFromLocal() {
 
 // ── 日期工具 ──
 function fbTaxDateStr(d) {
-  return d.toISOString().slice(0, 10);
+  // 用本地時間避免 UTC 偏移造成日期差一天（台灣 UTC+8）
+  const pad = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 }
 function fbTaxAddDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(dateStr + 'T12:00:00'); // 用正午避免 DST 問題
   d.setDate(d.getDate() + n);
   return fbTaxDateStr(d);
 }
@@ -11823,42 +11839,51 @@ function renderFbTax() {
       const dayTax   = dayTotal > 0 ? Math.round(dayTotal * FB_TAX_RATE) : 0;
       const isToday  = d === todayStr;
       const isFuture = d > todayStr;
-      const bgStyle  = isToday ? 'background:#fffbeb;' : '';
-      // 每筆記錄一列
-      const recRows = recs.map((rec,idx) => `
-        <tr style="${bgStyle}">
-          <td style="padding:3px 12px;font-size:11px;color:var(--text3)">${idx===0?fbTaxDisplayDate(d)+(isToday?' <span style="font-size:10px;background:var(--accent);color:#fff;border-radius:3px;padding:1px 5px">今天</span>':''):''}</td>
-          <td style="padding:3px 8px;display:flex;align-items:center;gap:6px">
-            <input type="number" min="0" step="1"
-              style="width:110px;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:var(--font);text-align:right"
-              value="${rec.amount||''}" placeholder="0"
-              data-date="${d}" data-recid="${rec.id||''}"
-              oninput="fbTaxInputChange(this)"
-            >
-            <input type="text" placeholder="備註" value="${rec.note||''}"
-              style="width:90px;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px"
-              data-date="${d}" data-recid="${rec.id||''}"
-              onchange="fbTaxNoteChange(this)"
-            >
-            <button onclick="fbTaxDeleteRec('${d}','${rec.id||''}')" title="刪除此筆"
-              style="padding:3px 7px;background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:var(--r);cursor:pointer;font-size:12px">✕</button>
-          </td>
-          <td style="text-align:right;padding:3px 14px;font-size:12px;color:var(--amber)">${rec.amount>0?fbTaxFmt(Math.round(Number(rec.amount)*FB_TAX_RATE)):'—'}</td>
-          <td style="text-align:right;padding:3px 14px;font-size:12px;color:var(--text2)">${rec.amount>0?fbTaxFmt(Number(rec.amount)):'—'}</td>
-        </tr>`).join('');
-      // 新增按鈕列
-      const addBtn = isFuture ? '' : `
-        <tr style="${bgStyle}">
-          <td style="padding:3px 12px">${recs.length===0?`<span style="font-size:13px;color:var(--text3)">${fbTaxDisplayDate(d)}${isToday?' <span style="font-size:10px;background:var(--accent);color:#fff;border-radius:3px;padding:1px 5px">今天</span>':''}</span>`:''}${recs.length===0?'':''}</td>
-          <td style="padding:3px 8px">
-            <button onclick="fbTaxAddRec('${d}')"
-              style="padding:4px 10px;background:none;border:1px dashed var(--border2);color:var(--text3);border-radius:var(--r);cursor:pointer;font-size:12px">＋ 新增一筆</button>
-          </td>
-          <td colspan="2" style="text-align:right;padding:3px 14px;font-size:12px;color:var(--text2)">
-            ${recs.length>1?`小計 ${fbTaxFmt(dayTax)}`:''}
-          </td>
-        </tr>`;
-      return recRows + addBtn;
+      const bg = isToday ? 'background:#fffbeb;' : '';
+      const dateLabel = fbTaxDisplayDate(d) + (isToday ? ' <span style="font-size:10px;background:var(--accent);color:#fff;border-radius:3px;padding:1px 5px;vertical-align:middle">今天</span>' : '');
+
+      // 若無記錄：顯示一個空白 input（預設可直接填）
+      // 若有記錄：顯示所有筆，最後一格有「+ 新增」按鈕
+      const inputRows = recs.length === 0
+        ? [`<tr style="${bg}${isFuture?'opacity:.45;':''}">
+            <td style="font-size:13px;white-space:nowrap;padding:9px 12px;${isToday?'font-weight:600;color:var(--accent)':''}">${dateLabel}</td>
+            <td style="padding:6px 8px;display:flex;align-items:center;gap:6px">
+              <input type="number" min="0" step="1"
+                style="width:120px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:var(--font);text-align:right;background:${isFuture?'var(--surface2)':'var(--surface)'}"
+                value="" placeholder="0" ${isFuture?'disabled':''}
+                data-date="${d}" data-recid=""
+                oninput="fbTaxInputChange(this)">
+              <button onclick="fbTaxAddRec('${d}')" title="新增一筆"
+                style="padding:5px 8px;background:none;border:1px dashed var(--border2);color:var(--text3);border-radius:var(--r);cursor:pointer;font-size:12px;white-space:nowrap" ${isFuture?'disabled':''}>＋</button>
+            </td>
+            <td style="text-align:right;padding:9px 14px;font-size:13px;color:var(--text3)">—</td>
+            <td style="text-align:right;padding:9px 14px;font-size:13px;color:var(--text3)">—</td>
+          </tr>`]
+        : recs.map((rec,idx) => `<tr style="${bg}">
+            <td style="font-size:13px;white-space:nowrap;padding:${idx===0?'9px':'3px'} 12px;${isToday&&idx===0?'font-weight:600;color:var(--accent)':''}">${idx===0?dateLabel:''}</td>
+            <td style="padding:${idx===0?'6px':'3px'} 8px;display:flex;align-items:center;gap:6px">
+              <input type="number" min="0" step="1"
+                style="width:120px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:var(--font);text-align:right"
+                value="${rec.amount||''}" placeholder="0"
+                data-date="${d}" data-recid="${rec.id||''}"
+                oninput="fbTaxInputChange(this)">
+              <input type="text" placeholder="備註" value="${rec.note||''}"
+                style="width:80px;padding:6px 8px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px"
+                data-date="${d}" data-recid="${rec.id||''}"
+                onchange="fbTaxNoteChange(this)">
+              ${recs.length>1?`<button onclick="fbTaxDeleteRec('${d}','${rec.id||''}')" title="刪除此筆" style="padding:4px 7px;background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:var(--r);cursor:pointer;font-size:12px">✕</button>`:''}
+              ${idx===recs.length-1?`<button onclick="fbTaxAddRec('${d}')" title="新增一筆" style="padding:5px 8px;background:none;border:1px dashed var(--border2);color:var(--text3);border-radius:var(--r);cursor:pointer;font-size:12px;white-space:nowrap">＋</button>`:''}
+            </td>
+            <td style="text-align:right;padding:${idx===0?'9px':'3px'} 14px;font-size:13px;font-variant-numeric:tabular-nums;color:${rec.amount>0?'var(--amber)':'var(--text3)'}">${rec.amount>0?fbTaxFmt(Math.round(Number(rec.amount)*FB_TAX_RATE)):'—'}</td>
+            <td style="text-align:right;padding:${idx===0?'9px':'3px'} 14px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--text2)">${rec.amount>0?fbTaxFmt(Number(rec.amount)):'—'}</td>
+          </tr>`);
+      // 若多筆，最後補一列小計
+      if(recs.length>1) inputRows.push(`<tr style="${bg};border-top:1px dashed var(--border)">
+        <td></td><td style="padding:3px 8px;font-size:11px;color:var(--text3)">本日小計</td>
+        <td style="text-align:right;padding:3px 14px;font-size:12px;font-weight:600;color:var(--amber)">${fbTaxFmt(dayTax)}</td>
+        <td style="text-align:right;padding:3px 14px;font-size:12px;font-weight:600">${fbTaxFmt(dayTotal)}</td>
+      </tr>`);
+      return inputRows.join('');
     }).join('');
 
     return `<div class="card" style="margin-bottom:16px">
