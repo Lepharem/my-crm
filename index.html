@@ -11712,12 +11712,23 @@ function fbTaxAddDays(dateStr, n) {
   return fbTaxDateStr(d);
 }
 function fbTaxWeekStart(dateStr) {
-  // 週一為第一天
+  // FB結算週：週二開始，週一結束（週四結算上一個完整區間）
+  // ex: 5/28(Thu) → 結算 5/19(Tue)~5/25(Mon)
   const d = new Date(dateStr + 'T00:00:00');
-  const day = d.getDay(); // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return fbTaxDateStr(d);
+  const dow = d.getDay(); // 0=Sun,1=Mon,2=Tue,...
+  // JS getDay: 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+  // 距「本區間週二」的天數：Tue=0, Wed=1, Thu=2, Fri=3, Sat=4, Sun=5, Mon=6
+  const daysSinceTue = dow === 0 ? 5 : dow === 1 ? 6 : dow - 2;
+  const thisWeekTue = new Date(d);
+  thisWeekTue.setDate(d.getDate() - daysSinceTue);
+  // 上一個完整區間的週二（再往前7天）
+  const prevWeekTue = new Date(thisWeekTue);
+  prevWeekTue.setDate(thisWeekTue.getDate() - 7);
+  return fbTaxDateStr(prevWeekTue);
+}
+// FB結算週：週區間為週二~週一（共7天）
+function fbTaxWeekEnd(weekStartStr) {
+  return fbTaxAddDays(weekStartStr, 6); // 週二+6 = 週一
 }
 function fbTaxFmt(n) {
   if (!n && n !== 0) return '—';
@@ -11758,17 +11769,17 @@ function renderFbTax() {
   try { oldLocal = JSON.parse(localStorage.getItem(FB_TAX_LS_KEY) || '{}'); } catch(e) {}
   const hasOld = Object.values(oldLocal).some(v => v > 0);
 
-  // 本週 + 上週 各7天
+  // 結算週（週二~週一）+ 上一結算週
   const weeks = [
-    { label: '上週', start: fbTaxAddDays(_fbTaxViewWeek, -7) },
-    { label: '本週', start: _fbTaxViewWeek },
+    { label: '上一結算週', start: fbTaxAddDays(_fbTaxViewWeek, -7) },
+    { label: '本結算週', start: _fbTaxViewWeek },
   ];
 
   const weekHTMLs = weeks.map(({ label, start }) => {
     const days = Array.from({ length: 7 }, (_, i) => fbTaxAddDays(start, i));
     const weekTotal = days.reduce((s, d) => s + (Number(data[d]?.amount) || 0), 0);
     const weekTax   = Math.round(weekTotal * FB_TAX_RATE);
-    const endDate   = days[6];
+    const endDate   = days[6]; // 週一
 
     const dayRows = days.map(d => {
       const rec    = data[d];
@@ -11802,7 +11813,7 @@ function renderFbTax() {
     return `<div class="card" style="margin-bottom:16px">
       <div class="card-header">
         <div>
-          <div class="card-title">${label}　<span style="font-weight:400;font-size:12px;color:var(--text3)">${start} ～ ${endDate}</span></div>
+          <div class="card-title">${label}　<span style="font-weight:400;font-size:12px;color:var(--text3)">${start}（週二）～ ${endDate}（週一）</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:16px">
           <div style="text-align:right">
@@ -11866,7 +11877,7 @@ function renderFbTax() {
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
       <button class="btn btn-sm" onclick="fbTaxChangeWeek(-1)">‹ 上一週</button>
       <span style="font-size:13px;color:var(--text3);min-width:180px;text-align:center">
-        ${_fbTaxViewWeek} ～ ${fbTaxAddDays(_fbTaxViewWeek, 6)}
+        ${_fbTaxViewWeek}（週二）～ ${fbTaxAddDays(_fbTaxViewWeek, 6)}（週一）
       </span>
       <button class="btn btn-sm" onclick="fbTaxChangeWeek(1)">下一週 ›</button>
     </div>
