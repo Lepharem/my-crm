@@ -2651,11 +2651,7 @@ function _clientSubmitSuggestion(taskId){
   // 也嘗試隱藏 client-suggest-wrap
   const wrap=document.getElementById('client-suggest-wrap-'+taskId);
   if(wrap) wrap.style.display='none';
-  // 刷新 SOP 頁（用 record 資料）
-  const sopEl=document.getElementById('page-sop-om');
-  if(sopEl&&sopEl.classList.contains('active')){
-    setTimeout(()=>_sopRefreshFromRecord(r), 150);
-  }
+  // 不在客戶頁觸發 SOP 頁重渲染（兩個不同的頁面，避免干擾）
 }
 function _clientSaveNote(taskId, note){
   const r = (DB.omRecords||[]).find(x=>x.id===taskId);
@@ -8855,10 +8851,11 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     </div>`;
   }
 
-  // ── A/B 線子 tab ──
-  const currentLine = window._sopActiveLine?.[baseCtId];
-  const stateA = getSopState(clientId, ym, baseCtId+'::A');
-  const stateB = getSopState(clientId, ym, baseCtId+'::B');
+  // ── A/B 線子 tab（直接查 DB.sopState 不呼叫 getSopState，避免建空 state 和重填 planItems）──
+  const currentLine = window._sopUserChoseLine?.[baseCtId] || window._sopActiveLine?.[baseCtId];
+  const _ymStates = DB.sopState?.[clientId]?.[ym] || {};
+  const stateA = _ymStates[baseCtId+'::A'] || {};
+  const stateB = _ymStates[baseCtId+'::B'] || {};
   const hasA = stateA.step > 0 || stateA.line==='A';
   const hasB = stateB.step > 0 || stateB.line==='B';
   const _aActive = currentLine==='A', _bActive = currentLine==='B';
@@ -8866,8 +8863,8 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   const _bStep = stateB.step>0?'<span style="font-size:10px;color:#0f6e56;margin-left:4px">步驟'+stateB.step+'</span>':'';
   const _ac = 'padding:9px 20px;cursor:pointer;font-size:12px;font-weight:600;border-bottom:2px solid ';
   const lineTabHtml = '<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;background:#fff;">'
-    + '<div onclick="renderSopFlow(\''+clientId+'\',\''+baseCtId+'::A\',\''+ym+'\',\''+containerId+'\')" style="'+_ac+(_aActive?'#1D4ED8':'transparent')+';color:'+(_aActive?'#1D4ED8':'var(--text3)')+';transition:.15s">📋 A 線（規劃）'+_aStep+'</div>'
-    + '<div onclick="renderSopFlow(\''+clientId+'\',\''+baseCtId+'::B\',\''+ym+'\',\''+containerId+'\')" style="'+_ac+(_bActive?'#0f6e56':'transparent')+';color:'+(_bActive?'#0f6e56':'var(--text3)')+';transition:.15s">⚡ B 線（直發）'+_bStep+'</div>'
+    + '<div onclick="_sopSelectLine(\''+clientId+'\',\''+baseCtId+'::A\',\''+ym+'\',\'A\',\''+containerId+'\')" style="'+_ac+(_aActive?'#1D4ED8':'transparent')+';color:'+(_aActive?'#1D4ED8':'var(--text3)')+';transition:.15s">📋 A 線（規劃）'+_aStep+'</div>'
+    + '<div onclick="_sopSelectLine(\''+clientId+'\',\''+baseCtId+'::B\',\''+ym+'\',\'B\',\''+containerId+'\')" style="'+_ac+(_bActive?'#0f6e56':'transparent')+';color:'+(_bActive?'#0f6e56':'var(--text3)')+';transition:.15s">⚡ B 線（直發）'+_bStep+'</div>'
     + '</div>';
 
   el.innerHTML = `
@@ -12027,7 +12024,16 @@ function fbTaxAddRec(date) {
   }, 80);
 }
 async function fbTaxDeleteRec(date, recId) {
-  await fbTaxDelete(date, recId || undefined);
+  if (!recId) { renderFbTax(); return; }
+  // 臨時 id：不呼叫 GAS，直接從陣列移除
+  if (recId.startsWith('_tmp_')) {
+    if (DB.fbTax?.[date]) {
+      DB.fbTax[date] = DB.fbTax[date].filter(r=>r.id!==recId);
+      if (!DB.fbTax[date].length) delete DB.fbTax[date];
+    }
+  } else {
+    await fbTaxDelete(date, recId);
+  }
   renderFbTax();
 }
 async function fbTaxNoteChange(input) {
@@ -12047,40 +12053,44 @@ function fbTaxInputChange(input) {
   const val   = parseFloat(input.value);
   if (!date) return;
 
-  // 即時更新該列稅額顯示（不等 GAS，先算給你看）
+  // 1. 即時更新 DB 記憶體（不重繪，避免其他格消失）
+  if (!DB.fbTax) DB.fbTax = {};
+  if (!DB.fbTax[date]) DB.fbTax[date] = [];
+  const recs = DB.fbTax[date];
+  const rec = recs.find(r=>r.id===recId);
+  if (rec) rec.amount = isNaN(val) || val <= 0 ? 0 : Math.round(val);
+
+  // 2. 即時更新同列的稅額欄（不重繪整表）
   const row = input.closest('tr');
   if (row) {
     const cells = row.querySelectorAll('td');
-    const tax = (!isNaN(val) && val > 0) ? Math.round(val * FB_TAX_RATE) : '';
-    if (cells[2]) { cells[2].textContent = tax !== '' ? fbTaxFmt(tax) : '—'; cells[2].style.color = tax ? 'var(--amber)' : 'var(--text3)'; }
-    if (cells[3]) cells[3].textContent = (!isNaN(val) && val > 0) ? fbTaxFmt(Math.round(val)) : '—';
+    const amt = rec ? rec.amount : (isNaN(val)?0:Math.round(val));
+    const tax = amt > 0 ? Math.round(amt * FB_TAX_RATE) : 0;
+    if (cells[2]) { cells[2].textContent = tax > 0 ? fbTaxFmt(tax) : '—'; cells[2].style.color = tax ? 'var(--amber)' : 'var(--text3)'; }
+    if (cells[3]) cells[3].textContent = amt > 0 ? fbTaxFmt(amt) : '—';
   }
 
-  // Debounce 500ms 後才寫入 GAS（避免每按一鍵就送一次請求）
+  // 3. Debounce 800ms 後才寫入 GAS（不重繪，只存資料）
   clearTimeout(window._fbTaxTimer);
   window._fbTaxTimer = setTimeout(async () => {
-    const recs = DB.fbTax?.[date] || [];
-    const rec = recs.find(r=>r.id===recId) || (recs.length===1?recs[0]:null);
     if (!rec) return;
-    if (isNaN(val) || val <= 0) {
-      // 清空：臨時 id 直接移除；真實 id 呼叫 GAS
+    if (!rec.amount || rec.amount <= 0) {
+      // 金額清空：移除這筆記錄
       if (rec.id && !rec.id.startsWith('_tmp_')) {
+        // 真實記錄：呼叫 GAS 刪除，刪完再重繪
         await fbTaxDelete(date, rec.id);
+        renderFbTax();
       } else {
-        DB.fbTax[date] = DB.fbTax[date].filter(r=>r!==rec);
+        // 臨時記錄：直接從陣列移除，重繪
+        DB.fbTax[date] = recs.filter(r=>r!==rec);
         if (!DB.fbTax[date].length) delete DB.fbTax[date];
         renderFbTax();
       }
     } else {
-      // fbTaxSave 直接更新 rec（in-place，不 push）
-      await fbTaxSave(date, Math.round(val), rec.note||'', rec.id);
+      // 儲存（in-place 更新，不重繪）
+      await fbTaxSave(date, rec.amount, rec.note||'', rec.id);
     }
-    // 重算週小計
-    renderFbTax();
-    // 重新聚焦（renderFbTax 會重繪 DOM，要把 focus 找回來）
-    const newInput = document.querySelector(`input[data-date="${date}"]`);
-    if (newInput) { newInput.focus(); newInput.setSelectionRange(newInput.value.length, newInput.value.length); }
-  }, 600);
+  }, 800);
 }
 
 function fbTaxExportWeek() {
