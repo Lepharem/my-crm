@@ -4015,6 +4015,7 @@ function renderHome(){
 
   // ── A2 通知中心 ──
   const notices=[];
+  const _seenDraftNotice = new Set();
 
   // 1. 逾期應收款
   if(overduePayments.length){
@@ -4111,17 +4112,23 @@ function renderHome(){
           action:`_sopNavWithClientAndLine('${_ncid}','${_nct}','${_nym}')`, actionLabel:'前往月度作業'
         });
       } else if(n.type==='draftSubmitted'){
-        // 寫手回稿通知：從 taskId 找 clientId/contractId/ym
         const _ntask = (DB.omRecords||[]).find(r=>r.id===n.taskId)||{};
         const _ncid  = _ntask.clientId||n.clientId||'';
         const _nct   = (_ntask.contractId||n.contractId||'') + '::' + (_ntask.sopLine||'A');
         const _nym   = (_ntask.month||n.ym||'').slice(0,7);
-        notices.push({
-          level:'purple', icon:'📄',
-          title: n.msg,
-          tags: [],
-          action:`_sopNavWithClientAndLine('${_ncid}','${_nct}','${_nym}')`, actionLabel:'前往審稿'
-        });
+        const _noticeKey = _ncid+'__'+(_ntask.contractId||n.contractId||'')+'__'+_nym;
+        // 同合約月份只推一筆（去重）
+        if(!_seenDraftNotice.has(_noticeKey)){
+          _seenDraftNotice.add(_noticeKey);
+          // 計算這個合約月份有幾筆待審稿
+          const _pendingReview = (DB.omRecords||[]).filter(r=>r.clientId===_ncid&&(r.month||'').slice(0,7)===_nym&&r.status==='文稿審核').length;
+          notices.push({
+            level:'purple', icon:'📄',
+            title: `寫手送回稿件：${_ntask.clientName||''} · 週監控 · ${_nym}（待審 ${_pendingReview} 筆）`,
+            tags: [],
+            action:`_sopNavWithClientAndLine('${_ncid}','${_nct}','${_nym}')`, actionLabel:'前往審稿'
+          });
+        }
       } else if(n.type==='sopPendingClient'){
         // 待辦卡片已顯示此資訊，上方通知欄不重複顯示
         // (skip)
@@ -6871,6 +6878,7 @@ function omAdvanceStatus(id, nextStatus){
   } else {
     if(typeof renderOmPage==='function') renderOmPage();
   }
+  if(typeof renderHome==='function') setTimeout(renderHome, 250);
   toast(`→ ${nextStatus}`,'success');
 }
 
@@ -8700,19 +8708,16 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
                +'</div></details>'
               :'');
             return '<div style="border:1px solid '+borderCol+';border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:'+bgCol+'">'
+              +'<div style="display:flex;align-items:flex-start;gap:8px">'
               +'<span class="tag '+tagCls+'" style="font-size:10px;flex-shrink:0;margin-top:1px">'+tagTxt+'</span>'
               +'<div style="flex:1">'
               +'<div style="font-size:12px;font-weight:600">'+(r.taskName||r.specType||'—')+'</div>'
               +'<div style="font-size:11px;color:var(--text3);margin-top:1px">'+(r.platform||'')+' '+(r.section?'· '+r.section:'')+' '+(r.publishDate?r.publishDate.slice(0,10):'')+'</div>'
               +contentHtml+noteHtml
-              +'</div>'
-              +(cs==='pending'
-                ? '<button class="btn btn-xs" style="background:#dcfce7;color:#166534;border-color:#86efac" onclick="_sopClientConfirm(\''+r.id+'\',\'confirmed\')">✓ 確認</button>'
-                : '')
-              +'</div>'
+              +'</div></div>'
               +rejectForm+historyHtml+'</div>';
           }).join('')
-        + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
+        + (state.step===2 ? '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
         + (s2Records.length>0&&!s2Records.some(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
           ? '<button id="btn-s2-done" class="btn btn-primary" style="flex:1" onclick="document.getElementById(\'btn-s2-done\').disabled=true;_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')">✓ 全部回覆完成，進行步驟3</button>'
           : '')
@@ -8722,11 +8727,12 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
         + (s2Records.length>0&&!confirmed.length&&s2Records.every(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
           ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="document.getElementById(\'btn-s2-force\').disabled=true;_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')">→ 略過客戶回覆，直接進行步驟3</button>'
           : '')
-        + '</div>';
+          : '' )
+        + (state.step===2 ? '</div>' : '') ;
     }  // if(state.step >= 2)
-  }  // if(state.line === 'A')
 
   // ── 指派寫手步驟（A線步3，B線步2）──
+  }  // if(state.line === 'A')
   // A線有 writerStep，B線步驟1完成後直接進文稿審核
   const writerStep = state.line==='A' ? 3 : null;
   let swStatus = 'waiting', swContent = '';
@@ -8866,9 +8872,9 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
           <span class="tag tag-green" style="font-size:10px">✓ 文稿通過</span>
         </div>`).join('')}
       <div id="sop-review-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
-        ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
-        ${reviewing.length>0&&reviewing.every(r=>r.status==='切角審核')&&!reviewed.length?`<button class="btn btn-sm" style="border-color:#7c3aed;color:#5b21b6;background:#f5f3ff" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">→ 全部已送審，先進行下一步</button>`:''}
+        ${state.step===reviewStep&&!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
+        ${state.step===reviewStep&&reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
+        ${state.step===reviewStep&&reviewing.length>0&&reviewing.every(r=>r.status==='切角審核')&&!reviewed.length?`<button class="btn btn-sm" style="border-color:#7c3aed;color:#5b21b6;background:#f5f3ff" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">→ 全部已送審，先進行下一步</button>`:''}
       </div>`;
   }
 
@@ -9315,7 +9321,9 @@ function _sopDirectWriterChange(clientId, contractId, ym, rowId, writerId){
 
 function _sopSelectLine(clientId, contractId, ym, line, containerId){
   const state = getSopState(clientId, ym, contractId);
-  state.line = line; state.step = 1;
+  state.line = line;
+  // 只有在尚未開始時才設 step=1，已有進度的不重置
+  if(!state.step || state.step < 1) state.step = 1;
   // 記住用戶明確選線（切換合約時保持，客戶切換時清除）
   const baseCtId = contractId.includes('::')?contractId.split('::')[0]:contractId;
   if(!window._sopUserChoseLine) window._sopUserChoseLine = {};
@@ -9510,9 +9518,10 @@ function _sopClientConfirm(taskId, status){
     });
   }
   syncToGAS('omRecords',r).catch(()=>{});
-  // 刷新 SOP 頁（用 record 資料，不依賴 DOM 下拉）
+  // 刷新 SOP 頁
   _sopRefreshFromRecord(r);
-  // 客戶頁不需要重渲染（_clientUpdateTaskCard 已更新 DOM）
+  // 刷新儀錶板（讓待辦進度同步）
+  if(typeof renderHome==='function') setTimeout(renderHome, 300);
 }
 
 function _sopSaveClientNote(taskId, note){
