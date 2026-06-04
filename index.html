@@ -2159,7 +2159,10 @@ function showClientInterface(){
   const app = document.getElementById('client-app');
   if(app){ app.style.display = 'flex'; app.style.flexDirection = 'column'; }
   const badge = document.getElementById('client-name-badge');
-  if(badge) badge.textContent = _userProfile?.name || _currentUser?.name || '';
+  // 優先從 DB.clients 取名稱（確保不顯示空值或錯誤值）
+  const _badgeClientId = _userProfile?.id || '';
+  const _badgeCl = _badgeClientId ? DB.clients.find(c=>c.id===_badgeClientId) : null;
+  if(badge) badge.textContent = _badgeCl?.name || _userProfile?.name || _currentUser?.name || '';
   // clientId 直接用 _userProfile.id
   window._clientId = _userProfile?.id || '';
   _renderClientNav();
@@ -2178,6 +2181,7 @@ function _renderClientNav(){
   const cl = _userProfile;
   if(!cl) return;
   const _cqId = window._clientId || cl.id || '';
+  const _clFullNav = DB.clients.find(c=>c.id===_cqId) || cl;
   const contracts = DB.contracts.filter(c=>c.clientId===_cqId&&c.status==='進行中');
   const navItemStyle = (id) => {
     const isActive = window._clientCurrentPage === id;
@@ -2214,6 +2218,8 @@ function renderClientDashboard(){
   if(!cl){ el.innerHTML='<div style="padding:40px;text-align:center;color:#8a8680">找不到客戶資料</div>'; return; }
 
   const _clId = window._clientId || cl.id || '';
+  // 優先從 DB.clients 取完整客戶資料（避免 _userProfile 欄位不完整）
+  const _clFull = DB.clients.find(c=>c.id===_clId) || cl;
   const contracts = DB.contracts.filter(c=>c.clientId===_clId&&c.status==='進行中');
   const ym = new Date().toISOString().slice(0,7);
   const allOm = (DB.omRecords||[]).filter(r=>r.clientId===_clId);
@@ -2233,7 +2239,7 @@ function renderClientDashboard(){
 
   el.innerHTML = `
     <div style="margin-bottom:20px">
-      <div style="font-size:20px;font-weight:700;color:#1a1917;margin-bottom:4px">${cl.brandName||cl.name}</div>
+      <div style="font-size:20px;font-weight:700;color:#1a1917;margin-bottom:4px">${_clFull.brandName||_clFull.name||cl.name}</div>
       <div style="font-size:12px;color:#8a8680">客戶儀錶板 · ${ym}</div>
     </div>
 
@@ -4095,11 +4101,14 @@ function renderHome(){
           action:`navTo('sop-om')`, actionLabel:'前往月度作業'
         });
       } else if(n.type==='sopPendingClient'){
+        // 通知帶 clientId 和 ym，跳轉後自動選好客戶
+        const _nclientId = n.clientId||'';
+        const _nym       = n.ym||'';
         notices.push({
           level:'blue', icon:'📋',
           title: n.msg,
           tags: [],
-          action:`navTo('sop-om')`, actionLabel:'前往月度作業'
+          action:`_sopNavWithClient('${_nclientId}','${_nym}')`, actionLabel:'前往月度作業'
         });
       }
     });
@@ -4230,7 +4239,7 @@ function renderHome(){
 
           const rows = sortedRecs.map(r=>{
             const info = _todoInfo(r);
-            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${info.bg};border:1px solid ${info.bd};border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:12px" onclick="navTo('sop-om')">
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${info.bg};border:1px solid ${info.bd};border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:12px" onclick="_sopNavWithClient('${todoContracts[ctId]?.recs[0]?.clientId||''}','${ym4todo}')">
               <span style="flex-shrink:0;font-size:13px">${info.icon}</span>
               <span style="font-weight:600;color:${info.tx};font-size:11px;min-width:50px;flex-shrink:0">${info.label}</span>
               <span style="flex:1;color:#1a1917;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.taskName||r.specType||'—'}</span>
@@ -8349,6 +8358,28 @@ function _clearSopDraft(clientId, ym, lineKey){
   try { localStorage.removeItem('sopDraft_'+clientId+'_'+ym+'_'+lineKey); } catch(e){}
 }
 
+// 從通知/外部跳轉到 SOP 月度作業，自動設好客戶和月份
+function _sopNavWithClient(clientId, ym){
+  navTo('sop-om');
+  setTimeout(()=>{
+    const ymEl = document.getElementById('sop-ym');
+    const clientEl = document.getElementById('sop-client');
+    if(ymEl && ym) ymEl.value = ym;
+    if(clientEl && clientId){
+      // 確保 option 已存在
+      const hasOpt = [...clientEl.options].some(o=>o.value===clientId);
+      if(!hasOpt){
+        const cl = DB.clients.find(c=>c.id===clientId)||{};
+        const opt = document.createElement('option');
+        opt.value = clientId; opt.textContent = cl.name||clientId;
+        clientEl.appendChild(opt);
+      }
+      clientEl.value = clientId;
+    }
+    renderSopOmPage();
+  }, 120);
+}
+
 function renderSopOmPage(){
   const ymEl = document.getElementById('sop-ym');
   const clientEl = document.getElementById('sop-client');
@@ -8613,10 +8644,10 @@ function renderSopFlow(clientId, contractId, ym, containerId){
           ? '<button id="btn-s2-done" class="btn btn-primary" style="flex:1" onclick="document.getElementById(\'btn-s2-done\').style.display=\'none\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
           : '')
         + (confirmed.length>0&&s2Records.some(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
-          ? '<button id="btn-s2-part" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById(\'btn-s2-part\').style.display=\'none\';_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
+          ? '<button id="btn-s2-part" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="(function(){const s=window.DB?.sopState?.[\''+clientId+'\']?.[\''+ym+'\']?.[\''+contractId+'\'];if(s){s.step=3;s.partialConfirm=true;console.log(\'[SOP] partial step3\',s);}document.getElementById(\'btn-s2-part\').style.display=\'none\';renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId());})()" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
         + (s2Records.length>0&&!confirmed.length&&s2Records.every(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
-          ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="document.getElementById(\'btn-s2-force\').style.display=\'none\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >→ 略過客戶回覆，直接進行步驟3</button>'
+          ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="(function(){const s=window.DB?.sopState?.[\''+clientId+'\']?.[\''+ym+'\']?.[\''+contractId+'\'];if(s){s.step=3;console.log(\'[SOP] force step3\',s);}document.getElementById(\'btn-s2-force\').style.display=\'none\';renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId());})()" >→ 略過客戶回覆，直接進行步驟3</button>'
           : '')
         + '</div>';
     }  // if(state.step >= 2)
