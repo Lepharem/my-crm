@@ -2556,11 +2556,7 @@ function _clientConfirmTask(taskId, action){
     syncToGAS('omRecords',r).catch(()=>{});
     // 更新小卡 DOM（支援儀錶板 div 卡和合約頁 tr 兩種格式）
     _clientUpdateTaskCard(taskId, r);
-    // 刷新 SOP 頁（用 record 資料，不依賴 DOM 下拉，避免觸發客戶頁重渲染）
-    const sopEl=document.getElementById('page-sop-om');
-    if(sopEl&&sopEl.classList.contains('active')){
-      setTimeout(()=>_sopRefreshFromRecord(r), 150);
-    }
+    // 客戶頁操作不觸發 SOP 頁重渲染（兩個介面完全獨立）
     return;
   } else if(action==='suggest'){
     const wrap=document.getElementById('client-suggest-wrap-'+taskId);
@@ -2654,7 +2650,7 @@ function _clientSubmitSuggestion(taskId){
   // 也嘗試隱藏 client-suggest-wrap
   const wrap=document.getElementById('client-suggest-wrap-'+taskId);
   if(wrap) wrap.style.display='none';
-  // 不在客戶頁觸發 SOP 頁重渲染（兩個不同的頁面，避免干擾）
+  // 客戶頁操作不觸發 SOP 頁重渲染
 }
 function _clientSaveNote(taskId, note){
   const r = (DB.omRecords||[]).find(x=>x.id===taskId);
@@ -2731,9 +2727,9 @@ async function gasApi(action, body={}){
     // ── 測試模式：寫入不打 GAS，只更新本地 DB ──
     console.log(`%c[🧪 TEST] 攔截寫入: ${action}`, 'color:#7c3aed;font-weight:bold', body);
 
-    // 新增的記錄 id 加 [TEST] 前綴，方便事後清除
+    // 測試模式：不修改 id（避免原始 id 和 TEST_ id 並存造成重複）
     if(!body.id) body.id = 'TEST_' + Date.now().toString(36);
-    else if(!String(body.id).startsWith('TEST_')) body.id = 'TEST_' + body.id;
+    // 保留原始 id，不加 TEST_ 前綴
 
     // ── 本地 DB 模擬更新 ──
     const id = body.id;
@@ -9244,6 +9240,16 @@ function _sopSubmitPlan(clientId, contractId, ym){
   const existingKeys = new Set(existingA.map(r=>
     (r.sopPlanItemId&&r.sopPlanItemId!=='')?r.sopPlanItemId:(r.taskName+'__'+r.specType)
   ));
+  // 若已有記錄數量 >= planItems 有效行數，直接跳過（避免 key 格式不一致的漏網）
+  const validPlanCount = state.planItems.filter(row=>row.specType).length;
+  if(existingA.length >= validPlanCount){
+    if(!created){ toast('所有任務均已建立，無需重複送出','info'); }
+    state.step = 2;
+    state.planItems = [];
+    _clearSopDraft(clientId, ym, contractId);
+    renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
+    return;
+  }
   let created = 0;
   state.planItems.forEach(row=>{
     if(!row.specType) return;
@@ -9275,6 +9281,7 @@ function _sopSubmitPlan(clientId, contractId, ym){
   });
   if(!created){ toast('所有任務均已建立，無需重複送出','info'); return; }
   state.step = 2;
+  state.planItems = []; // 清空記憶體中的 planItems，防止再次進入時重複送出
   _clearSopDraft(clientId, ym, contractId); // 送出後清除草稿
   toast(`✓ 已建立 ${created} 筆任務，等待客戶確認`,'success');
   // 儀錶板通知
@@ -11942,6 +11949,14 @@ function renderFbTax() {
               <td style="text-align:right;padding:10px 14px;font-size:14px;font-weight:700;color:var(--amber)">${fbTaxFmt(weekTax)}</td>
               <td style="text-align:right;padding:10px 14px;font-size:13px;font-weight:600">${fbTaxFmt(weekTotal)}</td>
             </tr>
+            <tr>
+              <td colspan="4" style="padding:10px 12px;text-align:right">
+                <button onclick="fbTaxSaveWeek('${start}')"
+                  style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600">
+                  ✓ 填寫完畢，儲存本週
+                </button>
+              </td>
+            </tr>
           </tfoot>
         </table>
       </div>
@@ -11950,8 +11965,10 @@ function renderFbTax() {
 
   // 月份統計
   const monthMap = {};
-  Object.entries(data).forEach(([d, rec]) => {
-    const v = Number(rec?.amount) || 0;
+  Object.entries(data).forEach(([d, recs]) => {
+    // recs 現在是陣列（支援單日多筆）
+    const recArr = Array.isArray(recs) ? recs : (recs ? [recs] : []);
+    const v = recArr.reduce((s,r)=>s+Number(r.amount||0),0);
     if (v <= 0) return;
     const ym = d.slice(0, 7);
     if (!monthMap[ym]) monthMap[ym] = { total: 0, tax: 0 };
@@ -12141,6 +12158,44 @@ function fbTaxInputChange(input) {
       await fbTaxSave(date, rec.amount, rec.note||'', rec.id);
     }
   }, 800);
+}
+
+async function fbTaxSaveWeek(weekStart) {
+  // 1. 讀取所有該週 input 的當前值更新 DB
+  const days = Array.from({length:7},(_,i)=>fbTaxAddDays(weekStart,i));
+  let saved = 0, errors = 0;
+  for(const d of days){
+    if(!DB.fbTax) DB.fbTax = {};
+    const recs = DB.fbTax[d] || [];
+    // 從 DOM 讀取最新的 input 值（包含未 debounce 的）
+    const inputs = document.querySelectorAll(`input[type="number"][data-date="${d}"]`);
+    inputs.forEach(inp => {
+      const val = parseFloat(inp.value);
+      const recId = inp.dataset.recid;
+      if(!recId && !isNaN(val) && val > 0){
+        // 空 recid = 預設第一筆（無記錄時的空 input）
+        if(!DB.fbTax[d]) DB.fbTax[d] = [];
+        if(DB.fbTax[d].length === 0){
+          DB.fbTax[d].push({id:'_tmp_'+Date.now(), amount:Math.round(val), note:''});
+        } else {
+          DB.fbTax[d][0].amount = Math.round(val);
+        }
+      } else if(recId) {
+        const rec = (DB.fbTax[d]||[]).find(r=>r.id===recId);
+        if(rec && !isNaN(val)) rec.amount = Math.round(val);
+      }
+    });
+    // 2. 批次儲存到 GAS
+    const toSave = (DB.fbTax[d]||[]).filter(r=>r.amount>0);
+    for(const rec of toSave){
+      try {
+        await fbTaxSave(d, rec.amount, rec.note||'', rec.id);
+        saved++;
+      } catch(e){ errors++; }
+    }
+  }
+  renderFbTax(); // 重繪以更新合計顯示
+  toast(errors > 0 ? `已儲存 ${saved} 筆，${errors} 筆失敗` : `✓ 已儲存 ${saved} 筆資料`, errors?'error':'success');
 }
 
 function fbTaxExportWeek() {
