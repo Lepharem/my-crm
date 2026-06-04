@@ -4123,14 +4123,8 @@ function renderHome(){
           action:`_sopNavWithClientAndLine('${_ncid}','${_nct}','${_nym}')`, actionLabel:'前往審稿'
         });
       } else if(n.type==='sopPendingClient'){
-        const _nclientId = n.clientId||'';
-        const _nym       = n.ym||'';
-        notices.push({
-          level:'blue', icon:'📋',
-          title: n.msg,
-          tags: [],
-          action:`_sopNavWithClient('${_nclientId}','${_nym}')`, actionLabel:'前往月度作業'
-        });
+        // 待辦卡片已顯示此資訊，上方通知欄不重複顯示
+        // (skip)
       }
     });
   }
@@ -8628,10 +8622,6 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
   // ── 步驟1：選擇執行線 + 展開表單 ──
   let s1Status = 'active', s1Content = '';
   if(state.line && state.step > 1) s1Status = 'done';
-  // debug（確認規格資料）
-  console.log('[SOP] specs for contract', contractId, ':', specs.length, 'total,', specsOpen.length, 'open');
-  if(specs.length) console.log('[SOP] first spec:', JSON.stringify(specs[0]));
-
   if(state.line === null){
     // 尚未選擇：s1Content 留空，由 stepsHtml 的大選線卡處理
     s1Content = '';
@@ -8709,7 +8699,7 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
                  +'</div>').join('')
                +'</div></details>'
               :'');
-              +'<div style="display:flex;align-items:flex-start;gap:8px">'
+            return '<div style="border:1px solid '+borderCol+';border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:'+bgCol+'">'
               +'<span class="tag '+tagCls+'" style="font-size:10px;flex-shrink:0;margin-top:1px">'+tagTxt+'</span>'
               +'<div style="flex:1">'
               +'<div style="font-size:12px;font-weight:600">'+(r.taskName||r.specType||'—')+'</div>'
@@ -8744,7 +8734,12 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
   const writerDone   = writerStep !== null && state.step > writerStep;
   if(writerDone) swStatus = 'done';
   else if(writerActive) swStatus = 'active';
-  if(writerActive || writerDone){
+  if(writerDone){
+    // 步驟3已完成：只顯示摘要
+    const _doneWriters = thisMonthOm.filter(r=>r.writerId);
+    swContent = `<div style="font-size:12px;color:#166534">✓ 已指派 ${_doneWriters.length} 位寫手</div>
+      ${_doneWriters.map(r=>`<div style="font-size:11px;color:var(--text3);margin-top:2px">· ${r.taskName||r.specType} → ${r.writerName||'—'}</div>`).join('')}`;
+  } else if(writerActive){
     const cutDocLink3 = ct.driveLink || '';  // 切角 DOC 連結（來自合約）
     const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
     const platformOpts3 = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
@@ -9578,12 +9573,16 @@ function _sopGetActiveContractId(clientId){
 
 // 從任意 omRecord 取回 lineKey，並刷新對應的 SOP 頁
 function _sopRefreshFromRecord(r){
+  // 只有當企劃在 sop-om 頁面且合約/客戶吻合時才重渲染
+  const sopPage = document.getElementById('page-sop-om');
+  if(!sopPage || !sopPage.classList.contains('active')) return;
   const ym = document.getElementById('sop-ym')?.value||'';
   const cId = r.clientId||'';
   const baseCtId = r.contractId||'';
   if(!cId||!baseCtId||!ym) return;
-  // 從記錄的 sopLine 取線別（最可靠），設定選線記憶後再渲染
-  const activeLine = r.sopLine || window._sopActiveLine?.[baseCtId] || 'A';
+  // 取線別：只用 _sopUserChoseLine（用戶已選的），不用 r.sopLine 強制覆蓋
+  // 避免 A線記錄的通知把 B線記憶蓋掉
+  const activeLine = window._sopUserChoseLine?.[baseCtId] || r.sopLine || 'A';
   if(!window._sopUserChoseLine) window._sopUserChoseLine = {};
   if(!window._sopActiveLine) window._sopActiveLine = {};
   window._sopUserChoseLine[baseCtId] = activeLine;
@@ -9691,6 +9690,8 @@ function _sopBatchAssignVendor(specType, clientId, ym, contractId){
     r.vendorId=vendorId; r.vendorName=vc?.name||''; r.status='待上刊';
     syncToGAS('omRecords',r).catch(()=>{});
   });
+  // 清除相關通知
+  if(targets.length) _sopMarkAllSopNoticesDone(clientId, ym);
   toast(`✓ 已批次指派 ${targets.length} 筆給 ${vc?.name||''}`,'success');
   const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
   const ymv=document.getElementById('sop-ym')?.value||ym;
