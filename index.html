@@ -2266,9 +2266,10 @@ function renderClientDashboard(){
          const cs = r.clientConfirmStatus||'pending';
          const borderCol = cs==='confirmed'?'#86efac':cs==='rejected'?'#fca5a5':'#fcd34d';
          const bgCol = cs==='confirmed'?'#f0fdf4':cs==='rejected'?'#fff3f3':'#fff';
-         const history = (r.reviewHistory&&r.reviewHistory.length)
-           ? `<details open style="margin-top:8px"><summary style="cursor:pointer;font-size:10px;font-weight:600;color:#8a8680;list-style:none">📋 往返記錄（${r.reviewHistory.length}次）</summary><div style="margin-top:4px">${
-               r.reviewHistory.map(h=>`<div style="padding:4px 8px;border-left:2px solid ${h.action==='confirmed'?'#16a34a':h.action==='rejected'?'#dc2626':'#1D4ED8'};margin-bottom:4px;font-size:11px;color:#4a4845">
+         const _rh1=Array.isArray(r.reviewHistory)?r.reviewHistory:[];
+         const history = (_rh1.length)
+           ? `<details open style="margin-top:8px"><summary style="cursor:pointer;font-size:10px;font-weight:600;color:#8a8680;list-style:none">📋 往返記錄（${_rh1.length}次）</summary><div style="margin-top:4px">${
+               _rh1.map(h=>`<div style="padding:4px 8px;border-left:2px solid ${h.action==='confirmed'?'#16a34a':h.action==='rejected'?'#dc2626':'#1D4ED8'};margin-bottom:4px;font-size:11px;color:#4a4845">
                  <span style="font-weight:600">${h.action==='confirmed'?'✓ 確認':h.action==='rejected'?'✕ 更動建議':'🔄 企劃重送'}</span> · ${(h.at||'').slice(0,10)}
                  ${h.note?`<div style="margin-top:2px;color:#1a1917">${h.note}</div>`:''}
                </div>`).join('')
@@ -2742,9 +2743,17 @@ async function gasApi(action, body={}){
     const id = body.id;
 
     if(action === 'saveOmRecord' || (action === 'saveRecord' && body.sheet?.includes('om'))){
+      // 反序列化 JSON 欄位（syncToGAS 序列化了，但 DB 要保持陣列）
+      const _dbBody = {...body};
+      if(typeof _dbBody.reviewHistory === 'string'){
+        try { _dbBody.reviewHistory = JSON.parse(_dbBody.reviewHistory); } catch(e){ _dbBody.reviewHistory = []; }
+      }
+      if(typeof _dbBody.screenshotLinks === 'string'){
+        try { _dbBody.screenshotLinks = JSON.parse(_dbBody.screenshotLinks); } catch(e){ _dbBody.screenshotLinks = []; }
+      }
       const existing = (DB.omRecords||[]).find(r=>r.id===id);
-      if(existing){ Object.assign(existing, body); }
-      else { (DB.omRecords = DB.omRecords||[]).push({...body, id}); }
+      if(existing){ Object.assign(existing, _dbBody); }
+      else { (DB.omRecords = DB.omRecords||[]).push({..._dbBody, id}); }
     }
     if(action === 'submitVendorPostByEmail' || action === 'submitVendorResult'){
       const rec = (DB.omRecords||[]).find(r=>r.id===body.id);
@@ -8530,7 +8539,8 @@ function renderSopOmPage(){
 // ── 主流程渲染 ──
 function renderSopFlow(clientId, contractId, ym, containerId){
   const el = document.getElementById(containerId||'sop-om-content');
-  if(!el) return;
+  if(!el){ console.error('[SOP] el not found, containerId=', containerId); return; }
+  console.log('[SOP] renderSopFlow el=', containerId||'sop-om-content', 'contractId=', contractId, 'clientId=', clientId);
   if(!contractId){
     el.innerHTML = '<div class="empty-state" style="padding:60px"><p style="color:var(--red)">找不到合約，請重新選擇客戶</p></div>';
     return;
@@ -8560,7 +8570,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   // 若從 A/B tab 點進來，自動進入步驟1（顯示規劃表或選線表單）
   if(activeLine && state.line===null) state.line = activeLine;
   if(activeLine && state.step === 0) state.step = 1;
-  console.log('[SOP] renderSopFlow lineKey=', lineKey, 'step=', state.step, 'line=', state.line);
+  console.log('[SOP] renderSopFlow lineKey=', lineKey, 'step=', state.step, 'line=', state.line, 'ct=', ct?.contractNo, 'cl=', cl?.name);
   const contractId2 = baseCtId; // 後續用 contractId2 代替原 contractId
   // contractId（函式參數）邏輯上改為 baseCtId（去掉 ::A/::B 後綴）
   const ct = DB.contracts.find(c=>c.id===baseCtId)||{};
@@ -8687,16 +8697,16 @@ function renderSopFlow(clientId, contractId, ym, containerId){
                +'<button class="btn btn-xs btn-primary" style="margin-top:6px" onclick="_sopResubmitToClient(\''+r.id+'\')" >🔄 修正完成，重新送交客戶</button>'
                +'</div>'
               :'';
-            const historyHtml=(r.reviewHistory&&r.reviewHistory.length)
-              ?'<details open style="margin-top:8px"><summary style="cursor:pointer;font-size:10px;font-weight:600;color:var(--text3);list-style:none">📋 往返記錄（'+r.reviewHistory.length+'次）</summary>'
+            const _rha2=Array.isArray(r.reviewHistory)?r.reviewHistory:[];
+            const historyHtml=(_rha2.length
+              ?'<details open style="margin-top:8px"><summary style="cursor:pointer;font-size:10px;font-weight:600;color:var(--text3);list-style:none">📋 往返記錄（'+_rha2.length+'次）</summary>'
                +'<div style="margin-top:4px">'
-               +r.reviewHistory.map(h=>'<div style="font-size:10px;color:var(--text3);padding:3px 6px;background:var(--surface2);border-radius:4px;margin-bottom:2px">'
+               +_rha2.map(h=>'<div style="font-size:10px;color:var(--text3);padding:3px 6px;background:var(--surface2);border-radius:4px;margin-bottom:2px">'
                  +(h.action==='confirmed'?'✓ 客戶確認':h.action==='rejected'?'✕ 客戶退回':'🔄 企劃重送')
                  +' · '+(h.at||'').slice(0,10)+(h.note?' ：'+h.note.slice(0,40):'')
                  +'</div>').join('')
                +'</div></details>'
-              :'';
-            return '<div style="border:1px solid '+borderCol+';border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:'+bgCol+'">' 
+              :'');
               +'<div style="display:flex;align-items:flex-start;gap:8px">'
               +'<span class="tag '+tagCls+'" style="font-size:10px;flex-shrink:0;margin-top:1px">'+tagTxt+'</span>'
               +'<div style="flex:1">'
@@ -8826,7 +8836,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
             <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}${r.platform?' · '+r.platform:''}${r.section?' · '+r.section:''}</span>
             ${r.draftLink?`<a href="${r.draftLink}" target="_blank" class="btn btn-xs">稿件</a>`:''}
           </div>
-          ${(r.reviewHistory&&r.reviewHistory.length)?'<details open style="margin-bottom:8px"><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--text3);list-style:none">📋 往返記錄（'+r.reviewHistory.length+'次）</summary><div style="margin-top:4px">'+r.reviewHistory.map(h=>'<div style="padding:4px 8px;border-left:2px solid '+(h.action==='confirmed'?'#16a34a':h.action==='rejected'?'#dc2626':'#1D4ED8')+';margin-bottom:3px;font-size:11px;color:#4a4845"><span style="font-weight:600">'+(h.action==='confirmed'?'✓ 確認':h.action==='rejected'?'✕ 退回':'🔄 重送')+'</span> · '+(h.at||'').slice(0,10)+(h.note?'<div style="margin-top:2px">'+h.note+'</div>':'')+'</div>').join('')+'</div></details>':''}
+          ${(()=>{ const rh=Array.isArray(r.reviewHistory)?r.reviewHistory:[]; return rh.length?'<details open style="margin-bottom:8px"><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--text3);list-style:none">📋 往返記錄（'+rh.length+'次）</summary><div style="margin-top:4px">'+rh.map(h=>'<div style="padding:4px 8px;border-left:2px solid '+(h.action==='confirmed'?'#16a34a':h.action==='rejected'?'#dc2626':'#1D4ED8')+';margin-bottom:3px;font-size:11px;color:#4a4845"><span style="font-weight:600">'+(h.action==='confirmed'?'✓ 確認':h.action==='rejected'?'✕ 退回':'🔄 重送')+'</span> · '+(h.at||'').slice(0,10)+(h.note?'<div style="margin-top:2px">'+h.note+'</div>':'')+'</div>').join('')+'</div></details>':''; })()}
           ${r.status==='文稿審核'?`<div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm" onclick="(function(){const rc=(DB.omRecords||[]).find(x=>x.id==='${r.id}');if(rc){rc.clientConfirmStatus='pending';syncToGAS('omRecords',rc).catch(()=>{});}omAdvanceStatus('${r.id}','切角審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);})()">→ 送客戶審核</button>
             <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">✓ 文稿直接通過</button>
