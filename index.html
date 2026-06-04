@@ -8540,11 +8540,17 @@ function renderSopOmPage(){
 function renderSopFlow(clientId, contractId, ym, containerId){
   const el = document.getElementById(containerId||'sop-om-content');
   if(!el){ console.error('[SOP] el not found, containerId=', containerId); return; }
-  console.log('[SOP] renderSopFlow el=', containerId||'sop-om-content', 'contractId=', contractId, 'clientId=', clientId);
   if(!contractId){
     el.innerHTML = '<div class="empty-state" style="padding:60px"><p style="color:var(--red)">找不到合約，請重新選擇客戶</p></div>';
     return;
   }
+  try { _renderSopFlowInner(clientId, contractId, ym, containerId, el); }
+  catch(e){
+    console.error('[SOP] renderSopFlow crashed:', e);
+    el.innerHTML = '<div style="padding:32px;text-align:center;color:#991B1B"><b>⚠ 渲染錯誤</b><br><pre style="font-size:11px;text-align:left;margin-top:8px;color:#6b7280;white-space:pre-wrap">'+e.stack+'</pre></div>';
+  }
+}
+function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
   // ── A/B 線 key：只有 contractId 明確帶 ::A 或 ::B 才設線 ──
   // 切換客戶/合約 tab 時一律顯示選線卡，用戶明確點擊才算開始
   if(!window._sopActiveLine) window._sopActiveLine = {};
@@ -9008,10 +9014,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     + '<div onclick="_sopSelectLine(\''+clientId+'\',\''+baseCtId+'::B\',\''+ym+'\',\'B\',\''+containerId+'\')" style="'+_ac+(_bActive?'#0f6e56':'transparent')+';color:'+(_bActive?'#0f6e56':'var(--text3)')+';transition:.15s">⚡ B 線（直發）'+_bStep+'</div>'
     + '</div>';
 
-  // 防止 template string 中的 JS 錯誤導致空白
-  let _sopHtml = '';
-  try {
-  _sopHtml = `
+  let _sopHtml = `
     <style>@keyframes sop-pulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.4)}70%{box-shadow:0 0 0 6px rgba(29,78,216,0)}}</style>
     <div style="padding:20px 24px">
       ${lineTabHtml}
@@ -9029,10 +9032,6 @@ function renderSopFlow(clientId, contractId, ym, containerId){
       
       ${stepsHtml}
     </div>`;
-  } catch(e) {
-    console.error('[SOP] renderSopFlow error:', e);
-    _sopHtml = '<div style="padding:32px;text-align:center;color:#991B1B"><b>渲染錯誤</b><br><pre style="font-size:11px;text-align:left;margin-top:8px;color:#6b7280">'+e.message+'</pre></div>';
-  }
   el.innerHTML = _sopHtml;
 }
 
