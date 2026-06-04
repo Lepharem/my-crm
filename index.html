@@ -2312,10 +2312,7 @@ function renderClientDashboard(){
                  ? `<button onclick="_clientConfirmTask('${r.id}','ok')" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ OK</button>
                     <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:6px 14px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✏️ 更動建議</button>`
                  : cs==='rejected'
-                 ? `<div>
-                      <div style="font-size:11px;color:#991B1B;font-weight:600;margin-bottom:4px">✕ 已送出更動，等待企劃調整</div>
-                      <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:4px 10px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:11px;cursor:pointer">✏️ 補充意見</button>
-                    </div>`
+                 ? `<div style="font-size:11px;color:#991B1B;font-weight:600">✕ 已送出更動，等待企劃調整</div>`
                  : '<span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>'
                }
              </div>
@@ -8655,7 +8652,7 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
   let s2Status = 'waiting', s2Content = '';
   if(state.line === 'A'){
     if(state.step > 2) s2Status = 'done';
-    else if(state.step === 2) s2Status = 'paused';
+    else if(state.step === 2) s2Status = 'active';  // 展開顯示，讓企劃看到待確認清單
     if(state.step >= 2){
       // 步驟2只顯示切角規劃確認階段（待規劃、切角確認）的記錄
       // 文稿審核後的記錄（status=撰文中/文稿審核/切角審核等）只在步驟4顯示
@@ -8727,13 +8724,13 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
           }).join('')
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
         + (s2Records.length>0&&!s2Records.some(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
-          ? '<button id="btn-s2-done" class="btn btn-primary" style="flex:1" onclick="document.getElementById(\'btn-s2-done\').style.display=\'none\';_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')" >✓ 全部回覆完成，進行步驟3</button>'
+          ? '<button id="btn-s2-done" class="btn btn-primary" style="flex:1" onclick="document.getElementById(\'btn-s2-done\').disabled=true;_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')">✓ 全部回覆完成，進行步驟3</button>'
           : '')
         + (confirmed.length>0&&s2Records.some(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
-          ? '<button id="btn-s2-part" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="(function(){const s=window.DB?.sopState?.[\''+clientId+'\']?.[\''+ym+'\']?.[\''+contractId+'\'];if(s){s.step=3;s.partialConfirm=true;console.log(\'[SOP] partial step3\',s);}document.getElementById(\'btn-s2-part\').style.display=\'none\';renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId());})()" >⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
+          ? '<button id="btn-s2-part" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById(\'btn-s2-part\').disabled=true;_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')">⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
           : '')
         + (s2Records.length>0&&!confirmed.length&&s2Records.every(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
-          ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="(function(){const s=window.DB?.sopState?.[\''+clientId+'\']?.[\''+ym+'\']?.[\''+contractId+'\'];if(s){s.step=3;console.log(\'[SOP] force step3\',s);}document.getElementById(\'btn-s2-force\').style.display=\'none\';renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId());})()" >→ 略過客戶回覆，直接進行步驟3</button>'
+          ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="document.getElementById(\'btn-s2-force\').disabled=true;_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')">→ 略過客戶回覆，直接進行步驟3</button>'
           : '')
         + '</div>';
     }  // if(state.step >= 2)
@@ -8874,9 +8871,9 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
           <span class="tag tag-green" style="font-size:10px">✓ 文稿通過</span>
         </div>`).join('')}
       <div id="sop-review-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="this.style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
-        ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="this.style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
-        ${reviewing.length>0&&reviewing.every(r=>r.status==='切角審核')&&!reviewed.length?`<button class="btn btn-sm" style="border-color:#7c3aed;color:#5b21b6;background:#f5f3ff" onclick="this.style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">→ 全部已送審，先進行下一步</button>`:''}
+        ${!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
+        ${reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
+        ${reviewing.length>0&&reviewing.every(r=>r.status==='切角審核')&&!reviewed.length?`<button class="btn btn-sm" style="border-color:#7c3aed;color:#5b21b6;background:#f5f3ff" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">→ 全部已送審，先進行下一步</button>`:''}
       </div>`;
   }
 
@@ -9551,17 +9548,25 @@ function _sopResubmitToClient(taskId){
 function _sopStep2Complete(clientId, contractId, ym){
   const state = getSopState(clientId, ym, contractId);
   state.step = (state.line==='A') ? 3 : 2;
-  console.log('[SOP] step2Complete → step set to', state.step, 'line=', state.line, 'contractId=', contractId);
-  // 確保使用正確的 containerId（單一合約時用 sop-om-content）
-  const cid = _sopGetContainerId();
-  console.log('[SOP] containerId=', cid);
-  renderSopFlow(clientId, contractId, ym, cid);
+  _sopMarkNoticesDone(clientId, ym, 'sopPendingClient');
+  if(typeof renderHome==='function') setTimeout(renderHome, 300);
+  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
 }
 
 function _sopStepNext(clientId, contractId, ym){
   const state = getSopState(clientId, ym, contractId);
   state.step++;
+  _sopMarkNoticesDone(clientId, ym, 'writersWorking');
+  _sopMarkNoticesDone(clientId, ym, 'draftSubmitted');
+  if(typeof renderHome==='function') setTimeout(renderHome, 300);
   renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
+}
+function _sopMarkNoticesDone(clientId, ym, type){
+  (DB.notifications||[]).forEach(n=>{
+    if(n.clientId===clientId && (n.ym||'').slice(0,7)===(ym||'').slice(0,7) && n.type===type){
+      n.done = true;
+    }
+  });
 }
 
 function _sopGetActiveContractId(clientId){
@@ -9651,6 +9656,12 @@ function _sopSaveNote(taskId, inputId){
   r.note=document.getElementById(inputId)?.value||'';
   syncToGAS('omRecords',r).catch(()=>{});
   toast('備註已儲存','success');
+}
+
+
+function _sopMarkAllSopNoticesDone(clientId, ym){
+  ['sopPendingClient','writersWorking','draftSubmitted'].forEach(t=>_sopMarkNoticesDone(clientId, ym, t));
+  if(typeof renderHome==='function') setTimeout(renderHome, 300);
 }
 
 function _sopAssignVendor(taskId, contractId, ym){
