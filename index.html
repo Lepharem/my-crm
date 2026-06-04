@@ -8591,7 +8591,7 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
     // 空字串 sopLine 視為 A 線（相容舊記錄，但仍需先有 baseCtId 比對通過）
     // sopLine 必須明確符合，空值記錄不混入已選線的視圖
     if(_sopLine==='A') return r.sopLine==='A';
-    if(_sopLine==='B') return r.sopLine==='B';
+    if(_sopLine==='B') return r.sopLine==='B' || (!r.sopLine && r.status==='文稿審核');
     // 尚未選線（顯示全部，含無 sopLine 的舊記錄）
     return true;
   });
@@ -8847,7 +8847,7 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
             <div style="font-size:11px;background:#ede9fe;color:#5b21b6;border-radius:6px;padding:6px 10px;margin-bottom:8px">⏸ 已送客戶審核，等待回覆中…</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
               <button class="btn btn-sm btn-primary" onclick="(function(){const rec=(DB.omRecords||[]).find(x=>x.id==='${r.id}');if(rec){if(!rec.reviewHistory)rec.reviewHistory=[];rec.reviewHistory.push({action:'confirmed',by:'planner',at:new Date().toISOString(),note:''});rec.clientConfirmStatus='confirmed';syncToGAS('omRecords',rec).catch(()=>{});}omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);})()">✓ 客戶確認通過</button>
-              <button class="btn btn-sm" style="background:#fff;color:#991B1B;border-color:#fca5a5" onclick="document.getElementById('sr-rj-${r.id}').style.display='block'">↩ 客戶要求修改</button>
+              <button class="btn btn-sm" style="background:#fff;color:#991B1B;border-color:#fca5a5" onclick="document.getElementById('sr-rj-${r.id}').style.display='block'">↩ 退回給寫手修改</button>
             </div>
             <div id="sr-rj-${r.id}" style="display:none">
               <textarea id="sr-rj-note-${r.id}" rows="2" placeholder="修改意見（給寫手參考）…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px;resize:vertical"></textarea>
@@ -8858,11 +8858,12 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
                   if(!rec.reviewHistory) rec.reviewHistory=[];
                   rec.reviewHistory.push({action:'rejected',by:'planner',at:new Date().toISOString(),note:note});
                   rec.clientNote=note;
+                  rec.clientConfirmStatus='pending'; // 重置客戶確認狀態，讓寫手重新提交
                   syncToGAS('omRecords',rec).catch(()=>{});
                 }
-                omAdvanceStatus('${r.id}','文稿審核');
+                omAdvanceStatus('${r.id}','撰文中'); // 退回給寫手，改回撰文中狀態
                 setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);
-              })()">確認退回</button>
+              })()">✓ 確認退回（寫手重新撰文）</button>
             </div></div>`:r.status==='撰文中'?`<div style="font-size:11px;color:var(--text3)">等待寫手完稿…</div>`:''}
         </div>`).join('')}
       ${reviewed.map(r=>`
