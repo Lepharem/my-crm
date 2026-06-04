@@ -8576,7 +8576,6 @@ function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
   // 若從 A/B tab 點進來，自動進入步驟1（顯示規劃表或選線表單）
   if(activeLine && state.line===null) state.line = activeLine;
   if(activeLine && state.step === 0) state.step = 1;
-  console.log('[SOP] renderSopFlow lineKey=', lineKey, 'step=', state.step, 'line=', state.line, 'ct=', ct?.contractNo, 'cl=', cl?.name);
   const contractId2 = baseCtId; // 後續用 contractId2 代替原 contractId
   // contractId（函式參數）邏輯上改為 baseCtId（去掉 ::A/::B 後綴）
   const ct = DB.contracts.find(c=>c.id===baseCtId)||{};
