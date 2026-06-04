@@ -4095,14 +4095,28 @@ function renderHome(){
     const sopNotices = DB.notifications.filter(n=>!n.done);
     sopNotices.forEach(n=>{
       if(n.type==='writersWorking'){
+        const _ncid = n.clientId||'';
+        const _nct  = n.contractId||''; // 可能含 ::B 後綴
+        const _nym  = n.ym||'';
         notices.push({
           level:'amber', icon:'✍️',
           title: n.msg,
           tags: [],
-          action:`navTo('sop-om')`, actionLabel:'前往月度作業'
+          action:`_sopNavWithClientAndLine('${_ncid}','${_nct}','${_nym}')`, actionLabel:'前往月度作業'
+        });
+      } else if(n.type==='draftSubmitted'){
+        // 寫手回稿通知：從 taskId 找 clientId/contractId/ym
+        const _ntask = (DB.omRecords||[]).find(r=>r.id===n.taskId)||{};
+        const _ncid  = _ntask.clientId||n.clientId||'';
+        const _nct   = (_ntask.contractId||n.contractId||'') + '::' + (_ntask.sopLine||'A');
+        const _nym   = (_ntask.month||n.ym||'').slice(0,7);
+        notices.push({
+          level:'purple', icon:'📄',
+          title: n.msg,
+          tags: [],
+          action:`_sopNavWithClientAndLine('${_ncid}','${_nct}','${_nym}')`, actionLabel:'前往審稿'
         });
       } else if(n.type==='sopPendingClient'){
-        // 通知帶 clientId 和 ym，跳轉後自動選好客戶
         const _nclientId = n.clientId||'';
         const _nym       = n.ym||'';
         notices.push({
@@ -4118,10 +4132,11 @@ function renderHome(){
   const noticeLevelStyle={
     red:'background:#fef2f2;border-color:#fca5a5',
     amber:'background:#fffbeb;border-color:#fcd34d',
-    blue:'background:#eff6ff;border-color:#93c5fd'
+    blue:'background:#eff6ff;border-color:#93c5fd',
+    purple:'background:#f5f3ff;border-color:#c4b5fd'
   };
-  const noticeTitleStyle={red:'color:#991b1b',amber:'color:#92400e',blue:'color:#1d4ed8'};
-  const noticeBtnStyle={red:'background:#991b1b;color:#fff;border-color:#991b1b',amber:'background:#92400e;color:#fff;border-color:#92400e',blue:'background:#1d4ed8;color:#fff;border-color:#1d4ed8'};
+  const noticeTitleStyle={red:'color:#991b1b',amber:'color:#92400e',blue:'color:#1d4ed8',purple:'color:#5b21b6'};
+  const noticeBtnStyle={red:'background:#991b1b;color:#fff;border-color:#991b1b',amber:'background:#92400e;color:#fff;border-color:#92400e',blue:'background:#1d4ed8;color:#fff;border-color:#1d4ed8',purple:'background:#5b21b6;color:#fff;border-color:#5b21b6'};
 
   const noticeHtml=notices.map(n=>`
     <div style="${noticeLevelStyle[n.level]||''};border:1px solid;border-radius:var(--r2);padding:12px 16px;display:flex;align-items:flex-start;gap:10px">
@@ -8360,25 +8375,71 @@ function _clearSopDraft(clientId, ym, lineKey){
 }
 
 // 從通知/外部跳轉到 SOP 月度作業，自動設好客戶和月份
-function _sopNavWithClient(clientId, ym){
+// 帶 contractId（含 ::A/::B）跳轉，確保選線記憶正確
+function _sopNavWithClientAndLine(clientId, contractId, ym){
+  if(!contractId){ _sopNavWithClient(clientId, ym); return; }
+  // 先設選線記憶，防止跳轉後顯示選線卡
+  const baseCtId = contractId.includes('::')?contractId.split('::')[0]:contractId;
+  const line     = contractId.includes('::A')?'A':contractId.includes('::B')?'B':null;
+  if(line){
+    if(!window._sopUserChoseLine) window._sopUserChoseLine = {};
+    if(!window._sopActiveLine)    window._sopActiveLine    = {};
+    window._sopUserChoseLine[baseCtId] = line;
+    window._sopActiveLine[baseCtId]    = line;
+  }
+  // 設定當前合約
+  if(!window._sopActiveContractId) window._sopActiveContractId = {};
+  window._sopActiveContractId[clientId] = baseCtId;
   navTo('sop-om');
   setTimeout(()=>{
-    const ymEl = document.getElementById('sop-ym');
+    const ymEl     = document.getElementById('sop-ym');
     const clientEl = document.getElementById('sop-client');
     if(ymEl && ym) ymEl.value = ym;
+    window._sopPendingClientId = clientId;
+    renderSopOmPage();
     if(clientEl && clientId){
-      // 確保 option 已存在
-      const hasOpt = [...clientEl.options].some(o=>o.value===clientId);
-      if(!hasOpt){
+      if(![...clientEl.options].some(o=>o.value===clientId)){
         const cl = DB.clients.find(c=>c.id===clientId)||{};
         const opt = document.createElement('option');
         opt.value = clientId; opt.textContent = cl.name||clientId;
         clientEl.appendChild(opt);
       }
       clientEl.value = clientId;
+      [...clientEl.options].forEach(o=>{ o.selected = o.value===clientId; });
+      if(clientEl.value === clientId) renderSopOmPage();
     }
+    window._sopPendingClientId = null;
+  }, 150);
+}
+
+function _sopNavWithClient(clientId, ym){
+  navTo('sop-om');
+  setTimeout(()=>{
+    const ymEl = document.getElementById('sop-ym');
+    const clientEl = document.getElementById('sop-client');
+    if(ymEl && ym) ymEl.value = ym;
+    // renderSopOmPage 會重建 options，所以先設 _pendingClientId
+    // renderSopOmPage 結束後再確認 select 有選到正確的值
+    window._sopPendingClientId = clientId;
     renderSopOmPage();
-  }, 120);
+    // renderSopOmPage 可能重建了 select，再設一次確保選中
+    if(clientEl && clientId){
+      if(![...clientEl.options].some(o=>o.value===clientId)){
+        const cl = DB.clients.find(c=>c.id===clientId)||{};
+        const opt = document.createElement('option');
+        opt.value = clientId; opt.textContent = cl.name||clientId;
+        clientEl.appendChild(opt);
+      }
+      clientEl.value = clientId;
+      if(clientEl.value !== clientId){
+        // select 設值失敗（option 存在但 value 不對），強制選中
+        [...clientEl.options].forEach(o=>{ o.selected = o.value===clientId; });
+      }
+      // 若設好後值有變，再渲染一次
+      if(clientEl.value === clientId) renderSopOmPage();
+    }
+    window._sopPendingClientId = null;
+  }, 150);
 }
 
 function renderSopOmPage(){
@@ -8387,7 +8448,8 @@ function renderSopOmPage(){
   if(ymEl && !ymEl.value) ymEl.value = new Date().toISOString().slice(0,7);
   // 填充客戶下拉（只列客戶，不含合約）
   if(clientEl){
-    const cur = clientEl.value;
+    // 若有待設定的 clientId（來自通知跳轉），優先使用
+    const cur = window._sopPendingClientId || clientEl.value;
     clientEl.innerHTML = '<option value="">— 選擇客戶 —</option>';
     const seenClients = new Set();
     DB.contracts.filter(c=>c.status==='進行中').forEach(ct=>{
@@ -8400,6 +8462,14 @@ function renderSopOmPage(){
       if(opt.value===cur) opt.selected=true;
       clientEl.appendChild(opt);
     });
+    // 若上方沒有找到對應 option，動態加入
+    if(cur && !seenClients.has(cur)){
+      const cl = DB.clients.find(c=>c.id===cur)||{};
+      const opt = document.createElement('option');
+      opt.value = cur; opt.textContent = cl.name||cur; opt.selected = true;
+      clientEl.appendChild(opt);
+    }
+    if(cur) clientEl.value = cur;
   }
   const ym = ymEl?.value;
   const clientId = clientEl?.value;
