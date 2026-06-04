@@ -2624,6 +2624,7 @@ function _clientSubmitSuggestion(taskId){
   r.clientNote=note;
   r.clientFeedback=note;
   r.clientFeedbackAt=new Date().toISOString();
+  r.clientConfirmStatus='rejected'; // 標記為已退回（移除 OK 按鈕）
   // 切角審核（文稿送審）退回 → 回到文稿審核讓企劃修改；切角規劃退回 → 待規劃
   r.status = (r.status==='切角審核') ? '文稿審核' : '待規劃';
   if(!r.reviewHistory) r.reviewHistory=[];
@@ -8494,7 +8495,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   // contractId（函式參數）邏輯上改為 baseCtId（去掉 ::A/::B 後綴）
   const ct = DB.contracts.find(c=>c.id===baseCtId)||{};
   const cl = DB.clients.find(c=>c.id===clientId)||{};
-  const specs = DB.specItems.filter(s=>s.contractId===baseCtId&&(s.category==='口碑'||!s.category));
+  const specs = (DB.specItems||[]).filter(s=>s.contractId===baseCtId&&(s.category==='口碑'||!s.category));
   // 開文規格（傳給規劃表使用，純回文不建行）
   const specsOpen = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name));
   // thisMonthOm 只包含本線（A/B）的記錄，避免互相干擾
@@ -8927,7 +8928,10 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     + '<div onclick="_sopSelectLine(\''+clientId+'\',\''+baseCtId+'::B\',\''+ym+'\',\'B\',\''+containerId+'\')" style="'+_ac+(_bActive?'#0f6e56':'transparent')+';color:'+(_bActive?'#0f6e56':'var(--text3)')+';transition:.15s">⚡ B 線（直發）'+_bStep+'</div>'
     + '</div>';
 
-  el.innerHTML = `
+  // 防止 template string 中的 JS 錯誤導致空白
+  let _sopHtml = '';
+  try {
+  _sopHtml = `
     <style>@keyframes sop-pulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.4)}70%{box-shadow:0 0 0 6px rgba(29,78,216,0)}}</style>
     <div style="padding:20px 24px">
       ${lineTabHtml}
@@ -8945,6 +8949,11 @@ function renderSopFlow(clientId, contractId, ym, containerId){
       
       ${stepsHtml}
     </div>`;
+  } catch(e) {
+    console.error('[SOP] renderSopFlow error:', e);
+    _sopHtml = '<div style="padding:32px;text-align:center;color:#991B1B"><b>渲染錯誤</b><br><pre style="font-size:11px;text-align:left;margin-top:8px;color:#6b7280">'+e.message+'</pre></div>';
+  }
+  el.innerHTML = _sopHtml;
 }
 
 // ── 專案規劃表渲染（A 線步驟1）──
