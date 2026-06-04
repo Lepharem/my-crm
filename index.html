@@ -3177,6 +3177,24 @@ function enableTestMode(){
   window._testOriginalUser    = _currentUser ? {..._currentUser} : null;
   window._testOriginalProfile = _userProfile ? {..._userProfile} : null;
 
+  // 注入 mock clients/contracts（確保切換到客戶角色時有名單）
+  // 若 GAS 已覆蓋，用靜態 mock 補回
+  const hasMockC001 = DB.clients.some(c=>c.id==='C001');
+  if(!hasMockC001){
+    const mockClients = [
+      {id:'C001',name:'彩御國際有限公司',brandName:'台北ihair',status:'進行中',clientEmail:'client@caiy.test'},
+      {id:'C002',name:'風華整外',brandName:'風華整形外科',status:'進行中',clientEmail:'client@fenghua.test',clientToken:'TEST_FENGHUA_TOKEN'},
+    ];
+    const mockContracts = [
+      {id:'CT001',clientId:'C001',name:'2026口碑操作合約',contractNo:'W60309M9',status:'進行中',start:'2026-04-11',end:'2026-12-31'},
+      {id:'CT002',clientId:'C002',name:'2026口碑操作合約',contractNo:'W60413M9',status:'進行中',start:'2026-04-13',end:'2026-12-31'},
+    ];
+    // 把 mock 客戶加到現有 clients 前面（不覆蓋，只補）
+    DB.clients = [...mockClients, ...DB.clients.filter(c=>!['C001','C002'].includes(c.id))];
+    DB.contracts = [...mockContracts, ...DB.contracts.filter(c=>!['CT001','CT002'].includes(c.id))];
+    console.log('[TEST] Injected mock clients/contracts');
+  }
+
   // 確保登入畫面隱藏，讓後續介面可以正常顯示
   const loginScreen = document.getElementById('login-screen');
   if(loginScreen) loginScreen.style.display = 'none';
@@ -8440,6 +8458,7 @@ function renderSopFlow(clientId, contractId, ym, containerId){
   // 若從 A/B tab 點進來，自動進入步驟1（顯示規劃表或選線表單）
   if(activeLine && state.line===null) state.line = activeLine;
   if(activeLine && state.step === 0) state.step = 1;
+  console.log('[SOP] renderSopFlow lineKey=', lineKey, 'step=', state.step, 'line=', state.line);
   const contractId2 = baseCtId; // 後續用 contractId2 代替原 contractId
   // contractId（函式參數）邏輯上改為 baseCtId（去掉 ::A/::B 後綴）
   const ct = DB.contracts.find(c=>c.id===baseCtId)||{};
@@ -8523,7 +8542,17 @@ function renderSopFlow(clientId, contractId, ym, containerId){
     if(state.step >= 2){
       // 步驟2只顯示切角規劃確認階段（待規劃、切角確認）的記錄
       // 文稿審核後的記錄（status=撰文中/文稿審核/切角審核等）只在步驟4顯示
-      const s2Records = thisMonthOm.filter(r=>['待規劃','切角確認'].includes(r.status)||(!r.status&&r.clientConfirmStatus));
+      // 步驟2記錄：去重複（相同 taskName+specType 只保留最有意義的狀態）
+      const _s2Raw = thisMonthOm.filter(r=>['待規劃','切角確認'].includes(r.status)||(!r.status&&r.clientConfirmStatus));
+      const _s2Map = new Map();
+      _s2Raw.forEach(r=>{
+        const key = (r.taskName||r.specType)+'__'+r.specType;
+        const ex = _s2Map.get(key);
+        if(!ex){ _s2Map.set(key,r); return; }
+        const pri = s=>s==='rejected'?3:s==='confirmed'?2:1;
+        if(pri(r.clientConfirmStatus||'pending') > pri(ex.clientConfirmStatus||'pending')) _s2Map.set(key,r);
+      });
+      const s2Records = [..._s2Map.values()];
       const pending   = s2Records.filter(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus);
       const confirmed = s2Records.filter(r=>r.clientConfirmStatus==='confirmed');
       const rejected  = s2Records.filter(r=>r.clientConfirmStatus==='rejected');
@@ -9404,7 +9433,11 @@ function _sopResubmitToClient(taskId){
 function _sopStep2Complete(clientId, contractId, ym){
   const state = getSopState(clientId, ym, contractId);
   state.step = (state.line==='A') ? 3 : 2;
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
+  console.log('[SOP] step2Complete → step set to', state.step, 'line=', state.line, 'contractId=', contractId);
+  // 確保使用正確的 containerId（單一合約時用 sop-om-content）
+  const cid = _sopGetContainerId();
+  console.log('[SOP] containerId=', cid);
+  renderSopFlow(clientId, contractId, ym, cid);
 }
 
 function _sopStepNext(clientId, contractId, ym){
