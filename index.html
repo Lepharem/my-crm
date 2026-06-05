@@ -3545,8 +3545,9 @@ function showTestRolePanel(){
         { role:'staff', label:'🧑‍💻 企劃（暫用）', name:'企劃同仁', email:'staff@lepharem.com', hrRole:'employee', memberId:'', color:'#1D4ED8' },
       ];
 
-  // ── 客戶：有進行中合約的客戶（從 crm_contracts 交叉比對）──
-  const _activeClientIds = new Set((DB.contracts||[]).filter(c=>c.status==='進行中').map(c=>c.clientId));
+  // ── 客戶：從 DB.clients 列出（有合約的客戶）──
+  // 測試模式下顯示所有客戶（因為合約狀態不一定準確）
+  const _activeClientIds = new Set((DB.contracts||[]).map(c=>c.clientId));
   const clientRoles = (DB.clients||[]).filter(c=>_activeClientIds.has(c.id)).map(c=>({
     role:'client', label:`🏢 ${c.name||c.id}`, name:c.name||c.id,
     email: c.clientEmail||c.email||`client_${c.id}@test.com`,
@@ -9129,60 +9130,56 @@ function _renderTaskCard(task, clientId, contractId, ym){
   }
 
   // 進度步驟——已啟動任務才顯示
-  // 進度步驟——接力棒邏輯，顯示已完成步驟和當前步驟
+  // 進度標籤——所有步驟都顯示，只有進行中的亮色，其餘灰底
   const progressSteps = task.activatedAt && s!=='待啟動' ? (() => {
     const cut = rel.cut||[], draft = rel.draft||[], wa = rel.writer, va = rel.vendor;
-    const parts = [];
 
-    // 切角（需要時）
+    // 定義所有步驟（切角只在需要時加入）
+    const steps = [];
     if(task.requireCutAngle){
-      const approved = cut.some(h=>h.action==='approved');
-      const lastCut  = cut.at(-1);
-      const waitCl   = lastCut?.action==='submitted' && lastCut?.by==='planner';
-      const label    = approved ? '✓ 切角'
-                     : s==='切角進行中' ? (waitCl?'🔸 切角（等客戶)':'▶ 切角審核')
-                     : '○ 切角';
-      const color    = approved?'#22c55e': s==='切角進行中'?'#f59e0b':'#94a3b8';
-      parts.push({label, color, fw: s==='切角進行中'?600:400});
+      const approved  = cut.some(h=>h.action==='approved');
+      const lastCut   = cut.at(-1);
+      const waitCl    = lastCut?.action==='submitted' && lastCut?.by==='planner';
+      const active    = s==='切角進行中';
+      steps.push({
+        label: approved ? '✓ 切角確認' : waitCl ? '切角（等客戶)' : '切角審核',
+        done: approved, active,
+        color: approved?'#22c55e': active?'#f59e0b':null,
+      });
     }
-
     // 指派寫手
-    if(s!=='切角進行中'){
-      const writerLabel = wa
-        ? (s==='待指派寫手'?'▶ 指派寫手':'✓ '+wa.writerName)
-        : (s==='待指派寫手'?'▶ 指派寫手':'○ 指派');
-      const wc = wa&&s!=='待指派寫手'?'#22c55e': s==='待指派寫手'?'#3b82f6':'#94a3b8';
-      parts.push({label:writerLabel, color:wc, fw:s==='待指派寫手'?600:400});
-    }
-
-    // 文章（已有寫手後才顯示）
-    if(wa||['撰文中','文章審核中','待指派帳號商','待上刊','已上刊'].includes(s)){
-      const draftOk = draft.some(h=>h.action==='approved');
-      const lastD   = draft.at(-1);
-      const isRej   = lastD?.action==='rejected';
-      const waitPM  = lastD?.action==='submitted' && lastD?.by==='writer';
-      const dLabel  = draftOk ? '✓ 文章通過'
-                    : ['撰文中','文章審核中'].includes(s)
-                      ? (isRej?'▶ 文章（待修改)': waitPM?'▶ 文章（待審核)':'▶ 撰文中')
-                    : '○ 文章';
-      const dc = draftOk?'#22c55e':['撰文中','文章審核中'].includes(s)?'#8b5cf6':'#94a3b8';
-      parts.push({label:dLabel, color:dc, fw:['撰文中','文章審核中'].includes(s)?600:400});
-    }
-
+    const wDone = !!wa && s!=='待指派寫手';
+    steps.push({
+      label: wDone ? `✓ ${wa.writerName}` : '指派寫手',
+      done: wDone, active: s==='待指派寫手',
+      color: wDone?'#22c55e': s==='待指派寫手'?'#3b82f6':null,
+    });
+    // 文章
+    const draftOk = draft.some(h=>h.action==='approved');
+    const lastD   = draft.at(-1);
+    const dActive = ['撰文中','文章審核中'].includes(s);
+    const dLabel  = draftOk?'✓ 文章通過': dActive?(lastD?.action==='rejected'?'文章（待修改)':lastD?.action==='submitted'&&lastD?.by==='writer'?'文章（待審核)':'撰文中'):'文章審核';
+    steps.push({ label:dLabel, done:draftOk, active:dActive, color:draftOk?'#22c55e':dActive?'#8b5cf6':null });
     // 上刊
-    if(['待指派帳號商','待上刊','已上刊'].includes(s)||va){
-      const published = s==='已上刊';
-      const vLabel = published?'✓ 已上刊': va?.postLink?'▶ 待企劃確認': va?'▶ 待上刊':'○ 上刊';
-      const vc = published?'#22c55e':va?'#eab308':'#94a3b8';
-      parts.push({label:vLabel, color:vc, fw:va&&!published?600:400});
-    }
+    const vDone = s==='已上刊';
+    const vActive = ['待指派帳號商','待上刊'].includes(s)||!!va;
+    const vLabel = vDone?'✓ 已上刊': va?.postLink?'待企劃確認': va?'待上刊':'上刊';
+    steps.push({ label:vLabel, done:vDone, active:vActive&&!vDone, color:vDone?'#22c55e':vActive?'#eab308':null });
 
-    return parts.map((p,i)=>`<span style="display:inline-flex;align-items:center;gap:1px">
-      <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:${p.fw};
-        color:${p.color};background:${p.color}18;border:1px solid ${p.color}44;white-space:nowrap">
-        ${p.label}
-      </span>${i<parts.length-1?'<span style="color:#d1d5db;margin:0 2px;font-size:11px">›</span>':''}
-    </span>`).join('');
+    return steps.map((st,i)=>{
+      // 灰底（未到/已過）vs 亮色（進行中）vs 綠色（完成）
+      const c   = st.color || '#94a3b8';
+      const bg  = st.done?'#dcfce7': st.active?c+'22':'#f3f4f6';
+      const bd  = st.done?'#86efac': st.active?c+'66':'#e5e7eb';
+      const tc  = st.done?'#166534': st.active?c:'#9ca3af';
+      const fw  = (st.done||st.active)?600:400;
+      return `<span style="display:inline-flex;align-items:center">
+        <span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;
+          font-weight:${fw};color:${tc};background:${bg};border:1px solid ${bd};white-space:nowrap">
+          ${st.label}
+        </span>${i<steps.length-1?'<span style="color:#d1d5db;margin:0 2px;font-size:10px">›</span>':''}
+      </span>`;
+    }).join('');
   })() : '';
 
   // cutBadge——只在「等客戶確認」時顯示提示標籤
@@ -9543,7 +9540,7 @@ function _getContainerId(contractId){
 }
 
 function _refreshPlan(clientId, contractId, ym){
-  // 測試模式：先把 TEST_DATA 完整同步到 DB，確保狀態不被舊資料覆蓋
+  // 測試模式：先把 TEST_DATA 完整同步到 DB
   if(window._testMode && window.TEST_DATA){
     if(TEST_DATA.tasks.length) DB.ops_tasks = TEST_DATA.tasks;
     if(TEST_DATA.plans.length) DB.ops_monthly_plans = TEST_DATA.plans;
@@ -9552,6 +9549,8 @@ function _refreshPlan(clientId, contractId, ym){
     DB.writerAssignments = TEST_DATA.writerAssignments;
     DB.vendorAssignments = TEST_DATA.vendorAssignments;
   }
+  // 重繪當前月度計畫（關鍵！）
+  renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId));
   if(typeof renderHome==='function') setTimeout(renderHome, 300);
 }
 
