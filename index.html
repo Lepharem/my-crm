@@ -1837,166 +1837,244 @@ async function _writerNavTo(page){
 }
 
 async function _writerLoadTasks(){
-  // 每次重置，確保不同寫手切換後資料分開
   _writerAllTasks = [];
-  let tasks=[], writerName=_userProfile?.name||_currentUser?.name||'';
-  try {
-    if(window._testMode){
-      // 精確匹配當前角色的寫手
-      const fl = DB.freelancers.find(f=>
-        (f.id===_userProfile?.id) ||
-        (f.email&&f.email.toLowerCase()===(_currentUser?.email||'').toLowerCase()) ||
-        f.name===writerName
-      );
-      if(fl){
-        writerName=fl.name;
-        tasks=(DB.omRecords||[])
-          .filter(r=>(r.writerId===fl.id||r.writerName===fl.name)&&['撰文中','文稿審核','切角審核','待派帳號商','待上刊','待確認','已上刊','觀察中','完成'].includes(r.status))
-          .map(r=>({id:r.id,contractId:r.contractId||'',clientName:r.clientName||'',month:r.month||'',
-            specType:r.specType||'',taskName:r.taskName||r.specType||'',
-            title:r.title||'',content:r.content||'',platform:r.platform||'',
-            actionType:r.actionType||'',section:r.section||'',driveLink:r.driveLink||'',
-            draftLink:r.draftLink||'',status:r.status,note:r.note||'',replyCount:r.replyCount||0}));
-      }
-    } else {
-      const res=await gasApi('getWriterTasks',{email:_currentUser.email});
-      tasks=res.tasks||[]; writerName=res.writer||writerName;
-    }
-  } catch(e){ console.warn('writer tasks load error:',e); }
-  _writerAllTasks=tasks;
-  const badge=document.getElementById('writer-name-badge');
-  if(badge) badge.textContent=writerName;
+  const flProfile = _userProfile;
+  const flId    = flProfile?.id  || '';
+  const flName  = flProfile?.name || _currentUser?.name || '';
+
+  // ── 從新架構 ops_tasks 取寫手任務 ──
+  const allTasks    = DB.ops_tasks || [];
+  const wAssigns    = DB.writerAssignments || [];
+  const draftHist   = DB.draftHistory || [];
+  const cutHist     = DB.cutAngleHistory || [];
+  const vAssigns    = DB.vendorAssignments || [];
+
+  // 找屬於我的 writer_assignments
+  const myAssigns = wAssigns.filter(a=>
+    (flId && (a.writerId===flId || a.writerId===('INTERNAL'&&flId))) ||
+    a.writerName===flName ||
+    (a.isInternal && window.myMember?.id===flId)
+  );
+  const myTaskIds = new Set(myAssigns.map(a=>a.taskId));
+
+  // 組裝任務資料
+  _writerAllTasks = allTasks.filter(t=>myTaskIds.has(t.id)).map(t=>{
+    const wa    = myAssigns.find(a=>a.taskId===t.id);
+    const cut   = cutHist.filter(h=>h.taskId===t.id);
+    const draft = draftHist.filter(h=>h.taskId===t.id);
+    const va    = vAssigns.find(a=>a.taskId===t.id);
+    const status= getTaskStatus(t, cut, draft, wa, va);
+    const cl    = (DB.clients||[]).find(c=>c.id===t.clientId)||{};
+    const plan  = (DB.ops_monthly_plans||[]).find(p=>p.id===t.planId)||{};
+    const lastDraft = draft.at(-1);
+    return {
+      id: t.id, taskId: t.id,
+      contractId: t.contractId,
+      clientId: t.clientId,
+      clientName: cl.name||'',
+      month: plan.ym||'',
+      specType: t.specType||'',
+      taskName: t.taskName||t.specType||'',
+      requireCutAngle: t.requireCutAngle,
+      dueDate: t.dueDate||'',
+      activatedAt: t.activatedAt||'',
+      publishedAt: t.publishedAt||'',
+      status,
+      _status: status,
+      _cut: cut, _draft: draft, _wa: wa, _va: va,
+      // 最新稿件連結
+      draftLink: lastDraft?.draftLink || '',
+      // 最新退稿意見
+      rejectNote: draft.filter(h=>h.action==='rejected').at(-1)?.note||'',
+      // 切角連結
+      cutAngleLink: cut.filter(h=>h.action==='submitted').at(-1)?.draftLink||'',
+      cutAngleContent: cut.filter(h=>h.action==='submitted').at(-1)?.content||'',
+    };
+  });
+
+  const badge = document.getElementById('writer-name-badge');
+  if(badge) badge.textContent = flName;
 }
 
+// ── 寫手送稿 ──
+async function _writerSubmitDraft(taskId){
+  const linkEl = document.getElementById('wd-link-'+taskId);
+  const noteEl = document.getElementById('wd-note-'+taskId);
+  const link   = linkEl?.value.trim()||'';
+  const note   = noteEl?.value.trim()||'';
+  if(!link){ toast('請填寫稿件連結', 'warning'); return; }
+
+  const draftHist = DB.draftHistory || [];
+  const round = Math.max(0, ...draftHist.filter(h=>h.taskId===taskId).map(h=>h.round||0)) + 1;
+
+  const record = {
+    id: 'DA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    taskId, round, action:'submitted', by:'writer',
+    draftLink: link, note, createdAt: new Date().toISOString(),
+  };
+  if(!DB.draftHistory) DB.draftHistory = [];
+  DB.draftHistory.push(record);
+  await syncToGAS('draft_history', record).catch(()=>{});
+
+  toast('稿件已送出，等待企劃審核', 'success');
+  await _writerNavTo(_writerCurrentPage);
+}
+
+// ── 寫手提交切角修改意見 ──
+async function _writerSubmitCutFeedback(taskId, opinion){
+  const noteEl = document.getElementById('wc-note-'+taskId);
+  const note   = noteEl?.value.trim()||opinion||'';
+  const cutHist= DB.cutAngleHistory||[];
+  const myRound= Math.max(0,...cutHist.filter(h=>h.taskId===taskId).map(h=>h.round||0));
+  const record = {
+    id:'CA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    taskId, round:myRound, action:opinion==='ok'?'approved':'rejected',
+    by:'writer', content:note, note, createdAt:new Date().toISOString(),
+  };
+  if(!DB.cutAngleHistory) DB.cutAngleHistory=[];
+  DB.cutAngleHistory.push(record);
+  await syncToGAS('cutangle_history',record).catch(()=>{});
+  toast(opinion==='ok'?'已確認切角方向':'已回覆修改意見','success');
+  await _writerNavTo(_writerCurrentPage);
+}
+
+
+// ════════════════════════════════════════════
+//  寫手介面 — 任務渲染（新架構）
+// ════════════════════════════════════════════
+
 function _renderWriterDashboard(){
-  const el=document.getElementById('writer-content');
+  const el = document.getElementById('writer-content');
   if(!el) return;
-  const tasks=_writerAllTasks;
-  const pending=tasks.filter(t=>t.status==='撰文中');
-  const reviewing=tasks.filter(t=>['文稿審核','切角審核'].includes(t.status));
-  // 已完稿：待派帳號商以後的所有狀態
-  const done=tasks.filter(t=>['待派帳號商','待上刊','待確認','已上刊','觀察中','完成'].includes(t.status));
-  el.innerHTML=`
-    <div style="margin-bottom:20px">
-      <div style="font-size:18px;font-weight:700;color:#1a1917">我的工作台</div>
-      <div style="font-size:12px;color:#8a8680;margin-top:2px">${new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'})}</div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #fcd34d;text-align:center">
-        <div style="font-size:24px;font-weight:700;color:#92400E">${pending.length}</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">待撰文</div>
+  const tasks = _writerAllTasks;
+  const needAction  = tasks.filter(t=>['撰文中','文章審核中'].includes(t._status));
+  const waiting     = tasks.filter(t=>['切角進行中'].includes(t._status));
+  const done        = tasks.filter(t=>t._status==='已上刊');
+  const statusColor = {'撰文中':'#8b5cf6','文章審核中':'#f97316','切角進行中':'#f59e0b','已上刊':'#22c55e','待上刊':'#eab308'};
+
+  el.innerHTML = `
+    <!-- 摘要 -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:600;color:#8b5cf6">${needAction.length}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">需要你行動</div>
       </div>
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #c4b5fd;text-align:center">
-        <div style="font-size:24px;font-weight:700;color:#5b21b6">${reviewing.length}</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">審核中</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:600;color:#f59e0b">${waiting.length}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">等待中</div>
       </div>
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #bbf7d0;text-align:center">
-        <div style="font-size:24px;font-weight:700;color:#166534">${done.length}</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">已完稿</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:600;color:#22c55e">${done.length}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">已完成</div>
       </div>
     </div>
-    ${window._testMode?`<div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#5b21b6">🧪 測試模式</div>`:''}
-    ${pending.length?`<div style="font-size:12px;font-weight:600;color:#92400E;margin-bottom:8px">📝 待撰文（${pending.length}）</div>${pending.map(t=>_writerTaskCard(t)).join('')}`:''}
-    ${reviewing.length?`<div style="font-size:12px;font-weight:600;color:#5b21b6;margin:14px 0 8px">🔍 審核中（${reviewing.length}）</div>${reviewing.map(t=>_writerTaskCard(t)).join('')}`:''}
-    ${done.length?`<details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:#166534;list-style:none;display:flex;align-items:center;gap:6px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">✓ 已完稿（${done.length}）<span style="font-size:10px;color:#8a8680;margin-left:auto">▼ 展開查看</span></summary><div style="margin-top:8px">${done.map(t=>_writerTaskCard(t)).join('')}</div></details>`:''}
-    ${!tasks.length?`<div style="text-align:center;padding:40px;color:#8a8680">目前沒有進行中的任務</div>`:''}
+
+    <!-- 需要行動 -->
+    ${needAction.length ? `
+      <div style="font-size:12px;font-weight:600;color:#ef4444;margin-bottom:10px">🔴 需要你處理</div>
+      ${needAction.map(t=>_writerTaskCard(t)).join('')}
+    ` : `<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px">✅ 目前沒有需要你行動的任務</div>`}
+
+    <!-- 等待中 -->
+    ${waiting.length ? `
+      <div style="font-size:12px;font-weight:600;color:#f59e0b;margin:16px 0 10px">🟡 等待企劃回覆</div>
+      ${waiting.map(t=>_writerTaskCard(t,true)).join('')}
+    ` : ''}
   `;
 }
 
 function _renderWriterTaskList(tasks){
-  const el=document.getElementById('writer-content');
+  const el = document.getElementById('writer-content');
   if(!el) return;
-  const pending=tasks.filter(t=>t.status==='撰文中');
-  const reviewing=tasks.filter(t=>['文稿審核','切角審核'].includes(t.status));
-  el.innerHTML=`
-    ${pending.length?`<div style="font-size:12px;font-weight:600;color:#92400E;margin-bottom:8px">📝 待撰文（${pending.length}）</div>${pending.map(t=>_writerTaskCard(t)).join('')}`:''}
-    ${reviewing.length?`<div style="font-size:12px;font-weight:600;color:#5b21b6;margin:14px 0 8px">🔍 審核中（${reviewing.length}）</div>${reviewing.map(t=>_writerTaskCard(t)).join('')}`:''}
-    ${!tasks.length?`<div style="text-align:center;padding:40px;color:#8a8680">此合約目前沒有進行中任務</div>`:''}
-  `;
-}
-
-function _writerTaskCard(t){
-  const isPending=t.status==='撰文中';
-  return `<div style="background:#fff;border:1px solid ${isPending?'#fcd34d':'#e8e6e1'};border-radius:12px;padding:16px;margin-bottom:12px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#1a1917">${t.clientName}</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">${t.month} · ${t.specType}</div>
-      </div>
-      <span style="font-size:11px;padding:3px 8px;border-radius:20px;background:${isPending?'#fef3c7':'#ede9fe'};color:${isPending?'#92400E':'#5b21b6'}">${t.status}</span>
-    </div>
-    ${t.platform?`<div style="font-size:12px;color:#4a4845;margin-bottom:6px">📍 ${t.platform}${t.actionType?' · '+t.actionType:''}${t.section?' · '+t.section:''}</div>`:''}
-    ${t.title?`<div style="font-size:13px;font-weight:500;margin-bottom:6px">${t.title}</div>`:''}
-    ${t.content?`<div style="font-size:12px;color:#4a4845;background:#f8f7f5;border-radius:6px;padding:8px;margin-bottom:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto">${t.content}</div>`:''}
-    ${t.driveLink?`<div style="margin-bottom:8px"><a href="${t.driveLink}" target="_blank" style="font-size:12px;color:#1B4FD8">📁 切角資料夾</a></div>`:''}
-    ${isPending?`<div style="margin-top:10px">
-      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Google Doc 稿件連結 *</label>
-      <input id="draft-${t.id}" type="url" placeholder="https://docs.google.com/..." value="${t.draftLink||''}"
-        style="width:100%;padding:8px 10px;border:1px solid #d4d1cb;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px">
-      <button onclick="submitWriterDraft('${t.id}')"
-        style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;width:100%">
-        ✓ 稿件完成，送回審核
-      </button>
-    </div>`:`<div style="font-size:12px;color:#5b21b6;background:#ede9fe;border-radius:6px;padding:8px">
-        ${t.status} · 等待樂法處理
-        ${t.draftLink?`<br><a href="${t.draftLink}" target="_blank" style="color:#5b21b6">${t.draftLink.slice(0,50)}…</a>`:''}
-      </div>`}
-  </div>`;
-}
-
-// 已保留給原本的renderWriterTasks呼叫
-async function renderWriterTasks(){
-  await _writerLoadTasks();
-  _renderWriterDashboard();
-}
-
-async function submitWriterDraft(taskId){
-  const link=document.getElementById('draft-'+taskId)?.value.trim();
-  if(!link){ toast('請填寫 Google Doc 連結'); return; }
-  const btn=document.querySelector(`button[onclick="submitWriterDraft('${taskId}')"]`);
-  if(btn){ btn.disabled=true; btn.textContent='送出中…'; }
-  try {
-    if(window._testMode){
-      // 測試模式：直接更新本地 DB
-      const rec=(DB.omRecords||[]).find(r=>r.id===taskId);
-      if(rec){
-        rec.status='文稿審核';
-        rec.draftLink=link;
-        rec.draftSubmittedAt=new Date().toISOString();
-        rec.writingDoneDate=new Date().toISOString().slice(0,10);
-      }
-      // 加入通知到 DB.notifications
-      if(!DB.notifications) DB.notifications=[];
-      DB.notifications.push({
-        id:'WR_'+Date.now(),type:'draftSubmitted',
-        msg:`寫手送回稿件：${rec?.clientName||''} · ${rec?.specType||''} · ${rec?.month||''}`,
-        created:new Date().toISOString(),done:false,taskId
-      });
-    } else {
-      // 寫手回覆後，同步刷新 SOP 頁（企劃端即時看到狀態變更）
-      const sopEl2=document.getElementById('page-sop-om');
-      if(sopEl2&&sopEl2.classList.contains('active')){
-        const cId2=document.getElementById('sop-client')?.value;
-        const ctId2=_sopGetActiveContractId(cId2);
-        const sopYm2=document.getElementById('sop-ym')?.value;
-        if(cId2&&ctId2&&sopYm2) setTimeout(()=>renderSopFlow(cId2,ctId2,sopYm2),200);
-      }
-      await gasApi('submitWriterDraft',{id:taskId,email:_currentUser.email,draftLink:link});
-    }
-    toast('✓ 稿件已送出，等待樂法審核','success');
-    // 重新載入並更新畫面
-    await _writerLoadTasks();
-    _writerCurrentPage==='dashboard'?_renderWriterDashboard():_renderWriterTaskList(_writerAllTasks);
-    _renderWriterNav();
-  } catch(e){
-    toast('送出失敗：'+e.message);
-    if(btn){ btn.disabled=false; btn.textContent='✓ 稿件完成，送回審核'; }
+  if(!tasks.length){
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">目前沒有任務</div>';
+    return;
   }
+  el.innerHTML = tasks.map(t=>_writerTaskCard(t)).join('');
 }
 
-// ══════════════════════════════════════════
-//  帳號商介面
-// ══════════════════════════════════════════
+function _writerTaskCard(t, collapsed=false){
+  const sc = {'撰文中':'#8b5cf6','文章審核中':'#f97316','切角進行中':'#f59e0b','已上刊':'#22c55e','待上刊':'#eab308','待指派帳號商':'#06b6d4'}[t._status]||'#94a3b8';
+
+  // 根據狀態決定行動區
+  let actionHtml = '';
+
+  if(t._status === '切角進行中'){
+    // 顯示切角方向，讓寫手確認
+    const cutContent = t.cutAngleContent;
+    const cutLink    = t.cutAngleLink;
+    actionHtml = `
+      <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:#92400e;margin-bottom:4px">🎯 企劃提交的切角方向</div>
+        ${cutContent?`<div style="font-size:12px;color:#451a03">${cutContent}</div>`:''}
+        ${cutLink?`<a href="${cutLink}" target="_blank" style="font-size:12px;color:#6366f1;display:block;margin-top:4px">查看切角連結 →</a>`:''}
+      </div>
+      <div style="margin-bottom:8px">
+        <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">你的意見（選填）</label>
+        <input id="wc-note-${t.id}" type="text" placeholder="有問題就填，沒問題可直接確認"
+          style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="_writerSubmitCutFeedback('${t.id}','ok')">✓ 確認，開始撰文</button>
+        <button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444" onclick="_writerSubmitCutFeedback('${t.id}','revise')">有問題，需修改</button>
+      </div>`;
+
+  } else if(t._status === '撰文中'){
+    // 寫手尚未送稿
+    const rejectNote = t.rejectNote;
+    actionHtml = `
+      ${rejectNote?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#7f1d1d">
+        ✕ 退稿意見：${rejectNote}
+      </div>`:''}
+      ${t.cutAngleContent?`<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 10px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:#0369a1;margin-bottom:2px">🎯 切角方向</div>
+        <div style="font-size:12px;color:#0c4a6e">${t.cutAngleContent}</div>
+        ${t.cutAngleLink?`<a href="${t.cutAngleLink}" target="_blank" style="font-size:11px;color:#6366f1">查看連結 →</a>`:''}
+      </div>`:''}
+      <div style="margin-bottom:8px">
+        <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">稿件連結 *（Google Doc / Drive）</label>
+        <input id="wd-link-${t.id}" type="url" value="${t.draftLink||''}"
+          placeholder="https://docs.google.com/..."
+          style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">備註（選填）</label>
+        <input id="wd-note-${t.id}" type="text" placeholder="寫給企劃的說明"
+          style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="_writerSubmitDraft('${t.id}')">→ 送出稿件</button>`;
+
+  } else if(t._status === '文章審核中'){
+    // 已送稿，等企劃審核
+    actionHtml = `
+      <div style="font-size:12px;color:#f97316">📄 稿件已送出，等待企劃審核中</div>
+      ${t.draftLink?`<a href="${t.draftLink}" target="_blank" style="font-size:12px;color:#6366f1;display:block;margin-top:4px">查看你送出的稿件 →</a>`:''}`;
+
+  } else if(t._status === '已上刊'){
+    actionHtml = `<div style="font-size:12px;color:#22c55e">✅ 已上刊完成${t.publishedAt?' （'+t.publishedAt.slice(0,10)+'）':''}</div>`;
+  }
+
+  return `
+    <div style="border:1px solid var(--border);border-left:3px solid ${sc};border-radius:10px;
+         margin-bottom:10px;background:var(--surface);overflow:hidden">
+      <!-- 標頭 -->
+      <div style="padding:12px 14px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="font-size:13px;font-weight:600">${t.taskName||t.specType||'—'}</div>
+          <span style="font-size:11px;font-weight:500;color:${sc};flex-shrink:0">${t._status}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">
+          ${t.clientName||'—'}${t.month?' · '+t.month:''}${t.dueDate?' · 截止 '+t.dueDate:''}
+        </div>
+      </div>
+      <!-- 展開內容 -->
+      <div style="display:${collapsed?'none':'block'};border-top:1px solid var(--border);padding:12px 14px">
+        ${actionHtml||`<div style="font-size:12px;color:var(--text3)">${t._status}</div>`}
+      </div>
+    </div>`;
+}
+
+
 async function showVendorInterface(){
   document.getElementById('vendor-app').style.display = '';
   const badge = document.getElementById('vendor-name-badge');
@@ -2011,189 +2089,193 @@ async function showVendorInterface(){
 async function renderVendorTasks(){
   const el = document.getElementById('vendor-content');
   if(!el) return;
-  el.innerHTML = `<div style="text-align:center;padding:40px;color:#8a8680">載入中…</div>`;
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:#8a8680">載入中…</div>';
+
   try {
-    let tasks = [], vendorName = _userProfile?.name || _currentUser?.name || '';
-    if(window._testMode){
-      const vc = _userProfile || (DB.vendorCompanies||[]).find(v=>v.name===vendorName||v.id===_userProfile?.id);
-      if(vc){
-        vendorName = vc.name;
-        tasks = (DB.omRecords||[]).filter(r=>
-          (r.vendorId===vc.id||r.vendorName===vc.name) &&
-          ['待上刊','待確認','已上刊','觀察中','完成'].includes(r.status)
-        ).map(r=>({...r}));
-      }
-    } else {
-      const res = await gasApi('getVendorTasksByEmail', { email: _currentUser.email });
-      tasks = res.tasks || [];
-      vendorName = res.vendor || vendorName;
+    const vcProfile  = _userProfile;
+    const vcId       = vcProfile?.id || '';
+    const vcName     = vcProfile?.name || _currentUser?.name || '';
+
+    // ── 從新架構取帳號商任務 ──
+    const allTasks  = DB.ops_tasks || [];
+    const vAssigns  = DB.vendorAssignments || [];
+    const draftHist = DB.draftHistory || [];
+    const cutHist   = DB.cutAngleHistory || [];
+    const wAssigns  = DB.writerAssignments || [];
+
+    const myAssigns = vAssigns.filter(a=>
+      (vcId && a.vendorId===vcId) || a.vendorName===vcName
+    );
+    const myTaskIds = new Set(myAssigns.map(a=>a.taskId));
+
+    const tasks = allTasks.filter(t=>myTaskIds.has(t.id)).map(t=>{
+      const wa  = wAssigns.find(a=>a.taskId===t.id);
+      const cut = cutHist.filter(h=>h.taskId===t.id);
+      const dh  = draftHist.filter(h=>h.taskId===t.id);
+      const va  = myAssigns.find(a=>a.taskId===t.id);
+      const st  = getTaskStatus(t, cut, dh, wa, va);
+      const cl  = (DB.clients||[]).find(c=>c.id===t.clientId)||{};
+      const pln = (DB.ops_monthly_plans||[]).find(p=>p.id===t.planId)||{};
+      return {...t, _status:st, _va:va, _cl:cl, _month:pln.ym||''};
+    });
+
+    const badge = document.getElementById('vendor-name-badge');
+    if(badge) badge.textContent = vcName;
+
+    const pending  = tasks.filter(t=>t._status==='待上刊');
+    const confirm  = tasks.filter(t=>t._status==='待上刊'&&t._va?.postLink);
+    const done     = tasks.filter(t=>t._status==='已上刊');
+
+    if(!tasks.length){
+      el.innerHTML = '<div style="text-align:center;padding:60px;color:#8a8680;font-size:13px">目前沒有被指派的任務</div>';
+      return;
     }
 
-    // 依月份分組
-    const byMonth = {};
-    tasks.forEach(t => {
-      const m = (t.month||t.publishDate||'').slice(0,7) || '未分類';
-      if(!byMonth[m]) byMonth[m] = [];
-      byMonth[m].push(t);
-    });
-    const months = Object.keys(byMonth).sort().reverse();
-
-    const pending  = tasks.filter(t=>t.status==='待上刊');
-    const done     = tasks.filter(t=>['待確認','已上刊','觀察中','完成'].includes(t.status));
-
-    // 單筆回傳表單
-    const postForm = (t) => `
-      <div id="vf-form-${t.id}" style="display:none;border-top:1px solid #e8e6e1;padding-top:10px;margin-top:10px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">發布日期 *</label>
-            <input id="vf-date-${t.id}" type="date" value="${t.publishDate||new Date().toISOString().slice(0,10)}"
-              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
-          </div>
-          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">時間</label>
-            <input id="vf-time-${t.id}" type="time"
-              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">論壇平台</label>
-            <select id="vf-platform-${t.id}"
-              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
-              ${['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google','其他'].map(p=>'<option value="'+p+'"'+(t.platform===p?' selected':'')+'>'+ p+'</option>').join('')}
-            </select>
-          </div>
-          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">板塊</label>
-            <input id="vf-section-${t.id}" value="${t.section||''}" placeholder="板塊"
-              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
-          </div>
-        </div>
-        <div style="margin-bottom:8px"><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">上文連結 *</label>
-          <input id="vf-link-${t.id}" type="url" placeholder="https://…" value="${t.postLink||''}"
-            style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">使用帳號</label>
-            <input id="vf-account-${t.id}" value="${t.account||''}" placeholder="帳號名稱"
-              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
-          </div>
-          <div><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">截圖連結（選填）</label>
-            <input id="vf-screenshot-${t.id}" type="url" placeholder="Google Drive 截圖"
-              style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
-          </div>
-        </div>
-        <div style="margin-bottom:8px"><label style="font-size:10px;color:#6b7280;display:block;margin-bottom:3px">備註</label>
-          <input id="vf-note-${t.id}" value="${t.note||''}" placeholder="選填"
-            style="width:100%;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;box-sizing:border-box">
-        </div>
-        <button onclick="submitVendorPost('${t.id}')"
-          style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;width:100%">
-          ✓ 已上刊，回報樂法
-        </button>
-      </div>`;
-
-    // 表格列
-    const tableRow = (t, idx) => {
-      const isPending = t.status==='待上刊';
-      const isDone    = ['待確認','已上刊','觀察中','完成'].includes(t.status);
-      const statusColor = isPending?'#92400E':isDone?'#166534':'#4a4845';
-      const statusBg    = isPending?'#fef3c7':isDone?'#dcfce7':'#f3f4f6';
-      return `<tr style="border-bottom:1px solid #f0efe9;${isPending?'background:#fffdf5':''}">
-        <td style="padding:8px 10px;font-size:12px;color:#8a8680;white-space:nowrap">${idx+1}</td>
-        <td style="padding:8px 10px;font-size:12px;font-weight:600;white-space:nowrap">${t.clientName||'—'}</td>
-        <td style="padding:8px 10px;font-size:12px;white-space:nowrap">${(t.publishDate||t.month||'').slice(0,10)}</td>
-        <td style="padding:8px 10px;font-size:12px;white-space:nowrap">${t.platform||'—'}</td>
-        <td style="padding:8px 10px;font-size:12px;white-space:nowrap">${t.section||'—'}</td>
-        <td style="padding:8px 10px;font-size:12px;white-space:nowrap">${t.taskName&&t.taskName!==t.specType?t.taskName:t.specType||'—'}</td>
-        <td style="padding:8px 10px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(t.title||t.content||'').replace(/"/g,'')}">
-          ${t.title||t.content||'—'}
-        </td>
-        <td style="padding:8px 10px">
-          ${t.postLink?`<a href="${t.postLink}" target="_blank" style="font-size:12px;color:#1B4FD8">連結↗</a>`:
-            isPending?`<span style="font-size:11px;color:#92400E">待填入</span>`:'—'}
-        </td>
-        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${t.account||'—'}</td>
-        <td style="padding:8px 10px">
-          <span style="font-size:11px;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:12px;white-space:nowrap">${t.status}</span>
-        </td>
-        <td style="padding:8px 10px">
-          ${isPending?`<button onclick="document.getElementById('vf-form-${t.id}').style.display=document.getElementById('vf-form-${t.id}').style.display==='none'?'block':'none'"
-            style="font-size:11px;background:#0f6e56;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap">
-            回報
-          </button>`:''}
-        </td>
-      </tr>
-      <tr id="vf-form-row-${t.id}">
-        <td colspan="11" style="padding:0 16px 12px">
-          ${postForm(t)}
-        </td>
-      </tr>`;
-    };
-
     el.innerHTML = `
-      <!-- 統計列 -->
+      <!-- 摘要欄 -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
-        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #fcd34d;text-align:center">
-          <div style="font-size:24px;font-weight:700;color:#92400E">${pending.length}</div>
-          <div style="font-size:12px;color:#8a8680;margin-top:2px">待上刊</div>
+        <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:600;color:#eab308">${pending.length}</div>
+          <div style="font-size:11px;color:var(--text3)">待上刊</div>
         </div>
-        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-          <div style="font-size:24px;font-weight:700;color:#166534">${done.length}</div>
-          <div style="font-size:12px;color:#8a8680;margin-top:2px">已回報</div>
+        <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:600;color:#06b6d4">${confirm.length}</div>
+          <div style="font-size:11px;color:var(--text3)">待企劃確認</div>
         </div>
-        <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-          <div style="font-size:24px;font-weight:700;color:#1a1917">${tasks.length}</div>
-          <div style="font-size:12px;color:#8a8680;margin-top:2px">本期總計</div>
+        <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:600;color:#22c55e">${done.length}</div>
+          <div style="font-size:11px;color:var(--text3)">已完成</div>
         </div>
       </div>
 
-      <!-- 口碑總表 -->
-      ${months.map(ym => {
-        const mTasks = byMonth[ym];
-        return `<div style="margin-bottom:20px">
-          <div style="font-size:12px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">
-            ${ym} · ${mTasks.length} 筆
-          </div>
-          <div style="background:#fff;border:1px solid #e8e6e1;border-radius:12px;overflow:hidden">
-            <div style="overflow-x:auto">
-              <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">
-                <thead>
-                  <tr style="background:#0f172a;color:#fff">
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">#</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">專案名稱</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">發布日期</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">論壇平台</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">板塊</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">項目</th>
-                    <th style="padding:8px 10px;text-align:left;min-width:180px">標題 / 內容摘要</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">上文連結</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">帳號</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">狀態</th>
-                    <th style="padding:8px 10px;text-align:left;white-space:nowrap">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${mTasks.map((t,i) => tableRow(t,i)).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>`;
-      }).join('')}
+      <!-- 任務列表 -->
+      ${tasks.map(t=>{
+        const sc = {
+          '待上刊':'#eab308', '已上刊':'#22c55e'
+        }[t._status]||'#94a3b8';
 
-      ${!tasks.length?`<div style="text-align:center;padding:48px;background:#fff;border-radius:12px;border:1px solid #e8e6e1;color:#8a8680">
-        <div style="font-size:32px;margin-bottom:8px">📋</div>
-        目前沒有指派給 ${vendorName} 的任務
-      </div>`:''}
-      <div style="text-align:center;margin-top:16px;font-size:11px;color:#c0bdb7">資料不會自動更新，請手動重新整理</div>
+        // 文章內容（從 task 的 taskName/content + 切角連結）
+        const draftRec = draftHist.filter(h=>h.taskId===t.id&&h.action==='approved').at(-1);
+        const draftLink= draftRec?.draftLink||'';
+
+        // 是否已回報上刊
+        const hasReported = t._va?.postLink;
+
+        const actionHtml = t._status==='待上刊' ? `
+          ${draftLink?`<div style="margin-bottom:10px"><a href="${draftLink}" target="_blank"
+            style="font-size:12px;color:#6366f1;text-decoration:underline">📄 查看文章稿件 →</a></div>`:''}
+
+          ${!hasReported ? `
+            <!-- 回報上刊表單 -->
+            <div id="vf-form-${t.id}" style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2)">
+              <div style="font-size:12px;font-weight:600;margin-bottom:10px">📣 回報上刊結果</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">發布日期 *</label>
+                  <input id="vf-date-${t.id}" type="date" value="${new Date().toISOString().slice(0,10)}"
+                    style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">論壇平台</label>
+                  <select id="vf-platform-${t.id}"
+                    style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+                    ${['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google','其他'].map(p=>`<option value="${p}">${p}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div style="margin-bottom:8px">
+                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">板塊 / 討論區</label>
+                <input id="vf-section-${t.id}" placeholder="例：感情板、美妝板"
+                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+              </div>
+              <div style="margin-bottom:8px">
+                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">上文連結 *</label>
+                <input id="vf-link-${t.id}" type="url" placeholder="https://..."
+                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+              </div>
+              <div style="margin-bottom:8px">
+                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">使用帳號</label>
+                <input id="vf-account-${t.id}" placeholder="帳號名稱"
+                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+              </div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">截圖連結（選填）</label>
+                <input id="vf-screenshot-${t.id}" type="url" placeholder="Google Drive 截圖"
+                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+              </div>
+              <div style="margin-bottom:8px">
+                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">備註</label>
+                <input id="vf-note-${t.id}" placeholder="選填"
+                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+              </div>
+              <button class="btn btn-primary btn-sm" style="width:100%" onclick="_vendorSubmitPost('${t.id}')">📣 回報上刊完成</button>
+            </div>
+          ` : `
+            <!-- 已回報，等企劃確認 -->
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;font-size:12px;color:#166534">
+              ✓ 已回報上刊（等待企劃確認）
+              ${t._va.postLink?`<br><a href="${t._va.postLink}" target="_blank" style="color:#6366f1">查看貼文 →</a>`:''}
+            </div>
+          `}
+        ` : t._status==='已上刊' ? `
+          <div style="font-size:12px;color:#22c55e">✅ 已確認完成${t.publishedAt?' （'+t.publishedAt.slice(0,10)+'）':''}</div>
+          ${t._va?.postLink?`<a href="${t._va.postLink}" target="_blank" style="font-size:12px;color:#6366f1;display:block;margin-top:4px">查看貼文 →</a>`:''}
+        ` : `<div style="font-size:12px;color:var(--text3)">${t._status}</div>`;
+
+        return `
+          <div style="border:1px solid var(--border);border-left:3px solid ${sc};border-radius:10px;margin-bottom:10px;background:var(--surface)">
+            <div style="padding:12px 14px;cursor:pointer"
+              onclick="const b=document.getElementById('vb-${t.id}');if(b)b.style.display=b.style.display==='none'?'block':'none'">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div style="font-size:13px;font-weight:600">${t.taskName||t.specType||'—'}</div>
+                <span style="font-size:11px;color:${sc};font-weight:500">${t._status}</span>
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:3px">
+                ${t._cl?.name||'—'}${t._month?' · '+t._month:''}${t.dueDate?' · 截止 '+t.dueDate:''}
+              </div>
+            </div>
+            <div id="vb-${t.id}" style="display:${t._status==='待上刊'&&!hasReported?'block':'none'};border-top:1px solid var(--border);padding:12px 14px">
+              ${actionHtml}
+            </div>
+          </div>`;
+      }).join('')}
     `;
   } catch(e){
-    el.innerHTML = `<div style="text-align:center;padding:40px;color:#991b1b">載入失敗：${e.message}</div>`;
+    console.error('renderVendorTasks error:', e);
+    el.innerHTML = `<div style="padding:20px;color:#ef4444">載入失敗：${e.message}</div>`;
   }
 }
 
+// ── 帳號商回報上刊 ──
+async function _vendorSubmitPost(taskId){
+  const date       = document.getElementById('vf-date-'+taskId)?.value||new Date().toISOString().slice(0,10);
+  const platform   = document.getElementById('vf-platform-'+taskId)?.value||'';
+  const section    = document.getElementById('vf-section-'+taskId)?.value.trim()||'';
+  const link       = document.getElementById('vf-link-'+taskId)?.value.trim()||'';
+  const account    = document.getElementById('vf-account-'+taskId)?.value.trim()||'';
+  const screenshot = document.getElementById('vf-screenshot-'+taskId)?.value.trim()||'';
+  const note       = document.getElementById('vf-note-'+taskId)?.value.trim()||'';
 
-// ══════════════════════════════════════════
-//  客戶儀錶板介面
-// ══════════════════════════════════════════
+  if(!link){ toast('請填寫上文連結', 'warning'); return; }
+
+  // 更新 vendorAssignment
+  const va = (DB.vendorAssignments||[]).find(a=>a.taskId===taskId);
+  if(!va){ toast('找不到指派記錄', 'error'); return; }
+
+  Object.assign(va, { postLink:link, account, platform, section,
+    screenshotLinks:screenshot?[screenshot]:[],
+    publishDate:date, note });
+
+  // 更新 task
+  const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
+  if(task){ task.platform=platform; task.section=section; }
+
+  await syncToGAS('vendor_assignments', va).catch(()=>{});
+  toast('✅ 已回報上刊，等待企劃確認', 'success');
+  await renderVendorTasks();
+}
+
+
 function showClientInterface(){
   const app = document.getElementById('client-app');
   if(app){ app.style.display = 'flex'; app.style.flexDirection = 'column'; }
@@ -3449,7 +3531,10 @@ function showTestRolePanel(){
   // ── 內部員工：從 hr_members 取實際人員 ──
   const roleIcon  = { owner:'👑', manager:'👩‍💼', employee:'🧑‍💻', staff:'🧑‍💻' };
   const roleColor = { owner:'#dc2626', manager:'#d97706', employee:'#1D4ED8', staff:'#1D4ED8' };
-  const hrMembers = (window.D?.members || []).filter(m => m.active===true || m.active==='TRUE' || m.active===1);
+  const hrMembers = (window.D?.members || []).filter(m =>
+    (m.active===true || m.active==='TRUE' || m.active===1) &&
+    !(m.super_admin===true || m.super_admin==='TRUE')  // 超級管理員不出現在切換面板
+  );
 
   const staffRoles = hrMembers.length > 0
     ? hrMembers.map(m => ({
@@ -3468,10 +3553,11 @@ function showTestRolePanel(){
         { role:'staff', label:'🧑‍💻 企劃（暫用）', name:'企劃同仁', email:'staff@lepharem.com', hrRole:'employee', memberId:'', color:'#1D4ED8' },
       ];
 
-  // ── 客戶（進行中合約的客戶）──
-  const clientRoles = DB.clients.filter(c=>c.status==='進行中').map(c=>({
-    role:'client', label:`🏢 ${c.name}`, name:c.name,
-    email: c.clientEmail||`client_${c.id}@test.com`,
+  // ── 客戶：有進行中合約的客戶（從 crm_contracts 交叉比對）──
+  const _activeClientIds = new Set((DB.contracts||[]).filter(c=>c.status==='進行中').map(c=>c.clientId));
+  const clientRoles = (DB.clients||[]).filter(c=>_activeClientIds.has(c.id)).map(c=>({
+    role:'client', label:`🏢 ${c.name||c.id}`, name:c.name||c.id,
+    email: c.clientEmail||c.email||`client_${c.id}@test.com`,
     clientId: c.id, color:'#0891b2'
   }));
   // ── 寫手（ref_freelancer_pricing，外包人員）──
@@ -8744,7 +8830,16 @@ function _testInitPlan(clientId, contractId, ym){
   }
 
   specs.forEach(s=>{
-    const qty = Number(s.monthlyQty||s.qty||0);
+    // monthlyQty 優先；若無，用 qty÷合約月數 估算月均量（至少1）
+    const _ct = (DB.contracts||[]).find(c=>c.id===s.contractId)||{};
+    const _months = Math.max(1, (() => {
+      if(_ct.start && _ct.end){
+        const s_=new Date(_ct.start), e_=new Date(_ct.end);
+        return Math.max(1, Math.round((e_-s_)/(1000*60*60*24*30)));
+      }
+      return 12;
+    })());
+    const qty = Number(s.monthlyQty) || Math.ceil(Number(s.qty||0)/_months) || 0;
     if(!qty) return;
     const planId = 'TEST_PLAN_'+s.id;
     const existPlan = TEST_DATA.plans.find(p=>p.id===planId);
@@ -9157,11 +9252,31 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
         ${_vendorSelect(id, clientId, contractId, ym)}
       </div>`;
 
-    case '待上刊':
-      return `<div style="font-size:12px;color:#eab308">
-        🕐 等待帳號商回報上刊結果。
-        <button class="btn btn-sm" style="margin-left:8px" onclick="_confirmPublish('${id}','${clientId}','${contractId}','${ym}')">✓ 確認上刊</button>
+    case '待上刊': {
+      const _va2 = task._rel?.vendor;
+      const _hasReport = _va2?.postLink;
+      return `<div style="display:flex;flex-direction:column;gap:8px">
+        ${_hasReport ? `
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;font-size:12px">
+            <div style="font-weight:600;color:#166534;margin-bottom:6px">📣 帳號商已回報上刊</div>
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;color:#374151">
+              ${_va2.publishDate?`<span style="color:#6b7280">日期</span><span>${_va2.publishDate}</span>`:''}
+              ${_va2.platform?`<span style="color:#6b7280">平台</span><span>${_va2.platform}${_va2.section?' · '+_va2.section:''}</span>`:''}
+              ${_va2.account?`<span style="color:#6b7280">帳號</span><span>${_va2.account}</span>`:''}
+            </div>
+            ${_va2.postLink?`<a href="${_va2.postLink}" target="_blank" style="color:#6366f1;font-size:12px;display:block;margin-top:6px">查看貼文 →</a>`:''}
+            ${_va2.screenshotLinks&&_va2.screenshotLinks.length?`<a href="${_va2.screenshotLinks[0]}" target="_blank" style="color:#6366f1;font-size:12px">查看截圖 →</a>`:''}
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="_confirmPublish('${id}','${clientId}','${contractId}','${ym}')">✓ 確認上刊完成</button>
+            <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="_rejectVendorPost('${id}','${clientId}','${contractId}','${ym}')">✕ 退回重發</button>
+          </div>
+        ` : `
+          <div style="font-size:12px;color:#eab308">🕐 等待帳號商回報上刊結果</div>
+          <button class="btn btn-sm" style="align-self:flex-start" onclick="_confirmPublish('${id}','${clientId}','${contractId}','${ym}')">✓ 手動確認上刊</button>
+        `}
       </div>`;
+    }
 
     case '已上刊':
       return `<div style="font-size:12px;color:#22c55e">✓ 已上刊完成 ${task.publishedAt?'（'+task.publishedAt.slice(0,10)+'）':''}</div>`;
@@ -9176,9 +9291,9 @@ function _plannerSelect(taskId, currentPlannerId, clientId, contractId, ym){
   const planners = (window.D?.members || DB.members || []).filter(m=>
     m.active===true || m.active==='TRUE' || m.active===1
   );
-  // 自動預設為當前登入者
-  const defaultId = currentPlannerId || window.myMember?.id || '';
-  const options = planners.map(m=>`<option value="${m.id}" ${String(m.id)===String(defaultId)?'selected':''}>${m.name_zh||m.name||m.id}</option>`).join('');
+  // 已指派的維持選中；新任務不預設（讓企劃主動選擇）
+  const defaultId = currentPlannerId || '';
+  const options = planners.map(m=>`<option value="${m.id}" ${defaultId&&String(m.id)===String(defaultId)?'selected':''}>${m.name_zh||m.name||m.id}</option>`).join('');
 
   if(!planners.length){
     return `<div style="font-size:11px;color:var(--text3)">
@@ -9357,6 +9472,18 @@ function _assignVendor(taskId, clientId, contractId, ym){
   syncToGAS('vendor_assignments', assignment).catch(()=>{});
   _refreshPlan(clientId, contractId, ym);
   toast(`已指派 ${vendor.name}`, 'success');
+}
+
+// 退回帳號商重發
+function _rejectVendorPost(taskId, clientId, contractId, ym){
+  const va = (DB.vendorAssignments||[]).find(a=>a.taskId===taskId);
+  if(!va){ toast('找不到指派記錄','error'); return; }
+  // 清除回報資料，讓帳號商重填
+  va.postLink=''; va.account=''; va.platform=''; va.section=''; va.screenshotLinks=[];
+  va.publishDate=''; va.confirmedAt='';
+  syncToGAS('vendor_assignments', va).catch(()=>{});
+  _refreshPlan(clientId, contractId, ym);
+  toast('已退回，等帳號商重新回報', 'info');
 }
 
 // 確認上刊
