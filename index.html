@@ -3251,7 +3251,6 @@ window.syncToGAS = async function(collection, obj){
     'draft_history': 'saveDraftHistory', 'ops_draft_history': 'saveDraftHistory',
     'writer_assignments': 'saveWriterAssignment', 'ops_writer_assignments': 'saveWriterAssignment',
     'vendor_assignments': 'saveVendorAssignment', 'ops_vendor_assignments': 'saveVendorAssignment',
-    'monthly_plans': 'saveMonthlyPlan',
   };
   if(_newTableAction[collection]){
     return gasApi(_newTableAction[collection], obj);
@@ -8631,10 +8630,27 @@ const TEST_DATA = {
 
 function _testInitPlan(clientId, contractId, ym){
   // 從 DB.specItems 建立假的月度計畫和任務
-  const specs = (DB.specItems||[]).filter(s=>
-    s.contractId===contractId && (s.category==='口碑'||!s.category)
+  // 優先找對應合約的口碑規格，若無則取此合約所有規格，再無則取此客戶任意合約的規格
+  let specs = (DB.specItems||[]).filter(s=>
+    s.contractId===contractId && (s.category==='口碑'||!s.category||s.category==='')
   );
-  if(!specs.length) return;
+  if(!specs.length){
+    // fallback 1：同合約，不限類型
+    specs = (DB.specItems||[]).filter(s=>s.contractId===contractId);
+  }
+  if(!specs.length){
+    // fallback 2：同客戶任意合約
+    const clientContracts = (DB.contracts||[]).filter(c=>c.clientId===clientId).map(c=>c.id);
+    specs = (DB.specItems||[]).filter(s=>clientContracts.includes(s.contractId));
+  }
+  if(!specs.length){
+    // fallback 3：建立假的規格（讓測試模式在沒有任何規格時也能工作）
+    specs = [
+      { id:'FAKE_SPEC_1', contractId, clientId, name:'週監控', category:'口碑', qty:4, monthlyQty:4 },
+      { id:'FAKE_SPEC_2', contractId, clientId, name:'長圖文', category:'口碑', qty:2, monthlyQty:2 },
+    ];
+    console.log('[TEST] 無規格資料，使用假規格');
+  }
 
   specs.forEach(s=>{
     const qty = Number(s.monthlyQty||s.qty||0);
@@ -9075,7 +9091,8 @@ function _deactivateTask(taskId, clientId, contractId, ym){
 }
 
 function _dueDateInput(taskId, current, clientId, contractId, ym){
-  return `<input type="date" value="${current||''}" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px"
+  return `<input type="date" id="due-${taskId}" value="${current||''}"
+    style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px"
     onchange="_setTaskDueDate('${taskId}',this.value,'${clientId}','${contractId}','${ym}')"
     title="截止日">`;
 }
@@ -10092,20 +10109,8 @@ function _buildQ100Section(section){
 }
 
 // ════════════════════════════════════════════════════════════════
-//  syncToGAS：新表的路由對應
+//  syncToGAS：新表路由已整合於 syncToGAS 函式內的 _newTableAction
 // ════════════════════════════════════════════════════════════════
-
-// 擴充 syncToGAS 以支援新表（在現有函式外補充，不覆蓋原本）
-const _NEW_TABLE_ACTIONS = {
-  'tasks':             'saveTask',
-  'ops_tasks':         'saveTask',
-  'monthly_plans':     'saveMonthlyPlan',
-  'ops_monthly_plans': 'saveMonthlyPlan',
-  'cutangle_history':  'saveCutAngleHistory',
-  'draft_history':     'saveDraftHistory',
-  'writer_assignments':'saveWriterAssignment',
-  'vendor_assignments':'saveVendorAssignment',
-};
 
 // ════════════════════════════════════════
 //  B2 — 廠商任務批次派發（從規格頁觸發）
