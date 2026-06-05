@@ -5205,8 +5205,29 @@ function openEditContract(contractId){
       <div class="form-group"><label class="form-label">合約編號</label><input class="form-input" id="f-cno" value="${ct.contractNo||''}"></div>
       <div class="form-group"><label class="form-label">簽約日</label><input class="form-input" type="date" id="f-sign" value="${(ct.signDate||'').slice(0,10)}"></div>
     </div>
-    <div class="form-group"><label class="form-label">狀態</label>
-      <select class="form-input" id="f-status">${['進行中','完成','暫停','結束合約'].map(s=>`<option ${s===ct.status?'selected':''}>${s}</option>`).join('')}</select>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">狀態</label>
+        <select class="form-input" id="f-status">${['進行中','完成','暫停','結束合約'].map(s=>`<option ${s===ct.status?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label class="form-label">合約類型</label>
+        <select class="form-input" id="f-contract-type">
+          ${['長約','短約','專案'].map(s=>`<option ${s===(ct.contractType||'長約')?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">主要負責企劃</label>
+        <select class="form-input" id="f-assigned-planner">
+          <option value="">— 選擇 —</option>
+          ${(window.D?.members||[]).filter(m=>m.active!==false).map(m=>`<option value="${m.id}" ${m.id===ct.assignedPlanner?'selected':''}>${m.name_zh||m.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">協同企劃</label>
+        <select class="form-input" id="f-co-planner">
+          <option value="">— 選擇 —</option>
+          ${(window.D?.members||[]).filter(m=>m.active!==false).map(m=>`<option value="${m.id}" ${m.id===ct.coPlanner?'selected':''}>${m.name_zh||m.name}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div class="form-group"><label class="form-label">備註</label><textarea class="form-input" id="f-note">${ct.note||''}</textarea></div>
     <div class="form-group"><label class="form-label">Google Drive 合約連結</label>
@@ -5233,6 +5254,9 @@ function openEditContract(contractId){
     ct.status=document.getElementById('f-status').value;
     ct.note=document.getElementById('f-note').value;
     ct.driveLink=document.getElementById('f-drive').value.trim();
+    ct.contractType=document.getElementById('f-contract-type')?.value||ct.contractType||'長約';
+    ct.assignedPlanner=document.getElementById('f-assigned-planner')?.value||ct.assignedPlanner||'';
+    ct.coPlanner=document.getElementById('f-co-planner')?.value||ct.coPlanner||'';
     syncToGAS('contracts', ct).catch(e=>console.error('sync contract failed',e));
     closeModal();openClientDrawer(ct.clientId);toast('合約已更新','success');
   });
@@ -6843,17 +6867,42 @@ function openAddFreelancerRecord(){
       <div class="form-group"><label class="form-label">項目</label><input class="form-input" id="f-item" placeholder="如：長圖文"></div>
       <div class="form-group"><label class="form-label">金額</label><input class="form-input" type="number" id="f-amount" placeholder="0"></div>
     </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">請款日</label><input class="form-input" type="date" id="f-requested-at"></div>
+      <div class="form-group"><label class="form-label">付款狀態</label>
+        <select class="form-input" id="f-fl-status" onchange="document.getElementById('f-paid-date-wrap').style.display=this.value==='已付'?'block':'none'"><option value="未付">未付</option><option value="已付">已付</option></select>
+      </div>
+    </div>
+    <div class="form-group" id="f-paid-date-wrap" style="display:none">
+      <label class="form-label">實際付款日</label><input class="form-input" type="date" id="f-paid-date">
+    </div>
     <div class="form-group"><label class="form-label">備註</label><input class="form-input" id="f-note"></div>
   `,()=>{
     const person=document.getElementById('f-person').value.trim();
     const clientId=document.getElementById('f-client').value;
     if(!person||!clientId)return alert('請填寫外包人員與客戶');
     if(!DB.freelancerRecords)DB.freelancerRecords=[];
-    const newRec={id:nextId('FR'),person,clientId,month:document.getElementById('f-month').value,type:document.getElementById('f-type').value,item:document.getElementById('f-item').value,amount:Number(document.getElementById('f-amount').value)||0,note:document.getElementById('f-note').value};
+    const flStatus=document.getElementById('f-fl-status').value;
+    const writerObj=(DB.freelancers||[]).find(f=>f.name===person)||{};
+    const newRec={
+      id:nextId('FR'),person,writerName:person,writerId:writerObj.id||'',
+      memberName:person,clientId,
+      month:document.getElementById('f-month').value,
+      type:document.getElementById('f-type').value,
+      item:document.getElementById('f-item').value,
+      qty:1,
+      amount:Number(document.getElementById('f-amount').value)||0,
+      status:flStatus,
+      requestedAt:document.getElementById('f-requested-at').value,
+      paidDate:flStatus==='已付'?(document.getElementById('f-paid-date').value||new Date().toISOString().slice(0,10)):'',
+      note:document.getElementById('f-note').value,
+      created_at:new Date().toISOString(),
+    };
     DB.freelancerRecords.push(newRec);
     syncToGAS('freelancerRecords',newRec).catch(e=>console.error('sync fl failed',e));
     closeModal();renderFreelancerStats();toast('外包記錄已新增','success');
   });
+
 }
 
 function openEditFreelancerRecord(id){
@@ -6867,11 +6916,21 @@ function openEditFreelancerRecord(id){
       <div class="form-group"><label class="form-label">月份</label><input class="form-input" type="month" id="f-month" value="${r.month||''}"></div>
       <div class="form-group"><label class="form-label">項目</label><input class="form-input" id="f-item" value="${r.item||''}"></div>
     </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">請款日</label><input class="form-input" type="date" id="f-requested-at" value="${r.requestedAt||''}"></div>
+      <div class="form-group"><label class="form-label">付款狀態</label>
+        <select class="form-input" id="f-fl-status"><option ${(r.status||'未付')==='未付'?'selected':''}>未付</option><option ${r.status==='已付'?'selected':''}>已付</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">實際付款日</label><input class="form-input" type="date" id="f-paid-date" value="${r.paidDate||''}"></div>
   `,()=>{
     r.person=document.getElementById('f-person').value.trim()||r.person;
     r.amount=Number(document.getElementById('f-amount').value)||0;
     r.month=document.getElementById('f-month').value;
     r.item=document.getElementById('f-item').value;
+    r.requestedAt=document.getElementById('f-requested-at').value;
+    r.status=document.getElementById('f-fl-status').value;
+    r.paidDate=document.getElementById('f-paid-date').value;
     syncToGAS('freelancerRecords',r).catch(e=>console.error('sync fl failed',e));
     closeModal();renderFreelancerStats();toast('已更新','success');
   });
@@ -9024,25 +9083,33 @@ function _dueDateInput(taskId, current, clientId, contractId, ym){
 function _writerSelect(taskId, clientId, contractId, ym){
   const writers = (DB.freelancers||[]);
   const options = writers.map(w=>`<option value="${w.id||w.name}">${w.name}</option>`).join('');
-  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <select id="writer-sel-${taskId}" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
-      <option value="">— 選擇寫手 —</option>
-      <option value="INTERNAL">內部產出</option>
-      ${options}
-    </select>
-    <button class="btn btn-primary btn-sm" onclick="_assignWriter('${taskId}','${clientId}','${contractId}','${ym}')">指派</button>
+  return `<div style="display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="writer-sel-${taskId}" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+        <option value="">— 選擇寫手 —</option>
+        <option value="INTERNAL">內部產出</option>
+        ${options}
+      </select>
+      <input id="writer-fee-${taskId}" type="number" placeholder="費用（選填）" min="0"
+        style="width:110px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+      <button class="btn btn-primary btn-sm" onclick="_assignWriter('${taskId}','${clientId}','${contractId}','${ym}')">指派</button>
+    </div>
   </div>`;
 }
 
 function _vendorSelect(taskId, clientId, contractId, ym){
   const vendors = (DB.vendorCompanies||[]);
   const options = vendors.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
-  return `<div style="display:flex;gap:8px;align-items:center">
-    <select id="vendor-sel-${taskId}" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
-      <option value="">— 選擇帳號商 —</option>
-      ${options}
-    </select>
-    <button class="btn btn-primary btn-sm" onclick="_assignVendor('${taskId}','${clientId}','${contractId}','${ym}')">指派</button>
+  return `<div style="display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="vendor-sel-${taskId}" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+        <option value="">— 選擇帳號商 —</option>
+        ${options}
+      </select>
+      <input id="vendor-fee-${taskId}" type="number" placeholder="費用（選填）" min="0"
+        style="width:110px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+      <button class="btn btn-primary btn-sm" onclick="_assignVendor('${taskId}','${clientId}','${contractId}','${ym}')">指派</button>
+    </div>
   </div>`;
 }
 
@@ -9100,11 +9167,13 @@ function _assignWriter(taskId, clientId, contractId, ym){
     : (DB.freelancers||[]).find(w=>String(w.id||w.name)===sel.value);
   if(!writer) return;
 
+  const agreedFee = parseFloat(document.getElementById('writer-fee-'+taskId)?.value||'0')||0;
   const assignment = {
     id: 'WA_'+Date.now().toString(36),
     taskId, writerId: writer.id, writerName: writer.name,
     assignedAt: new Date().toISOString(),
     assignedBy: window.myMember?.id||'',
+    agreedFee,
   };
   if(!DB.writerAssignments) DB.writerAssignments = [];
   // 移除舊的指派（重新指派）
@@ -9122,12 +9191,14 @@ function _assignVendor(taskId, clientId, contractId, ym){
   const vendor = (DB.vendorCompanies||[]).find(v=>v.id===sel.value);
   if(!vendor) return;
 
+  const agreedFeeV = parseFloat(document.getElementById('vendor-fee-'+taskId)?.value||'0')||0;
   const assignment = {
     id: 'VA_'+Date.now().toString(36),
     taskId, vendorId: vendor.id, vendorName: vendor.name,
     assignedAt: new Date().toISOString(),
     assignedBy: window.myMember?.id||'',
     confirmedAt: '',
+    agreedFee: agreedFeeV,
   };
   if(!DB.vendorAssignments) DB.vendorAssignments = [];
   DB.vendorAssignments = DB.vendorAssignments.filter(a=>a.taskId!==taskId);
@@ -9198,6 +9269,13 @@ function _addSingleTask(clientId, contractId, ym){
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
         <input type="checkbox" id="new-task-extra"> 臨時加發（不計入計畫量）
       </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="new-task-repost" onchange="document.getElementById('new-task-repost-detail').style.display=this.checked?'block':'none'"> 補發任務（替代被刪文章）
+      </label>
+      <div id="new-task-repost-detail" style="display:none;margin-top:4px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">刪文日期</label>
+        <input id="new-task-deleted-at" type="date" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+      </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
       <button class="btn btn-sm" onclick="closeModal()">取消</button>
@@ -9214,6 +9292,8 @@ function _submitNewTask(clientId, contractId, ym){
   const isExtra  = document.getElementById('new-task-extra')?.checked||false;
 
   const spec = (DB.specItems||[]).find(s=>s.id===specId);
+  const isRepost   = document.getElementById('new-task-repost')?.checked||false;
+  const deletedAt  = document.getElementById('new-task-deleted-at')?.value||'';
   const task = {
     id: 'T_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
     planId: '', contractId, clientId,
@@ -9221,6 +9301,7 @@ function _submitNewTask(clientId, contractId, ym){
     taskName: taskName||(spec?.name||'新任務'),
     requireCutAngle: needCut,
     isExtraTask: isExtra,
+    isRepost, deletedAt,
     dueDate, activatedAt: '',
     assignedPlanner: window.myMember?.id||'',
     coPlanner: '', platform: '', section: '', publishedAt: '',
@@ -9537,7 +9618,7 @@ function _buildQ100Section(section){
       })(), `${tasks.filter(t=>t.publishedAt&&dayDiff(t.publishedAt,today)>7).length} 筆`),
       card('Q9 — 刪文補發記錄', (()=>{
         const reposts = tasks.filter(t=>t.isRepost);
-        if(!reposts.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">尚無補發記錄（需在 ops_tasks 設定 isRepost=true）</div>';
+        if(!reposts.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">尚無補發記錄。新增任務時勾選「補發任務」即可建立。</div>';
         return table(['補發任務','客戶','原刪文日','補發狀態'],
           reposts.map(t=>[t.taskName||t.specType,clName(t.clientId),t.deletedAt?.slice(0,10)||'—',badge(taskStatus(t),STATUS_COLOR[taskStatus(t)]||'#94a3b8')]));
       })()),
@@ -9903,6 +9984,22 @@ function _buildQ100Section(section){
     return header('獲利分析','📈') + [
       card('Q1 — 各服務類型毛利率', table(['規格項目','售價','外包成本','毛利','毛利率'], Object.entries(bySpecType).sort((a,b)=>b[1].price-a[1].price).map(([name,v])=>{ const profit=v.price-v.extCost-v.intCost; const margin=v.price>0?Math.round(profit/v.price*100):0; return [name,fmt(v.price),fmt(v.extCost+v.intCost),fmt(profit),`${margin}%`]; })), ''),
       card('Q3 — 各客戶專案毛利', table(['客戶','已收','成本','毛利'], Object.values(byClient).sort((a,b)=>b.profit-a.profit).map(v=>[v.name,fmt(v.income),fmt(v.cost),fmt(v.profit)])), ''),
+      card('Q5 — 長約 vs 短約平均毛利率差異', (()=>{
+        const byType = {};
+        contracts.forEach(c=>{
+          const type = c.contractType||'長約';
+          const cl = clients.find(x=>x.id===c.clientId)||{};
+          const income = payments.filter(p=>p.contractId===c.id&&p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0);
+          const cost = vendorRecs.filter(r=>r.clientId===c.clientId).reduce((s,r)=>s+(r.amount||0),0);
+          if(!byType[type]) byType[type]={income:0,cost:0,count:0};
+          byType[type].income+=income; byType[type].cost+=cost; byType[type].count++;
+        });
+        return table(['合約類型','合約數','平均毛利率'],
+          Object.entries(byType).map(([type,v])=>{
+            const margin=v.income>0?((v.income-v.cost)/v.income*100).toFixed(1):0;
+            return [type,v.count,badge(`${margin}%`,Number(margin)>=40?'#22c55e':Number(margin)>=20?'#f59e0b':'#ef4444')];
+          }));
+      })()),
       card('Q7 — 各寫手退改率', (()=>{ const byWriter={}; drafts.forEach(h=>{ const t=tasks.find(x=>x.id===h.taskId); const w=wAssign.find(a=>a.taskId===h.taskId); if(!w) return; const wn=wName(w.writerId); if(!byWriter[wn]) byWriter[wn]={total:0,rejected:0}; byWriter[wn].total++; if(h.action==='rejected') byWriter[wn].rejected++; }); return table(['寫手','審核次數','退改次數','退改率'],Object.entries(byWriter).sort((a,b)=>(b[1].rejected/b[1].total)-(a[1].rejected/a[1].total)).map(([name,v])=>[name,v.total,v.rejected,`${Math.round(v.rejected/v.total*100)}%`])); })()),
       card('Q10 — 各 PM 負責專案毛利', (()=>{ const byPM={}; contracts.forEach(c=>{ const pm=c.owner||c.assignedPlanner||'未指派'; if(!byPM[pm]) byPM[pm]={contracts:0,income:0,cost:0}; byPM[pm].contracts++; const pays=payments.filter(p=>p.contractId===c.id); byPM[pm].income+=pays.filter(p=>p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0); }); return table(['PM','合約數','已收入','毛利率'],Object.entries(byPM).map(([pm,v])=>[pm,v.contracts,fmt(v.income),'—'])); })()),
       card('Q2 — 各服務類型從發包到上刊平均天數', (()=>{
