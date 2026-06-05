@@ -9530,6 +9530,77 @@ function _buildQ100Section(section){
       card('Q11 — 任務完整時間軸（點選任務查看）', `<div style="padding:14px;font-size:12px;color:var(--color-text-secondary)">前往「口碑月度作業」點開任務卡，展開可看完整切角 + 文章往返紀錄</div>`),
       card('Q17 — 本月各平台上刊統計', (()=>{ const byPlatform={}; published.filter(t=>t.publishedAt?.slice(0,7)===thisMonth).forEach(t=>{const p=t.platform||'未設定';byPlatform[p]=(byPlatform[p]||0)+1;}); return table(['平台','篇數'],Object.entries(byPlatform).sort((a,b)=>b[1]-a[1]).map(([p,n])=>[p,n])); })()),
       card('Q18 — 同時有 PM 退稿和客戶退稿的任務', (()=>{ const pmRej=new Set(drafts.filter(h=>h.action==='rejected'&&h.by==='planner').map(h=>h.taskId)); const clRej=new Set(drafts.filter(h=>h.action==='rejected'&&h.by==='client').map(h=>h.taskId)); const both=[...pmRej].filter(id=>clRej.has(id)); return table(['任務','客戶'],both.map(id=>{ const t=tasks.find(x=>x.id===id)||{}; return [t.taskName||t.specType||id,clName(t.clientId)]; })); })()),
+      card('Q6 — 上刊超過 7 天可結案', (()=>{
+        const closeable = tasks.filter(t=>t.publishedAt && dayDiff(t.publishedAt,today)>7);
+        return table(['任務','客戶','上刊日','已過天數'],
+          closeable.map(t=>[t.taskName||t.specType,clName(t.clientId),t.publishedAt?.slice(0,10),`${dayDiff(t.publishedAt,today)} 天`]));
+      })(), `${tasks.filter(t=>t.publishedAt&&dayDiff(t.publishedAt,today)>7).length} 筆`),
+      card('Q9 — 刪文補發記錄', (()=>{
+        const reposts = tasks.filter(t=>t.isRepost);
+        if(!reposts.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">尚無補發記錄（需在 ops_tasks 設定 isRepost=true）</div>';
+        return table(['補發任務','客戶','原刪文日','補發狀態'],
+          reposts.map(t=>[t.taskName||t.specType,clName(t.clientId),t.deletedAt?.slice(0,10)||'—',badge(taskStatus(t),STATUS_COLOR[taskStatus(t)]||'#94a3b8')]));
+      })()),
+      card('Q13 — 截止日不足 3 天但尚未到待發廠商', (()=>{
+        const urgent = tasks.filter(t=>{
+          if(!t.dueDate || !t.activatedAt) return false;
+          const daysLeft = dayDiff(today, t.dueDate);
+          const st = taskStatus(t);
+          return daysLeft>=0 && daysLeft<=3 && !['待指派帳號商','待上刊','已上刊'].includes(st);
+        });
+        return table(['任務','客戶','截止日','剩餘天數','當前狀態'],
+          urgent.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).map(t=>{
+            const left = dayDiff(today,t.dueDate);
+            return [t.taskName||t.specType,clName(t.clientId),t.dueDate,
+              `<span style="color:${left<=1?'#ef4444':'#f97316'};font-weight:600">${left} 天</span>`,
+              badge(taskStatus(t),STATUS_COLOR[taskStatus(t)]||'#94a3b8')];
+          }));
+      })(), ''),
+      card('Q14 — 各帳號商從接單到上刊平均天數', (()=>{
+        const vendorStats = {};
+        vAssign.forEach(a=>{
+          if(!a.confirmedAt || !a.assignedAt) return;
+          const vname = (DB.vendorCompanies||[]).find(v=>v.id===a.vendorId)?.name || a.vendorId || '未知';
+          if(!vendorStats[vname]) vendorStats[vname]={total:0,count:0};
+          vendorStats[vname].total += dayDiff(a.assignedAt,a.confirmedAt);
+          vendorStats[vname].count++;
+        });
+        return table(['帳號商','已完成任務','平均天數'],
+          Object.entries(vendorStats).sort((a,b)=>a[1].total/a[1].count - b[1].total/b[1].count)
+            .map(([name,v])=>[name,v.count,`${(v.total/v.count).toFixed(1)} 天`]));
+      })()),
+      card('Q16 — 本月各寫手準時交稿率', (()=>{
+        const writerStats = {};
+        tasks.filter(t=>t.dueDate && t.dueDate.slice(0,7)===thisMonth).forEach(t=>{
+          const w = wAssign.find(a=>a.taskId===t.id);
+          if(!w) return;
+          const wn = wName(w.writerId);
+          const firstSubmit = drafts.filter(h=>h.taskId===t.id&&h.action==='submitted'&&h.by==='writer')[0];
+          if(!firstSubmit) return;
+          if(!writerStats[wn]) writerStats[wn]={onTime:0,total:0};
+          writerStats[wn].total++;
+          if(firstSubmit.createdAt?.slice(0,10) <= t.dueDate) writerStats[wn].onTime++;
+        });
+        if(!Object.keys(writerStats).length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">本月尚無足夠資料計算</div>';
+        return table(['寫手','送稿次數','準時次數','準時率'],
+          Object.entries(writerStats).sort((a,b)=>(b[1].onTime/b[1].total)-(a[1].onTime/a[1].total))
+            .map(([name,v])=>[name,v.total,v.onTime,`${Math.round(v.onTime/v.total*100)}%`]));
+      })()),
+      card('Q20 — 各寫手從接稿到交稿平均天數', (()=>{
+        const writerDays = {};
+        wAssign.forEach(a=>{
+          const firstSubmit = drafts.filter(h=>h.taskId===a.taskId&&h.action==='submitted'&&h.by==='writer')[0];
+          if(!firstSubmit || !a.assignedAt) return;
+          const wn = wName(a.writerId);
+          if(!writerDays[wn]) writerDays[wn]={total:0,count:0};
+          const days = dayDiff(a.assignedAt,firstSubmit.createdAt);
+          if(days>=0){ writerDays[wn].total+=days; writerDays[wn].count++; }
+        });
+        if(!Object.keys(writerDays).length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">尚無足夠資料</div>';
+        return table(['寫手','樣本數','平均天數'],
+          Object.entries(writerDays).sort((a,b)=>a[1].total/a[1].count - b[1].total/b[1].count)
+            .map(([name,v])=>[name,v.count,`${(v.total/v.count).toFixed(1)} 天`]));
+      })()),
     ].join('');
   }
 
@@ -9550,6 +9621,88 @@ function _buildQ100Section(section){
       card('Q9 — 切角確認後遲遲未啟動任務', table(['任務','客戶','確認日'], noTaskAfterCut.map(t=>{ const a=cuts.filter(h=>h.taskId===t.id&&h.action==='approved').at(-1); return [t.taskName||t.specType,clName(t.clientId),a?.createdAt?.slice(0,10)||'—']; })), `${noTaskAfterCut.length} 筆`),
       card('Q16 — 同版本被退回 2 次以上', (()=>{ const cnt={}; cuts.forEach(h=>{if(h.action==='rejected'){const key=h.taskId+'_'+h.round;cnt[key]=(cnt[key]||0)+1;}}); const over2=Object.entries(cnt).filter(([,n])=>n>=2); return table(['任務','版次','退回次數'],over2.map(([key,n])=>{ const [taskId,round]=key.split('_'); const t=tasks.find(x=>x.id===taskId)||{}; return [t.taskName||t.specType||taskId,round,n]; })); })()),
       card('Q20 — 某切角歷時天數與退回次數', table(['任務','客戶','退回次數','首次提出','確認日','歷時天數'], tasks.filter(t=>cuts.find(h=>h.taskId===t.id)).map(t=>{ const tc=cuts.filter(h=>h.taskId===t.id); const first=tc[0]?.createdAt; const approved=tc.filter(h=>h.action==='approved').at(-1)?.createdAt; const rejected=tc.filter(h=>h.action==='rejected').length; return [t.taskName||t.specType,clName(t.clientId),rejected,first?.slice(0,10)||'—',approved?.slice(0,10)||'進行中',approved&&first?dayDiff(first,approved)+'天':'—']; }).sort((a,b)=>Number(b[2])-Number(a[2])))),
+      card('Q5 — 各切角從首次提出到確認花幾天', (()=>{
+        const stats = tasks.filter(t=>t.requireCutAngle).map(t=>{
+          const tc = cuts.filter(h=>h.taskId===t.id);
+          const first = tc[0]?.createdAt;
+          const approved = tc.filter(h=>h.action==='approved').at(-1)?.createdAt;
+          if(!first) return null;
+          return [t.taskName||t.specType, clName(t.clientId), first.slice(0,10), approved?.slice(0,10)||'進行中', approved&&first?`${dayDiff(first,approved)} 天`:'—'];
+        }).filter(Boolean);
+        return table(['任務','客戶','首次提出','確認日','歷時'], stats);
+      })()),
+      card('Q6 — 各客戶切角修改次數排行', (()=>{
+        const byClient = {};
+        cuts.filter(h=>h.action==='rejected').forEach(h=>{
+          const t = tasks.find(x=>x.id===h.taskId)||{};
+          const cl = clName(t.clientId);
+          byClient[cl] = (byClient[cl]||0) + 1;
+        });
+        return table(['客戶','退回次數'],
+          Object.entries(byClient).sort((a,b)=>b[1]-a[1]).map(([name,n])=>[name,n]));
+      })()),
+      card('Q7 — 各 PM 切角第一版通過率', (()=>{
+        const pmStats = {};
+        tasks.filter(t=>t.requireCutAngle).forEach(t=>{
+          const pm = mName(t.assignedPlanner) || '未指派';
+          const firstResult = cuts.filter(h=>h.taskId===t.id&&h.round===1)[0];
+          if(!firstResult) return;
+          if(!pmStats[pm]) pmStats[pm]={pass:0,total:0};
+          pmStats[pm].total++;
+          if(firstResult.action==='approved') pmStats[pm].pass++;
+        });
+        return table(['PM','送審次數','第一版通過','通過率'],
+          Object.entries(pmStats).sort((a,b)=>(b[1].pass/b[1].total)-(a[1].pass/a[1].total))
+            .map(([name,v])=>[name,v.total,v.pass,`${Math.round(v.pass/v.total*100)}%`]));
+      })()),
+      card('Q10 — 本月各切角平均退改次數', (()=>{
+        const thisMonthCuts = cuts.filter(h=>h.createdAt?.slice(0,7)===thisMonth);
+        const taskIds = [...new Set(thisMonthCuts.map(h=>h.taskId))];
+        const rejected = thisMonthCuts.filter(h=>h.action==='rejected').length;
+        const avg = taskIds.length ? (rejected/taskIds.length).toFixed(1) : 0;
+        return `<div style="padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">
+          <div><div style="font-size:22px;font-weight:500">${taskIds.length}</div><div style="font-size:11px;color:var(--color-text-tertiary)">本月送審任務</div></div>
+          <div><div style="font-size:22px;font-weight:500;color:#f97316">${rejected}</div><div style="font-size:11px;color:var(--color-text-tertiary)">退回次數</div></div>
+          <div><div style="font-size:22px;font-weight:500">${avg}</div><div style="font-size:11px;color:var(--color-text-tertiary)">平均退改次數</div></div>
+        </div>`;
+      })()),
+      card('Q14 — PM 收到退回後平均幾天重新提交', (()=>{
+        const intervals = [];
+        const byTask = {};
+        cuts.forEach(h=>{ if(!byTask[h.taskId]) byTask[h.taskId]=[]; byTask[h.taskId].push(h); });
+        Object.values(byTask).forEach(history=>{
+          history.sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+          for(let i=0;i<history.length-1;i++){
+            if(history[i].action==='rejected' && history[i+1].action==='submitted'){
+              intervals.push(dayDiff(history[i].createdAt, history[i+1].createdAt));
+            }
+          }
+        });
+        if(!intervals.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">尚無足夠資料</div>';
+        const avg = (intervals.reduce((s,n)=>s+n,0)/intervals.length).toFixed(1);
+        return `<div style="padding:14px;text-align:center"><div style="font-size:28px;font-weight:500">${avg} 天</div><div style="font-size:12px;color:var(--color-text-tertiary);margin-top:4px">平均重提天數（樣本 ${intervals.length} 筆）</div></div>`;
+      })()),
+      card('Q15 — 本月新提切角按服務類型分佈', (()=>{
+        const byType = {};
+        cuts.filter(h=>h.action==='submitted'&&h.round===1&&h.createdAt?.slice(0,7)===thisMonth).forEach(h=>{
+          const t = tasks.find(x=>x.id===h.taskId)||{};
+          const sp = t.specType||'未設定';
+          byType[sp] = (byType[sp]||0)+1;
+        });
+        return table(['服務類型','本月新提件數'],
+          Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([sp,n])=>[sp,n]));
+      })()),
+      card('Q18 — 切角確認率低於 50% 的專案', (()=>{
+        const byContract = {};
+        tasks.filter(t=>t.requireCutAngle).forEach(t=>{
+          if(!byContract[t.contractId]) byContract[t.contractId]={pass:0,total:0};
+          byContract[t.contractId].total++;
+          if(cuts.filter(h=>h.taskId===t.id&&h.action==='approved').length>0) byContract[t.contractId].pass++;
+        });
+        const low = Object.entries(byContract).filter(([,v])=>v.total>0&&v.pass/v.total<0.5);
+        return table(['合約','確認','總計','確認率'],
+          low.map(([ctId,v])=>{ const ct=contracts.find(c=>c.id===ctId)||{}; return [ct.contractNo||ctId,v.pass,v.total,`${Math.round(v.pass/v.total*100)}%`]; }));
+      })()),
     ].join('');
   }
 
@@ -9574,6 +9727,64 @@ function _buildQ100Section(section){
       card('Q8 — 各分期付款狀態', table(['客戶','合約','期次','到期日','開票日','入款日','狀態'], payments.map(p=>[clName(p.clientId),p.contractNo||ctName(p.contractId),p.period,p.dueDate||'—',p.invoiceDate||'—',p.paidDate||'—',badge(p.status==='已入款'?'已入款':'未入款',p.status==='已入款'?'#22c55e':'#ef4444')]))),
       card('Q11 — 各廠商累積費用', (()=>{ const byV={}; vendorRecs.forEach(r=>{if(!byV[r.vendorId||r.vendorName]) byV[r.vendorId||r.vendorName]={name:r.vendorName||r.vendorId,total:0}; byV[r.vendorId||r.vendorName].total+=(r.amount||0);}); return table(['廠商','累積費用'],Object.values(byV).sort((a,b)=>b.total-a.total).map(v=>[v.name,fmt(v.total)])); })()),
       card('Q14 — 發票超 30 天未收款', (()=>{ const over30=payments.filter(p=>p.invoiceDate&&!p.paidDate&&dayDiff(p.invoiceDate,today)>30); return table(['客戶','合約','發票日','逾期天數'],over30.map(p=>[clName(p.clientId),p.contractNo||ctName(p.contractId),p.invoiceDate,`${dayDiff(p.invoiceDate,today)} 天`])); })()),
+      card('Q5 — 本月寫手費用', (()=>{
+        const flRecs = (DB.freelancerRecords||[]).filter(r=>(r.month||r.created_at||'').slice(0,7)===thisMonth);
+        if(!flRecs.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">fin_freelancer_records 尚無本月資料。需在外包統計中建立費用記錄後才會顯示。</div>';
+        const byWriter = {};
+        flRecs.forEach(r=>{ const wn=r.memberName||r.writerId||'未知'; if(!byWriter[wn]) byWriter[wn]=0; byWriter[wn]+=(Number(r.amount)||0); });
+        return table(['寫手','本月費用'],Object.entries(byWriter).sort((a,b)=>b[1]-a[1]).map(([name,amt])=>[name,fmt(amt)]));
+      })()),
+      card('Q9 — 本年累積收入與支出', (()=>{
+        const thisYear = today.slice(0,4);
+        const income = payments.filter(p=>p.paidDate?.slice(0,4)===thisYear&&p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0);
+        const vendorCost = vendorRecs.filter(r=>(r.date||r.month||'').slice(0,4)===thisYear).reduce((s,r)=>s+(r.amount||0),0);
+        const flCost = freelancerRecs.filter(r=>(r.created_at||'').slice(0,4)===thisYear).reduce((s,r)=>s+(r.amount||0),0);
+        const totalCost = vendorCost + flCost;
+        return `<div style="padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">
+          <div><div style="font-size:20px;font-weight:500;color:var(--color-text-success)">${fmt(income)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">今年已收入</div></div>
+          <div><div style="font-size:20px;font-weight:500;color:var(--color-text-danger)">${fmt(totalCost)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">今年總支出</div></div>
+          <div><div style="font-size:20px;font-weight:500;color:${income-totalCost>=0?'var(--color-text-success)':'var(--color-text-danger)'}">${fmt(income-totalCost)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">毛利</div></div>
+        </div>`;
+      })()),
+      card('Q12 — 各客戶歷年合約金額', (()=>{
+        const byClientYear = {};
+        contracts.forEach(c=>{
+          const year = c.signDate?.slice(0,4)||c.start?.slice(0,4)||'未知';
+          const cl = clName(c.clientId);
+          const key = cl+'__'+year;
+          byClientYear[key] = (byClientYear[key]||0) + Number(c.total||0);
+        });
+        return table(['客戶','年份','合約金額'],
+          Object.entries(byClientYear).sort().map(([key,amt])=>{ const [cl,yr]=key.split('__'); return [cl,yr,fmt(amt)]; }));
+      })()),
+      card('Q15 — 各寫手今年應付費用', (()=>{
+        const thisYear = today.slice(0,4);
+        const flRecs = (DB.freelancerRecords||[]).filter(r=>(r.created_at||'').slice(0,4)===thisYear);
+        if(!flRecs.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">fin_freelancer_records 尚無資料</div>';
+        const byWriter = {};
+        flRecs.forEach(r=>{ const wn=r.memberName||r.writerId||'未知'; if(!byWriter[wn]) byWriter[wn]={total:0,paid:0}; byWriter[wn].total+=(r.amount||0); if(r.status==='已付') byWriter[wn].paid+=(r.amount||0); });
+        return table(['寫手','應付','已付','未付'],
+          Object.entries(byWriter).map(([name,v])=>[name,fmt(v.total),fmt(v.paid),fmt(v.total-v.paid)]));
+      })()),
+      card('Q19 — 本月收入 vs 上月比較', (()=>{
+        const prevMonth = new Date(new Date().getFullYear(), new Date().getMonth()-1, 1).toISOString().slice(0,7);
+        const thisIncome = payments.filter(p=>p.paidDate?.slice(0,7)===thisMonth&&p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0);
+        const prevIncome = payments.filter(p=>p.paidDate?.slice(0,7)===prevMonth&&p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0);
+        const diff = thisIncome - prevIncome;
+        const pct = prevIncome>0 ? ((diff/prevIncome)*100).toFixed(1) : '—';
+        return `<div style="padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">
+          <div><div style="font-size:20px;font-weight:500">${fmt(prevIncome)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">${prevMonth} 收入</div></div>
+          <div><div style="font-size:20px;font-weight:500">${fmt(thisIncome)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">${thisMonth} 收入</div></div>
+          <div><div style="font-size:20px;font-weight:500;color:${diff>=0?'var(--color-text-success)':'var(--color-text-danger)'}">${diff>=0?'+':''}${fmt(diff)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">${pct}%</div></div>
+        </div>`;
+      })()),
+      card('Q20 — 各服務類型每篇平均執行成本', (()=>{
+        const specItems = DB.specItems||[];
+        const byType = {};
+        specItems.forEach(s=>{ const name=s.name||s.spec||'未知'; if(!byType[name]) byType[name]={ext:0,int:0,qty:0}; byType[name].ext+=(Number(s.extCost||0)*Number(s.qty||1)); byType[name].int+=(Number(s.intCost||0)*Number(s.qty||1)); byType[name].qty+=Number(s.qty||1); });
+        return table(['服務類型','總篇數','外包成本/篇','內部成本/篇','合計/篇'],
+          Object.entries(byType).map(([name,v])=>{ const q=v.qty||1; return [name,v.qty,fmt(Math.round(v.ext/q)),fmt(Math.round(v.int/q)),fmt(Math.round((v.ext+v.int)/q))]; }));
+      })()),
     ].join('');
   }
 
@@ -9596,6 +9807,87 @@ function _buildQ100Section(section){
       card('Q9 — 活躍寫手與廠商', (()=>{ const writers=(DB.freelancers||[]).length; const vendors=(DB.vendorCompanies||[]).filter(v=>v.active!==false).length; return `<div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center"><div><div style="font-size:22px;font-weight:500;color:var(--color-text-info)">${writers}</div><div style="font-size:11px;color:var(--color-text-tertiary)">活躍寫手</div></div><div><div style="font-size:22px;font-weight:500;color:var(--color-text-success)">${vendors}</div><div style="font-size:11px;color:var(--color-text-tertiary)">活躍帳號商</div></div></div>`; })()),
       card('Q11 — 有寫手無帳號商且截止日近', (()=>{ const risk=tasks.filter(t=>{ const w=wAssign.find(a=>a.taskId===t.id); const v=vAssign.find(a=>a.taskId===t.id); return w&&!v&&t.dueDate&&dayDiff(today,t.dueDate)<=5&&dayDiff(today,t.dueDate)>=0; }); return table(['任務','客戶','寫手','截止日'],risk.map(t=>{ const w=wAssign.find(a=>a.taskId===t.id); return [t.taskName||t.specType,clName(t.clientId),w?wName(w.writerId):'—',t.dueDate]; })); })()),
       card('Q15 — 本月新簽合約', (()=>{ const newCts=contracts.filter(c=>c.signDate?.slice(0,7)===thisMonth); const total=newCts.reduce((s,c)=>s+Number(c.total||0),0); return `<div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center"><div><div style="font-size:22px;font-weight:500">${newCts.length}</div><div style="font-size:11px;color:var(--color-text-tertiary)">本月新簽</div></div><div><div style="font-size:20px;font-weight:500">${fmt(total)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">合計金額</div></div></div>`; })()),
+      card('Q3 — 執行進度落後合約（完成率低於 30%）', (()=>{
+        const activeContracts = contracts.filter(c=>c.status==='進行中');
+        const behind = activeContracts.map(ct=>{
+          const ctTasks = tasks.filter(t=>t.contractId===ct.id);
+          if(!ctTasks.length) return null;
+          const done = ctTasks.filter(t=>t.publishedAt).length;
+          const rate = done/ctTasks.length;
+          if(rate>=0.3) return null;
+          const cl = clients.find(c=>c.id===ct.clientId)||{};
+          return [cl.name||'—',ct.contractNo||ct.id,done,ctTasks.length,`${Math.round(rate*100)}%`];
+        }).filter(Boolean);
+        return table(['客戶','合約','已完成','總計','完成率'], behind);
+      })(), ''),
+      card('Q5 — 本月各服務類型完成篇數', (()=>{
+        const byType = {};
+        tasks.filter(t=>t.publishedAt?.slice(0,7)===thisMonth).forEach(t=>{
+          const sp = t.specType||'未設定';
+          byType[sp]=(byType[sp]||0)+1;
+        });
+        return table(['服務類型','本月完成篇數'],
+          Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([sp,n])=>[sp,n]));
+      })()),
+      card('Q10 — 近 6 個月任務量趨勢', (()=>{
+        const months = [];
+        for(let i=5;i>=0;i--){ const d=new Date(); d.setMonth(d.getMonth()-i); months.push(d.toISOString().slice(0,7)); }
+        return table(['月份','新建任務','已上刊'],
+          months.map(m=>[m,tasks.filter(t=>t.createdAt?.slice(0,7)===m).length,tasks.filter(t=>t.publishedAt?.slice(0,7)===m).length]));
+      })()),
+      card('Q12 — 結案超 6 個月無新合約的客戶', (()=>{
+        const halfYearAgo = new Date(Date.now()-180*86400000).toISOString().slice(0,10);
+        const inactive = clients.filter(cl=>{
+          const clContracts = contracts.filter(c=>c.clientId===cl.id);
+          if(!clContracts.length) return false;
+          const hasActive = clContracts.some(c=>c.status==='進行中');
+          if(hasActive) return false;
+          const lastEnd = clContracts.map(c=>c.end||c.start||'').sort().at(-1);
+          return lastEnd && lastEnd < halfYearAgo;
+        });
+        return table(['客戶','最後合約結束日'],
+          inactive.map(cl=>{ const lc=contracts.filter(c=>c.clientId===cl.id).sort((a,b)=>(b.end||'').localeCompare(a.end||'')).at(0); return [cl.name,lc?.end?.slice(0,10)||'—']; }));
+      })()),
+      card('Q13 — PM 同時負責超過 3 個進行中專案', (()=>{
+        const pmLoad = {};
+        contracts.filter(c=>c.status==='進行中').forEach(c=>{ const pm=c.owner||c.assignedPlanner||'未指派'; pmLoad[pm]=(pmLoad[pm]||0)+1; });
+        const over3 = Object.entries(pmLoad).filter(([,n])=>n>3);
+        if(!over3.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-success)">✓ 所有 PM 負責的進行中專案均在 3 個以內</div>';
+        return table(['PM','進行中專案數'], over3.sort((a,b)=>b[1]-a[1]).map(([pm,n])=>[pm,n]));
+      })()),
+      card('Q16 — 過去 3 個月未接任務的帳號商', (()=>{
+        const threeMonthsAgo = new Date(Date.now()-90*86400000).toISOString().slice(0,10);
+        const recentVendors = new Set(vAssign.filter(a=>a.assignedAt>=threeMonthsAgo).map(a=>a.vendorId));
+        const inactive = (DB.vendorCompanies||[]).filter(v=>!recentVendors.has(v.id));
+        return table(['帳號商','狀態'],inactive.map(v=>[v.name||v.id,v.active===false?'停用':'閒置']));
+      })()),
+      card('Q17 — 本月各 PM 任務完成率', (()=>{
+        const pmStats = {};
+        tasks.filter(t=>t.createdAt?.slice(0,7)===thisMonth).forEach(t=>{
+          const pm = mName(t.assignedPlanner)||'未指派';
+          if(!pmStats[pm]) pmStats[pm]={total:0,done:0};
+          pmStats[pm].total++;
+          if(t.publishedAt) pmStats[pm].done++;
+        });
+        return table(['PM','本月任務','已完成','完成率'],
+          Object.entries(pmStats).sort((a,b)=>(b[1].done/b[1].total)-(a[1].done/a[1].total))
+            .map(([pm,v])=>[pm,v.total,v.done,`${Math.round(v.done/v.total*100)}%`]));
+      })()),
+      card('Q18 — 卡在 PM 校稿超過 3 天', (()=>{
+        const stuck = tasks.filter(t=>{
+          const writerSubmit = drafts.filter(h=>h.taskId===t.id&&h.action==='submitted'&&h.by==='writer').at(-1);
+          if(!writerSubmit) return false;
+          const pmAction = drafts.filter(h=>h.taskId===t.id&&h.createdAt>writerSubmit.createdAt&&h.by==='planner').at(-1);
+          return !pmAction && dayDiff(writerSubmit.createdAt,today)>3;
+        });
+        return table(['任務','客戶','寫手送稿日','等待天數'],
+          stuck.map(t=>{ const ws=drafts.filter(h=>h.taskId===t.id&&h.by==='writer').at(-1); return [t.taskName||t.specType,clName(t.clientId),ws?.createdAt?.slice(0,10),`${dayDiff(ws?.createdAt||today,today)} 天`]; }));
+      })(), `${tasks.filter(t=>{ const ws=drafts.filter(h=>h.taskId===t.id&&h.action==='submitted'&&h.by==='writer').at(-1); if(!ws) return false; const pa=drafts.filter(h=>h.taskId===t.id&&h.createdAt>ws.createdAt&&h.by==='planner').at(-1); return !pa&&dayDiff(ws.createdAt,today)>3; }).length} 筆`),
+      card('Q19 — 執行中任務按平台分佈', (()=>{
+        const byPlatform = {};
+        tasks.filter(t=>t.activatedAt&&taskStatus(t)!=='已上刊').forEach(t=>{ const p=t.platform||'未設定'; byPlatform[p]=(byPlatform[p]||0)+1; });
+        return table(['平台','進行中篇數'],Object.entries(byPlatform).sort((a,b)=>b[1]-a[1]).map(([p,n])=>[p,n]));
+      })()),
     ].join('');
   }
 
@@ -9613,6 +9905,89 @@ function _buildQ100Section(section){
       card('Q3 — 各客戶專案毛利', table(['客戶','已收','成本','毛利'], Object.values(byClient).sort((a,b)=>b.profit-a.profit).map(v=>[v.name,fmt(v.income),fmt(v.cost),fmt(v.profit)])), ''),
       card('Q7 — 各寫手退改率', (()=>{ const byWriter={}; drafts.forEach(h=>{ const t=tasks.find(x=>x.id===h.taskId); const w=wAssign.find(a=>a.taskId===h.taskId); if(!w) return; const wn=wName(w.writerId); if(!byWriter[wn]) byWriter[wn]={total:0,rejected:0}; byWriter[wn].total++; if(h.action==='rejected') byWriter[wn].rejected++; }); return table(['寫手','審核次數','退改次數','退改率'],Object.entries(byWriter).sort((a,b)=>(b[1].rejected/b[1].total)-(a[1].rejected/a[1].total)).map(([name,v])=>[name,v.total,v.rejected,`${Math.round(v.rejected/v.total*100)}%`])); })()),
       card('Q10 — 各 PM 負責專案毛利', (()=>{ const byPM={}; contracts.forEach(c=>{ const pm=c.owner||c.assignedPlanner||'未指派'; if(!byPM[pm]) byPM[pm]={contracts:0,income:0,cost:0}; byPM[pm].contracts++; const pays=payments.filter(p=>p.contractId===c.id); byPM[pm].income+=pays.filter(p=>p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0); }); return table(['PM','合約數','已收入','毛利率'],Object.entries(byPM).map(([pm,v])=>[pm,v.contracts,fmt(v.income),'—'])); })()),
+      card('Q2 — 各服務類型從發包到上刊平均天數', (()=>{
+        const byType = {};
+        tasks.filter(t=>t.publishedAt).forEach(t=>{
+          const w = wAssign.find(a=>a.taskId===t.id);
+          if(!w?.assignedAt) return;
+          const days = dayDiff(w.assignedAt, t.publishedAt);
+          const sp = t.specType||'未設定';
+          if(!byType[sp]) byType[sp]={total:0,count:0};
+          byType[sp].total+=days; byType[sp].count++;
+        });
+        return table(['服務類型','樣本數','平均天數'],
+          Object.entries(byType).sort((a,b)=>b[1].total/b[1].count - a[1].total/a[1].count)
+            .map(([sp,v])=>[sp,v.count,`${(v.total/v.count).toFixed(1)} 天`]));
+      })()),
+      card('Q4 — 今年按月份收入與毛利趨勢', (()=>{
+        const thisYear = today.slice(0,4);
+        const months = Array.from({length:12},(_,i)=>thisYear+'-'+(i+1).toString().padStart(2,'0'));
+        const vendorByMonth = {};
+        vendorRecs.forEach(r=>{ const m=(r.date||r.month||'').slice(0,7); if(m.slice(0,4)===thisYear){vendorByMonth[m]=(vendorByMonth[m]||0)+(r.amount||0);} });
+        const rows = months.map(m=>{ const inc=payments.filter(p=>p.paidDate?.slice(0,7)===m&&p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0); const cost=vendorByMonth[m]||0; return inc||cost?[m,fmt(inc),fmt(cost),fmt(inc-cost)]:null; }).filter(Boolean);
+        if(!rows.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">本年尚無付款記錄</div>';
+        return table(['月份','收入','廠商成本','毛利'], rows);
+      })()),
+      card('Q6 — 各帳號商成本 vs 上刊速度', (()=>{
+        const vendorStats = {};
+        vAssign.forEach(a=>{
+          if(!a.confirmedAt||!a.assignedAt) return;
+          const vname=(DB.vendorCompanies||[]).find(v=>v.id===a.vendorId)?.name||a.vendorId||'未知';
+          if(!vendorStats[vname]) vendorStats[vname]={days:0,cost:0,count:0};
+          vendorStats[vname].days+=dayDiff(a.assignedAt,a.confirmedAt);
+          const vrec=vendorRecs.find(r=>r.vendorId===a.vendorId);
+          vendorStats[vname].cost+=(vrec?.amount||0);
+          vendorStats[vname].count++;
+        });
+        if(!Object.keys(vendorStats).length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">尚無帳號商上刊記錄</div>';
+        return table(['帳號商','已完成','平均天數','平均費用'],
+          Object.entries(vendorStats).sort((a,b)=>a[1].days/a[1].count - b[1].days/b[1].count)
+            .map(([name,v])=>[name,v.count,`${(v.days/v.count).toFixed(1)} 天`,fmt(Math.round(v.cost/v.count))]));
+      })()),
+      card('Q8 — 各服務類型外包成本佔售價比', (()=>{
+        const specItems = DB.specItems||[];
+        const byType = {};
+        specItems.forEach(s=>{ const name=s.name||s.spec||'未知'; if(!byType[name]) byType[name]={price:0,extCost:0,qty:0}; byType[name].price+=(Number(s.price||0)*Number(s.qty||1)); byType[name].extCost+=(Number(s.extCost||0)*Number(s.qty||1)); byType[name].qty+=Number(s.qty||1); });
+        return table(['服務類型','售價','外包成本','佔比'],
+          Object.entries(byType).sort((a,b)=>b[1].extCost/Math.max(b[1].price,1) - a[1].extCost/Math.max(a[1].price,1))
+            .map(([name,v])=>{ const ratio=v.price>0?Math.round(v.extCost/v.price*100):0; return [name,fmt(v.price),fmt(v.extCost),`${ratio}%`]; }));
+      })()),
+      card('Q11 — 各廠商費用佔執行成本比例', (()=>{
+        const totalVendor = vendorRecs.reduce((s,r)=>s+(r.amount||0),0);
+        const totalFl = freelancerRecs.reduce((s,r)=>s+(r.amount||0),0);
+        const totalCost = totalVendor+totalFl;
+        const byVendor = {};
+        vendorRecs.forEach(r=>{ const vn=r.vendorName||r.vendorId||'未知'; byVendor[vn]=(byVendor[vn]||0)+(r.amount||0); });
+        return table(['廠商','費用','佔總成本'],
+          Object.entries(byVendor).sort((a,b)=>b[1]-a[1]).map(([name,amt])=>[name,fmt(amt),totalCost>0?`${(amt/totalCost*100).toFixed(1)}%`:'—']));
+      })()),
+      card('Q13 — 各服務類型報價趨勢（按合約年份）', (()=>{
+        const specItems = DB.specItems||[];
+        const byTypeYear = {};
+        specItems.forEach(s=>{ const ct=contracts.find(c=>c.id===s.contractId); const year=ct?.signDate?.slice(0,4)||ct?.start?.slice(0,4)||'未知'; const name=s.name||s.spec||'未知'; const key=name+'__'+year; if(!byTypeYear[key]) byTypeYear[key]={total:0,qty:0}; byTypeYear[key].total+=(Number(s.price||0)*Number(s.qty||1)); byTypeYear[key].qty+=Number(s.qty||1); });
+        return table(['服務類型','年份','平均單價'],
+          Object.entries(byTypeYear).sort().map(([key,v])=>{ const [name,yr]=key.split('__'); return [name,yr,fmt(v.qty>0?Math.round(v.total/v.qty):0)]; }));
+      })()),
+      card('Q16 — 本月毛利率最高/最低的進行中專案', (()=>{
+        const activeContracts = contracts.filter(c=>c.status==='進行中');
+        const profitData = activeContracts.map(ct=>{
+          const cl=clients.find(c=>c.id===ct.clientId)||{};
+          const income=payments.filter(p=>p.contractId===ct.id&&p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0);
+          const cost=vendorRecs.filter(r=>r.clientId===ct.clientId).reduce((s,r)=>s+(r.amount||0),0);
+          const margin=income>0?((income-cost)/income*100).toFixed(1):null;
+          return {name:cl.name||'—',contractNo:ct.contractNo||ct.id,income,cost,margin:margin!==null?Number(margin):null};
+        }).filter(v=>v.margin!==null).sort((a,b)=>b.margin-a.margin);
+        if(!profitData.length) return '<div style="padding:14px;font-size:12px;color:var(--color-text-tertiary)">尚無付款記錄可計算毛利</div>';
+        return table(['客戶','合約','收入','成本','毛利率'],
+          [...profitData.slice(0,3),...(profitData.length>6?[null]:[]),(profitData.length>3?profitData.slice(-1)[0]:null)].filter(Boolean)
+            .map(v=>[v.name,v.contractNo,fmt(v.income),fmt(v.cost),badge(`${v.margin}%`,v.margin>=50?'#22c55e':v.margin>=20?'#f59e0b':'#ef4444')]));
+      })()),
+      card('Q18/Q19 — 服務類型週期與季度佔比', (()=>{
+        const byTypeDays={};
+        wAssign.forEach(a=>{ const t=tasks.find(x=>x.id===a.taskId); if(!t?.publishedAt||!a.assignedAt) return; const sp=t.specType||'未設定'; if(!byTypeDays[sp]) byTypeDays[sp]={total:0,count:0}; byTypeDays[sp].total+=dayDiff(a.assignedAt,t.publishedAt); byTypeDays[sp].count++; });
+        return table(['服務類型','件數','平均上刊天數'],
+          Object.entries(byTypeDays).sort((a,b)=>b[1].total/b[1].count-a[1].total/a[1].count).map(([sp,v])=>[sp,v.count,`${(v.total/v.count).toFixed(1)} 天`]));
+      })()),
     ].join('');
   }
 
