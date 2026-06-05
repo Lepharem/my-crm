@@ -3083,6 +3083,31 @@ window.loadAllData = async function(){
       while(el.options.length > 1) el.remove(1);
     });
 
+    // ── 填充 sop-client 下拉（有進行中合約的客戶）──
+    const _sopClientSel = document.getElementById('sop-client');
+    if(_sopClientSel){
+      const _prev = _sopClientSel.value;
+      _sopClientSel.innerHTML = '<option value="">— 選擇客戶 —</option>';
+      const _activeClients = (DB.clients||[]).filter(cl=>
+        (DB.contracts||[]).some(ct=>ct.clientId===cl.id && ct.status==='進行中')
+      ).sort((a,b)=>(a.name||'').localeCompare(b.name||'','zh-TW'));
+      _activeClients.forEach(cl=>{
+        const opt = document.createElement('option');
+        opt.value = cl.id;
+        opt.textContent = cl.name || cl.id;
+        _sopClientSel.appendChild(opt);
+      });
+      // 恢復之前選取的值
+      if(_prev && _sopClientSel.querySelector(`option[value="${_prev}"]`)){
+        _sopClientSel.value = _prev;
+      }
+      // 預設選今年今月
+      const _sopYm = document.getElementById('sop-ym');
+      if(_sopYm && !_sopYm.value){
+        _sopYm.value = new Date().toISOString().slice(0,7);
+      }
+    }
+
     renderHome();
     // 若使用者切換到其他頁面後資料才回來，重新 render 當前頁面
     setTimeout(()=>{
