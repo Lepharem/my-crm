@@ -679,6 +679,37 @@ body.test-mode .test-mode-fab{display:flex}</style>
     </div>
   </div>
 
+  <!-- 100問（老闆限定）-->
+  <div class="nav-section nav-mgmt-section" id="nav-section-100q" style="padding-top:2px;padding-bottom:2px;display:none">
+    <div class="nav-group-header" id="nav-group-100q" onclick="toggleNavGroup('100q')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      100問
+      <svg class="nav-group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="nav-sub" id="nav-sub-100q" style="display:none">
+      <div class="nav-sub-item" onclick="navTo('q100-content',this)" id="nav-q100-content">
+        <svg style="width:13px;height:13px;flex-shrink:0;opacity:.7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        內容生產
+      </div>
+      <div class="nav-sub-item" onclick="navTo('q100-cutangle',this)" id="nav-q100-cutangle">
+        <svg style="width:13px;height:13px;flex-shrink:0;opacity:.7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+        切角管理
+      </div>
+      <div class="nav-sub-item" onclick="navTo('q100-finance',this)" id="nav-q100-finance">
+        <svg style="width:13px;height:13px;flex-shrink:0;opacity:.7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        帳務
+      </div>
+      <div class="nav-sub-item" onclick="navTo('q100-mgmt',this)" id="nav-q100-mgmt">
+        <svg style="width:13px;height:13px;flex-shrink:0;opacity:.7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        管理者視角
+      </div>
+      <div class="nav-sub-item" onclick="navTo('q100-profit',this)" id="nav-q100-profit">
+        <svg style="width:13px;height:13px;flex-shrink:0;opacity:.7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        獲利分析
+      </div>
+    </div>
+  </div>
+
   <!-- 設定（需權限，預設收合） -->
   <div class="nav-section nav-mgmt-section" style="padding-top:2px;padding-bottom:8px">
     <div class="nav-group-header" id="nav-group-settings" onclick="toggleNavGroup('settings')">
@@ -1566,6 +1597,14 @@ body.test-mode .test-mode-fab{display:flex}</style>
     </div>
   </div>
 </div><!-- /main -->
+
+  <!-- ══ 100問：五個子頁面 ══ -->
+  <div id="page-q100-content"  class="page"><div id="q100-content-body"  style="padding:24px 28px;overflow-y:auto;height:100%"></div></div>
+  <div id="page-q100-cutangle" class="page"><div id="q100-cutangle-body" style="padding:24px 28px;overflow-y:auto;height:100%"></div></div>
+  <div id="page-q100-finance"  class="page"><div id="q100-finance-body"  style="padding:24px 28px;overflow-y:auto;height:100%"></div></div>
+  <div id="page-q100-mgmt"     class="page"><div id="q100-mgmt-body"     style="padding:24px 28px;overflow-y:auto;height:100%"></div></div>
+  <div id="page-q100-profit"   class="page"><div id="q100-profit-body"   style="padding:24px 28px;overflow-y:auto;height:100%"></div></div>
+
 </div><!-- /app -->
 
 <!-- DRAWER -->
@@ -3854,6 +3893,12 @@ const NAV_PERM_MAP = {
   'nav-freelancer-stats':     'specs',
   'nav-vendor-exec':          'vendor-exec',
   'nav-sop-om':               'sop-om',
+  // 100問（老闆限定）
+  'nav-q100-content':  'q100',
+  'nav-q100-cutangle': 'q100',
+  'nav-q100-finance':  'q100',
+  'nav-q100-mgmt':     'q100',
+  'nav-q100-profit':   'q100',
 };
 
 function _getCurrentRole(){
@@ -3863,6 +3908,7 @@ function _getCurrentRole(){
 
 function _hasPermission(permId){
   const role = _getCurrentRole();
+  if(permId === 'q100') return role === 'owner';       // 100問：老闆限定
   if(role === 'owner') return true;                    // 管理者全開
   const rolePerms = DB.permissions?.roles?.[role]?.perms || {};
   if(rolePerms.all) return true;
@@ -3878,7 +3924,13 @@ function _applySidebarPermissions(){
     el.style.display = visible ? '' : 'none';
   });
   // 若整個群組的子項都隱藏，也隱藏群組 header
-  ['biz','ops','mgmt','fin','hr','settings'].forEach(grp => {
+  // 100問群組：老闆才顯示整個群組
+  const q100section = document.getElementById('nav-section-100q');
+  if(q100section){
+    const showQ100 = _getCurrentRole() === 'owner';
+    q100section.style.display = showQ100 ? '' : 'none';
+  }
+  ['biz','ops','mgmt','fin','hr','settings','100q'].forEach(grp => {
     const sub = document.getElementById('nav-sub-'+grp);
     if(!sub) return;
     const visible = [...sub.querySelectorAll('.nav-sub-item')].some(el => el.style.display !== 'none');
@@ -3936,7 +3988,13 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
-const renders={home:renderHome,clients:renderClients,receivable:renderReceivable,'receivable-overview':renderReceivableOverview,'settings-catalog':renderCatalogPage,'settings-freelancer':renderFreelancerPage,'settings-vendor':renderVendorPricePage,'settings-theme':renderThemePage,'settings-permissions':renderPermissionsPage,summary:renderSummary,performance:renderPerformance,'biz-schedule':renderSchedule,'plan-schedule':renderSchedule2,projects:renderProjects,specs:renderSpecsPage,'vendor-exec':renderVendorExec,'freelancer-stats':renderFreelancerStats,'exec-om':renderOmPage,'exec-social':renderExecSocial,'exec-ad':renderExecAd,'monthly-checkup':()=>{},'sop-om':renderSopOmPage,clock:function(){hrStartClock();hrLoadAttendanceStatus();},hr:hrRenderPage,logs:hrLoadLogs,'fb-tax':renderFbTax};
+const renders={home:renderHome,clients:renderClients,receivable:renderReceivable,'receivable-overview':renderReceivableOverview,'settings-catalog':renderCatalogPage,'settings-freelancer':renderFreelancerPage,'settings-vendor':renderVendorPricePage,'settings-theme':renderThemePage,'settings-permissions':renderPermissionsPage,summary:renderSummary,performance:renderPerformance,'biz-schedule':renderSchedule,'plan-schedule':renderSchedule2,projects:renderProjects,specs:renderSpecsPage,'vendor-exec':renderVendorExec,'freelancer-stats':renderFreelancerStats,'exec-om':renderOmPage,'exec-social':renderExecSocial,'exec-ad':renderExecAd,'monthly-checkup':()=>{},'sop-om':renderSopOmPage,
+  'q100-content':()=>renderQ100Page('content'),
+  'q100-cutangle':()=>renderQ100Page('cutangle'),
+  'q100-finance':()=>renderQ100Page('finance'),
+  'q100-mgmt':()=>renderQ100Page('mgmt'),
+  'q100-profit':()=>renderQ100Page('profit'),
+  clock:function(){hrStartClock();hrLoadAttendanceStatus();},hr:hrRenderPage,logs:hrLoadLogs,'fb-tax':renderFbTax};
   if(renders[id])renders[id]();
 }
 function goHome(){navTo('home',document.getElementById('nav-home'));}
@@ -9363,6 +9421,202 @@ function getOpsTodoBySelf(){
     const status = getTaskStatus(t, rel.cut, rel.draft, rel.writer, rel.vendor);
     return {...t, _status: status, _rel: rel};
   }).filter(t=>t._status!=='已上刊'&&t.activatedAt);
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  100問 — 老闆視角即時查詢儀表板
+//  資料全從 DB 即時計算，不打 GAS
+// ════════════════════════════════════════════════════════════════
+
+function renderQ100Page(section){
+  const bodyId = `q100-${section}-body`;
+  const el = document.getElementById(bodyId);
+  if(!el) return;
+  try {
+    el.innerHTML = _buildQ100Section(section);
+  } catch(e){
+    console.error('[Q100] render error:', e);
+    el.innerHTML = `<div style="color:var(--color-text-danger);padding:20px">${e.message}</div>`;
+  }
+}
+
+function _buildQ100Section(section){
+  const today = new Date().toISOString().slice(0,10);
+  const thisMonth = today.slice(0,7);
+  const tasks   = DB.ops_tasks            || [];
+  const cuts    = DB.cutAngleHistory      || [];
+  const drafts  = DB.draftHistory         || [];
+  const wAssign = DB.writerAssignments    || [];
+  const vAssign = DB.vendorAssignments    || [];
+  const plans   = DB.ops_monthly_plans   || [];
+  const clients = DB.clients             || [];
+  const contracts = DB.contracts         || [];
+  const specs   = DB.specItems           || [];
+  const payments = DB.receivables?.flatMap(r=>r.payments.map(p=>({...p,contractId:r.contractId,clientId:r.clientId}))) || [];
+  const vendorRecs = DB.vendorRecords    || [];
+  const freelancerRecs = DB.freelancerRecords || [];
+  const members = window.D?.members     || [];
+
+  // ── 輔助函式 ──
+  const clName  = id => clients.find(c=>c.id===id)?.name || id;
+  const ctName  = id => contracts.find(c=>c.id===id)?.contractNo || id;
+  const mName   = id => members.find(m=>m.id===id)?.name_zh || id;
+  const wName   = id => (DB.freelancers||[]).find(f=>f.id===id)?.name || id;
+  const dayDiff = (a,b) => Math.floor((new Date(b)-new Date(a))/(1000*60*60*24));
+
+  const taskStatus = t => {
+    const c=(cuts||[]).filter(h=>h.taskId===t.id);
+    const d=(drafts||[]).filter(h=>h.taskId===t.id);
+    const w=(wAssign||[]).find(a=>a.taskId===t.id);
+    const v=(vAssign||[]).find(a=>a.taskId===t.id);
+    return getTaskStatus(t,c,d,w,v);
+  };
+
+  const staleDays = t => {
+    if(!t.activatedAt) return 0;
+    return dayDiff(t.activatedAt, today);
+  };
+
+  // ── 表格 builder ──
+  const table = (cols, rows, emptyMsg='暫無資料') => {
+    if(!rows.length) return `<div style="padding:20px;text-align:center;color:var(--color-text-tertiary);font-size:13px">${emptyMsg}</div>`;
+    const thead = cols.map(c=>`<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:500;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-tertiary);white-space:nowrap">${c}</th>`).join('');
+    const tbody = rows.map(r=>`<tr>${r.map(cell=>`<td style="padding:7px 12px;font-size:12px;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-primary)">${cell??'—'}</td>`).join('')}</tr>`).join('');
+    return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table></div>`;
+  };
+
+  const badge = (text,color) => `<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:500;background:${color}22;color:${color}">${text}</span>`;
+  const STATUS_COLOR = {'待啟動':'#94a3b8','切角進行中':'#f59e0b','待指派寫手':'#3b82f6','撰文中':'#8b5cf6','文章審核中':'#f97316','待指派帳號商':'#06b6d4','待上刊':'#eab308','已上刊':'#22c55e'};
+
+  const card = (title, content, subtitle='') => `
+    <div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:16px;overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--color-border-tertiary);display:flex;align-items:baseline;gap:8px">
+        <span style="font-size:13px;font-weight:500">${title}</span>
+        ${subtitle?`<span style="font-size:11px;color:var(--color-text-tertiary)">${subtitle}</span>`:''}
+      </div>
+      <div>${content}</div>
+    </div>`;
+
+  const header = (title, icon) => `
+    <div style="margin-bottom:20px">
+      <div style="font-size:18px;font-weight:500;display:flex;align-items:center;gap:8px">
+        <span>${icon}</span>${title}
+      </div>
+      <div style="font-size:12px;color:var(--color-text-tertiary);margin-top:4px">以下資料即時從資料庫計算，不需重新整理</div>
+    </div>`;
+
+  // ════════ 內容生產 ════════
+  if(section === 'content'){
+    const noWriter    = tasks.filter(t=>t.activatedAt && taskStatus(t)==='待指派寫手');
+    const waitPM      = tasks.filter(t=>{ const d=(drafts||[]).filter(h=>h.taskId===t.id); const last=d.at(-1); return last?.action==='submitted'&&last?.by==='writer'; });
+    const waitClient  = tasks.filter(t=>{ const d=(drafts||[]).filter(h=>h.taskId===t.id); const last=d.at(-1); return last?.action==='submitted'&&last?.by==='planner'; });
+    const waitVendor  = tasks.filter(t=>t.activatedAt && taskStatus(t)==='待指派帳號商');
+    const published   = tasks.filter(t=>t.publishedAt);
+    const rejected    = drafts.filter(h=>h.action==='rejected');
+    const overdue     = tasks.filter(t=>t.dueDate && t.dueDate < today && taskStatus(t)!=='已上刊');
+    const writerLoad  = {};
+    wAssign.forEach(a=>{ const st=taskStatus(tasks.find(t=>t.id===a.taskId)||{}); if(st!=='已上刊'){writerLoad[a.writerId]=(writerLoad[a.writerId]||0)+1;} });
+
+    return header('內容生產','📄') + [
+      card('Q1 — 還沒發包給寫手的任務', table(['任務','客戶','狀態','截止日'], noWriter.map(t=>[t.taskName||t.specType,clName(t.clientId),badge(taskStatus(t),STATUS_COLOR[taskStatus(t)]||'#94a3b8'),t.dueDate||'—'])), `${noWriter.length} 筆`),
+      card('Q2 — 寫手已完稿、等 PM 校稿', table(['任務','客戶','寫手','送稿時間'], waitPM.map(t=>{ const d=drafts.filter(h=>h.taskId===t.id&&h.action==='submitted'&&h.by==='writer').at(-1); const w=wAssign.find(a=>a.taskId===t.id); return [t.taskName||t.specType,clName(t.clientId),w?wName(w.writerId):'—',d?.createdAt?.slice(0,10)||'—']; })), `${waitPM.length} 筆`),
+      card('Q3 — PM 校稿完、等客戶審稿', table(['任務','客戶','送審時間'], waitClient.map(t=>{ const d=drafts.filter(h=>h.taskId===t.id&&h.action==='submitted'&&h.by==='planner').at(-1); return [t.taskName||t.specType,clName(t.clientId),d?.createdAt?.slice(0,10)||'—']; })), `${waitClient.length} 筆`),
+      card('Q4 — 客戶已審、可發廠商上刊', table(['任務','客戶','截止日'], waitVendor.map(t=>[t.taskName||t.specType,clName(t.clientId),t.dueDate||'—'])), `${waitVendor.length} 筆`),
+      card('Q5 — 口碑商已上刊（本月）', table(['任務','客戶','上刊日'], published.filter(t=>t.publishedAt?.slice(0,7)===thisMonth).map(t=>[t.taskName||t.specType,clName(t.clientId),t.publishedAt?.slice(0,10)])), `本月 ${published.filter(t=>t.publishedAt?.slice(0,7)===thisMonth).length} 篇`),
+      card('Q7 — 退稿記錄（含原因）', table(['任務','退回原因','退回者','時間'], rejected.map(h=>{ const t=tasks.find(x=>x.id===h.taskId)||{}; return [t.taskName||t.specType||h.taskId,h.note||'未填',h.by==='planner'?'PM':'客戶',h.createdAt?.slice(0,10)]; })), `${rejected.length} 筆`),
+      card('Q8 — 逾期未完成任務', table(['任務','客戶','截止日','已過天數'], overdue.map(t=>[t.taskName||t.specType,clName(t.clientId),t.dueDate,`${dayDiff(t.dueDate,today)} 天`])), `${overdue.length} 筆`),
+      card('Q10 — 每位寫手進行中篇數', table(['寫手','進行中篇數'], Object.entries(writerLoad).sort((a,b)=>b[1]-a[1]).map(([id,cnt])=>[wName(id),cnt])), ''),
+      card('Q11 — 任務完整時間軸（點選任務查看）', `<div style="padding:14px;font-size:12px;color:var(--color-text-secondary)">前往「口碑月度作業」點開任務卡，展開可看完整切角 + 文章往返紀錄</div>`),
+      card('Q17 — 本月各平台上刊統計', (()=>{ const byPlatform={}; published.filter(t=>t.publishedAt?.slice(0,7)===thisMonth).forEach(t=>{const p=t.platform||'未設定';byPlatform[p]=(byPlatform[p]||0)+1;}); return table(['平台','篇數'],Object.entries(byPlatform).sort((a,b)=>b[1]-a[1]).map(([p,n])=>[p,n])); })()),
+      card('Q18 — 同時有 PM 退稿和客戶退稿的任務', (()=>{ const pmRej=new Set(drafts.filter(h=>h.action==='rejected'&&h.by==='planner').map(h=>h.taskId)); const clRej=new Set(drafts.filter(h=>h.action==='rejected'&&h.by==='client').map(h=>h.taskId)); const both=[...pmRej].filter(id=>clRej.has(id)); return table(['任務','客戶'],both.map(id=>{ const t=tasks.find(x=>x.id===id)||{}; return [t.taskName||t.specType||id,clName(t.clientId)]; })); })()),
+    ].join('');
+  }
+
+  // ════════ 切角管理 ════════
+  if(section === 'cutangle'){
+    const pendingCut = tasks.filter(t=>t.requireCutAngle && taskStatus(t)==='切角進行中');
+    const rejectedCut = cuts.filter(h=>h.action==='rejected');
+    const noTaskAfterCut = tasks.filter(t=>{ const approved=cuts.filter(h=>h.taskId===t.id&&h.action==='approved'); return approved.length>0 && !t.activatedAt; });
+
+    const cutRoundCount = {};
+    cuts.forEach(h=>{ if(h.action==='rejected'){ cutRoundCount[h.taskId]=(cutRoundCount[h.taskId]||0)+1; }});
+
+    return header('切角管理','🎯') + [
+      card('Q1 — 等客戶確認的切角', table(['任務','客戶','目前版次','等待天數'], pendingCut.map(t=>{ const tc=cuts.filter(h=>h.taskId===t.id); const last=tc.at(-1); const days=last?dayDiff(last.createdAt,today):0; return [t.taskName||t.specType,clName(t.clientId),Math.max(...tc.map(h=>h.round||1),1),`${days} 天`]; })), `${pendingCut.length} 筆`),
+      card('Q2 — 被退回的切角（含原因）', table(['任務','客戶','退回意見','退回時間'], rejectedCut.map(h=>{ const t=tasks.find(x=>x.id===h.taskId)||{}; return [t.taskName||t.specType||h.taskId,clName(t.clientId),h.note||'未填原因',h.createdAt?.slice(0,10)]; })), `${rejectedCut.length} 筆`),
+      card('Q3 — 切角版本歷史（退改次數）', table(['任務','客戶','退改次數'], Object.entries(cutRoundCount).sort((a,b)=>b[1]-a[1]).map(([id,n])=>{ const t=tasks.find(x=>x.id===id)||{}; return [t.taskName||t.specType||id,clName(t.clientId),n]; })), ''),
+      card('Q4 — 尚未提交切角的任務', table(['任務','客戶','啟動日'], tasks.filter(t=>t.requireCutAngle&&t.activatedAt&&!cuts.find(h=>h.taskId===t.id)).map(t=>[t.taskName||t.specType,clName(t.clientId),t.activatedAt?.slice(0,10)])), ''),
+      card('Q9 — 切角確認後遲遲未啟動任務', table(['任務','客戶','確認日'], noTaskAfterCut.map(t=>{ const a=cuts.filter(h=>h.taskId===t.id&&h.action==='approved').at(-1); return [t.taskName||t.specType,clName(t.clientId),a?.createdAt?.slice(0,10)||'—']; })), `${noTaskAfterCut.length} 筆`),
+      card('Q16 — 同版本被退回 2 次以上', (()=>{ const cnt={}; cuts.forEach(h=>{if(h.action==='rejected'){const key=h.taskId+'_'+h.round;cnt[key]=(cnt[key]||0)+1;}}); const over2=Object.entries(cnt).filter(([,n])=>n>=2); return table(['任務','版次','退回次數'],over2.map(([key,n])=>{ const [taskId,round]=key.split('_'); const t=tasks.find(x=>x.id===taskId)||{}; return [t.taskName||t.specType||taskId,round,n]; })); })()),
+      card('Q20 — 某切角歷時天數與退回次數', table(['任務','客戶','退回次數','首次提出','確認日','歷時天數'], tasks.filter(t=>cuts.find(h=>h.taskId===t.id)).map(t=>{ const tc=cuts.filter(h=>h.taskId===t.id); const first=tc[0]?.createdAt; const approved=tc.filter(h=>h.action==='approved').at(-1)?.createdAt; const rejected=tc.filter(h=>h.action==='rejected').length; return [t.taskName||t.specType,clName(t.clientId),rejected,first?.slice(0,10)||'—',approved?.slice(0,10)||'進行中',approved&&first?dayDiff(first,approved)+'天':'—']; }).sort((a,b)=>Number(b[2])-Number(a[2])))),
+    ].join('');
+  }
+
+  // ════════ 帳務 ════════
+  if(section === 'finance'){
+    const activeContracts = contracts.filter(c=>c.status==='進行中');
+    const totalAmount = activeContracts.reduce((s,c)=>s+Number(c.total||0),0);
+    const overduePay = payments.filter(p=>p.status!=='已入款'&&p.dueDate&&p.dueDate<today);
+    const upcoming30 = payments.filter(p=>p.status!=='已入款'&&p.dueDate&&p.dueDate>=today&&p.dueDate<=new Date(Date.now()+30*86400000).toISOString().slice(0,10));
+    const thisMonthVendor = vendorRecs.filter(r=>(r.month||r.date||'').slice(0,7)===thisMonth);
+
+    return header('帳務','💰') + [
+      card('Q1 — 進行中專案總覽', (()=>{ return `<div style="padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">`+
+        [`<div><div style="font-size:22px;font-weight:500;color:var(--color-text-info)">${activeContracts.length}</div><div style="font-size:11px;color:var(--color-text-tertiary)">進行中合約</div></div>`,
+         `<div><div style="font-size:22px;font-weight:500">${fmt(totalAmount)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">合約總金額</div></div>`,
+         `<div><div style="font-size:22px;font-weight:500;color:var(--color-text-danger)">${overduePay.length}</div><div style="font-size:11px;color:var(--color-text-tertiary)">逾期應收筆數</div></div>`
+        ].join('')+'</div>'; })()),
+      card('Q3 — 逾期應收款', table(['客戶','合約','期次','到期日','金額'], overduePay.map(p=>[clName(p.clientId),p.contractNo||ctName(p.contractId),p.period,p.dueDate,fmt(p.amount||0)])), `${overduePay.length} 筆，合計 ${fmt(overduePay.reduce((s,p)=>s+(p.amount||0),0))}`),
+      card('Q2 — 未來 30 天應收款', table(['客戶','合約','期次','到期日','金額'], upcoming30.map(p=>[clName(p.clientId),p.contractNo||ctName(p.contractId),p.period,p.dueDate,fmt(p.amount||0)])), `${upcoming30.length} 筆`),
+      card('Q4 — 各客戶應收/已收/未收', (()=>{ const byClient={}; payments.forEach(p=>{ if(!byClient[p.clientId]) byClient[p.clientId]={total:0,paid:0}; byClient[p.clientId].total+=(p.amount||0); if(p.status==='已入款') byClient[p.clientId].paid+=(p.amount||0); }); return table(['客戶','合約總額','已收','未收'],Object.entries(byClient).map(([id,v])=>[clName(id),fmt(v.total),fmt(v.paid),fmt(v.total-v.paid)])); })()),
+      card('Q6 — 本月廠商費用', table(['廠商','金額','月份'], thisMonthVendor.map(r=>[r.vendorName||r.vendorId,fmt(r.amount||0),r.month])), `本月共 ${thisMonthVendor.length} 筆`),
+      card('Q8 — 各分期付款狀態', table(['客戶','合約','期次','到期日','開票日','入款日','狀態'], payments.map(p=>[clName(p.clientId),p.contractNo||ctName(p.contractId),p.period,p.dueDate||'—',p.invoiceDate||'—',p.paidDate||'—',badge(p.status==='已入款'?'已入款':'未入款',p.status==='已入款'?'#22c55e':'#ef4444')]))),
+      card('Q11 — 各廠商累積費用', (()=>{ const byV={}; vendorRecs.forEach(r=>{if(!byV[r.vendorId||r.vendorName]) byV[r.vendorId||r.vendorName]={name:r.vendorName||r.vendorId,total:0}; byV[r.vendorId||r.vendorName].total+=(r.amount||0);}); return table(['廠商','累積費用'],Object.values(byV).sort((a,b)=>b.total-a.total).map(v=>[v.name,fmt(v.total)])); })()),
+      card('Q14 — 發票超 30 天未收款', (()=>{ const over30=payments.filter(p=>p.invoiceDate&&!p.paidDate&&dayDiff(p.invoiceDate,today)>30); return table(['客戶','合約','發票日','逾期天數'],over30.map(p=>[clName(p.clientId),p.contractNo||ctName(p.contractId),p.invoiceDate,`${dayDiff(p.invoiceDate,today)} 天`])); })()),
+    ].join('');
+  }
+
+  // ════════ 管理者視角 ════════
+  if(section === 'mgmt'){
+    const activeContracts = contracts.filter(c=>c.status==='進行中');
+    const expiring30 = activeContracts.filter(c=>c.end&&dayDiff(today,c.end)<=30&&dayDiff(today,c.end)>=0);
+    const myTasks = tasks.filter(t=>t.activatedAt&&taskStatus(t)!=='已上刊');
+    const plannerLoad = {};
+    myTasks.forEach(t=>{ const p=t.assignedPlanner||'__none'; if(!plannerLoad[p]) plannerLoad[p]={need:0,total:0}; plannerLoad[p].total++; if(['切角進行中','文章審核中','待指派寫手','待指派帳號商'].includes(taskStatus(t))) plannerLoad[p].need++; });
+    const waitClientOver5 = tasks.filter(t=>{ const d=drafts.filter(h=>h.taskId===t.id&&h.action==='submitted'&&h.by==='planner'); const last=d.at(-1); return last&&dayDiff(last.createdAt,today)>5; });
+    const writerOver7 = tasks.filter(t=>{ const w=wAssign.find(a=>a.taskId===t.id); return w&&taskStatus(t)==='撰文中'&&dayDiff(w.assignedAt,today)>7; });
+
+    return header('管理者視角','👔') + [
+      card('Q1 — 各專案完成進度', (()=>{ const byContract={}; tasks.forEach(t=>{ if(!byContract[t.contractId]) byContract[t.contractId]={done:0,total:0}; byContract[t.contractId].total++; if(t.publishedAt) byContract[t.contractId].done++; }); return table(['合約','客戶','完成','總計','完成率'],Object.entries(byContract).map(([id,v])=>{ const ct=contracts.find(c=>c.id===id)||{}; const cl=clients.find(c=>c.id===ct.clientId)||{}; return [ct.contractNo||id,cl.name||'—',v.done,v.total,`${Math.round(v.done/v.total*100)}%`]; })); })()),
+      card('Q2 — 合約即將到期（30 天內）', table(['客戶','合約','到期日','剩餘天數'], expiring30.map(c=>{ const cl=clients.find(x=>x.id===c.clientId)||{}; return [cl.name||'—',c.contractNo||c.id,c.end,`${dayDiff(today,c.end)} 天`]; })), `${expiring30.length} 份`),
+      card('Q4 — 各企劃負荷（進行中任務）', table(['企劃','需立即處理','進行中合計'], Object.entries(plannerLoad).map(([id,v])=>[id==='__none'?'未指派':mName(id),v.need,v.total])),  ''),
+      card('Q6 — 卡在客戶審稿超過 5 天', table(['任務','客戶','送審日','等待天數'], waitClientOver5.map(t=>{ const d=drafts.filter(h=>h.taskId===t.id&&h.action==='submitted'&&h.by==='planner').at(-1); return [t.taskName||t.specType,clName(t.clientId),d?.createdAt?.slice(0,10),`${dayDiff(d?.createdAt||today,today)} 天`]; })), `${waitClientOver5.length} 筆`),
+      card('Q7 — 寫手撰文超過 7 天', table(['任務','客戶','寫手','指派日','天數'], writerOver7.map(t=>{ const w=wAssign.find(a=>a.taskId===t.id); return [t.taskName||t.specType,clName(t.clientId),w?wName(w.writerId):'—',w?.assignedAt?.slice(0,10),`${dayDiff(w?.assignedAt||today,today)} 天`]; })), `${writerOver7.length} 筆`),
+      card('Q9 — 活躍寫手與廠商', (()=>{ const writers=(DB.freelancers||[]).length; const vendors=(DB.vendorCompanies||[]).filter(v=>v.active!==false).length; return `<div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center"><div><div style="font-size:22px;font-weight:500;color:var(--color-text-info)">${writers}</div><div style="font-size:11px;color:var(--color-text-tertiary)">活躍寫手</div></div><div><div style="font-size:22px;font-weight:500;color:var(--color-text-success)">${vendors}</div><div style="font-size:11px;color:var(--color-text-tertiary)">活躍帳號商</div></div></div>`; })()),
+      card('Q11 — 有寫手無帳號商且截止日近', (()=>{ const risk=tasks.filter(t=>{ const w=wAssign.find(a=>a.taskId===t.id); const v=vAssign.find(a=>a.taskId===t.id); return w&&!v&&t.dueDate&&dayDiff(today,t.dueDate)<=5&&dayDiff(today,t.dueDate)>=0; }); return table(['任務','客戶','寫手','截止日'],risk.map(t=>{ const w=wAssign.find(a=>a.taskId===t.id); return [t.taskName||t.specType,clName(t.clientId),w?wName(w.writerId):'—',t.dueDate]; })); })()),
+      card('Q15 — 本月新簽合約', (()=>{ const newCts=contracts.filter(c=>c.signDate?.slice(0,7)===thisMonth); const total=newCts.reduce((s,c)=>s+Number(c.total||0),0); return `<div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center"><div><div style="font-size:22px;font-weight:500">${newCts.length}</div><div style="font-size:11px;color:var(--color-text-tertiary)">本月新簽</div></div><div><div style="font-size:20px;font-weight:500">${fmt(total)}</div><div style="font-size:11px;color:var(--color-text-tertiary)">合計金額</div></div></div>`; })()),
+    ].join('');
+  }
+
+  // ════════ 獲利分析 ════════
+  if(section === 'profit'){
+    const specItems = DB.specItems || [];
+    const bySpecType = {};
+    specItems.forEach(s=>{ const name=s.name||s.spec||'未知'; if(!bySpecType[name]) bySpecType[name]={price:0,extCost:0,intCost:0,qty:0}; bySpecType[name].price+=(Number(s.price||0)*Number(s.qty||1)); bySpecType[name].extCost+=(Number(s.extCost||0)*Number(s.qty||1)); bySpecType[name].intCost+=(Number(s.intCost||0)*Number(s.qty||1)); bySpecType[name].qty+=Number(s.qty||1); });
+
+    const byClient = {};
+    contracts.forEach(c=>{ const pays=payments.filter(p=>p.contractId===c.id); const income=pays.filter(p=>p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0); const cost=(vendorRecs.filter(r=>r.clientId===c.clientId).reduce((s,r)=>s+(r.amount||0),0))+(freelancerRecs.filter(r=>r.clientId===c.clientId).reduce((s,r)=>s+(r.amount||0),0)); const cl=clients.find(x=>x.id===c.clientId)||{}; byClient[c.clientId]={name:cl.name||c.clientId,income,cost,profit:income-cost}; });
+
+    return header('獲利分析','📈') + [
+      card('Q1 — 各服務類型毛利率', table(['規格項目','售價','外包成本','毛利','毛利率'], Object.entries(bySpecType).sort((a,b)=>b[1].price-a[1].price).map(([name,v])=>{ const profit=v.price-v.extCost-v.intCost; const margin=v.price>0?Math.round(profit/v.price*100):0; return [name,fmt(v.price),fmt(v.extCost+v.intCost),fmt(profit),`${margin}%`]; })), ''),
+      card('Q3 — 各客戶專案毛利', table(['客戶','已收','成本','毛利'], Object.values(byClient).sort((a,b)=>b.profit-a.profit).map(v=>[v.name,fmt(v.income),fmt(v.cost),fmt(v.profit)])), ''),
+      card('Q7 — 各寫手退改率', (()=>{ const byWriter={}; drafts.forEach(h=>{ const t=tasks.find(x=>x.id===h.taskId); const w=wAssign.find(a=>a.taskId===h.taskId); if(!w) return; const wn=wName(w.writerId); if(!byWriter[wn]) byWriter[wn]={total:0,rejected:0}; byWriter[wn].total++; if(h.action==='rejected') byWriter[wn].rejected++; }); return table(['寫手','審核次數','退改次數','退改率'],Object.entries(byWriter).sort((a,b)=>(b[1].rejected/b[1].total)-(a[1].rejected/a[1].total)).map(([name,v])=>[name,v.total,v.rejected,`${Math.round(v.rejected/v.total*100)}%`])); })()),
+      card('Q10 — 各 PM 負責專案毛利', (()=>{ const byPM={}; contracts.forEach(c=>{ const pm=c.owner||c.assignedPlanner||'未指派'; if(!byPM[pm]) byPM[pm]={contracts:0,income:0,cost:0}; byPM[pm].contracts++; const pays=payments.filter(p=>p.contractId===c.id); byPM[pm].income+=pays.filter(p=>p.status==='已入款').reduce((s,p)=>s+(p.amount||0),0); }); return table(['PM','合約數','已收入','毛利率'],Object.entries(byPM).map(([pm,v])=>[pm,v.contracts,fmt(v.income),'—'])); })()),
+    ].join('');
+  }
+
+  return `<div style="padding:20px;color:var(--color-text-tertiary)">載入中…</div>`;
 }
 
 // ════════════════════════════════════════════════════════════════
