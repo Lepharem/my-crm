@@ -1838,6 +1838,16 @@ async function _writerNavTo(page){
 
 async function _writerLoadTasks(){
   _writerAllTasks = [];
+  // 先同步 TEST_DATA → DB（確保看到最新指派）
+  if(window._testMode && window.TEST_DATA){
+    if(TEST_DATA.tasks.length)          DB.ops_tasks          = TEST_DATA.tasks;
+    if(TEST_DATA.plans.length)          DB.ops_monthly_plans  = TEST_DATA.plans;
+    DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
+    DB.draftHistory      = TEST_DATA.draftHistory;
+    DB.writerAssignments = TEST_DATA.writerAssignments;
+    DB.vendorAssignments = TEST_DATA.vendorAssignments;
+  }
+
   const flProfile = _userProfile;
   const flId    = flProfile?.id  || '';
   const flName  = flProfile?.name || _currentUser?.name || '';
@@ -2109,6 +2119,16 @@ async function renderVendorTasks(){
   el.innerHTML = '<div style="text-align:center;padding:40px;color:#8a8680">載入中…</div>';
 
   try {
+    // 先同步 TEST_DATA → DB
+    if(window._testMode && window.TEST_DATA){
+      if(TEST_DATA.tasks.length)          DB.ops_tasks          = TEST_DATA.tasks;
+      if(TEST_DATA.plans.length)          DB.ops_monthly_plans  = TEST_DATA.plans;
+      DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
+      DB.draftHistory      = TEST_DATA.draftHistory;
+      DB.writerAssignments = TEST_DATA.writerAssignments;
+      DB.vendorAssignments = TEST_DATA.vendorAssignments;
+    }
+
     const vcProfile  = _userProfile;
     const vcId       = vcProfile?.id || '';
     const vcName     = vcProfile?.name || _currentUser?.name || '';
@@ -2361,6 +2381,15 @@ function _clientNavTo(page){
 function renderClientDashboard(){
   const el = document.getElementById('client-content');
   if(!el) return;
+  // 先同步 TEST_DATA → DB
+  if(window._testMode && window.TEST_DATA){
+    if(TEST_DATA.tasks.length)          DB.ops_tasks          = TEST_DATA.tasks;
+    if(TEST_DATA.plans.length)          DB.ops_monthly_plans  = TEST_DATA.plans;
+    DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
+    DB.draftHistory      = TEST_DATA.draftHistory;
+    DB.writerAssignments = TEST_DATA.writerAssignments;
+    DB.vendorAssignments = TEST_DATA.vendorAssignments;
+  }
   const cl = _userProfile;
   if(!cl){ el.innerHTML='<div style="padding:40px;text-align:center;color:#8a8680">找不到客戶資料</div>'; return; }
 
@@ -2394,12 +2423,13 @@ function renderClientDashboard(){
     const lastCut = t._cut.at(-1);
     return lastCut && lastCut.action === 'submitted' && lastCut.by === 'planner';
   });
-  // 企劃修改中（客戶退回，企劃尚未重送）：不計入待確認，但顯示在合約進度頁
-  const pendingCutRevision = tasksWithStatus.filter(t=>{
-    if(t._status !== '切角進行中') return false;
-    const lastCut = t._cut.at(-1);
-    return lastCut && lastCut.action === 'rejected' && lastCut.by === 'client';
-  });
+  // 已確認切角：客戶 approved 過，且不在 pending 中
+  // 直接從 cutAngleHistory 判斷（不依賴狀態機，確保確認後仍顯示）
+  const confirmedCutTasks = tasksWithStatus.filter(t=>
+    t.requireCutAngle &&
+    t._cut.some(h=>h.action==='approved' && h.by==='client') &&
+    !pendingCutAngle.find(p=>p.id===t.id)
+  );
 
   // 需要客戶確認的文章（文章審核中且企劃已送審）
   const pendingDraft = tasksWithStatus.filter(t=>{
@@ -2450,11 +2480,7 @@ function renderClientDashboard(){
 
     <!-- 已確認的切角（收闔留存） -->
     ${(()=>{
-      const confirmed = tasksWithStatus.filter(t=>
-        t.requireCutAngle &&
-        t._cut.some(h=>h.action==='approved') &&
-        !pendingCutAngle.find(p=>p.id===t.id)
-      );
+      const confirmed = confirmedCutTasks;
       if(!confirmed.length) return '';
       return `<details open style="margin-bottom:12px">
         <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#166534;
@@ -9151,8 +9177,11 @@ function _renderTaskCard(task, clientId, contractId, ym){
       parts.push({label:vLabel, color:vc, fw:va&&!published?600:400});
     }
 
-    return parts.map((p,i)=>`<span style="display:inline-flex;align-items:center;gap:1px;font-size:10px;color:${p.color};font-weight:${p.fw}">
-      ${p.label}${i<parts.length-1?'<span style="color:#d1d5db;margin:0 3px">›</span>':''}
+    return parts.map((p,i)=>`<span style="display:inline-flex;align-items:center;gap:1px">
+      <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:${p.fw};
+        color:${p.color};background:${p.color}18;border:1px solid ${p.color}44;white-space:nowrap">
+        ${p.label}
+      </span>${i<parts.length-1?'<span style="color:#d1d5db;margin:0 2px;font-size:11px">›</span>':''}
     </span>`).join('');
   })() : '';
 
@@ -9187,7 +9216,7 @@ function _renderTaskCard(task, clientId, contractId, ym){
             ${cutBadge}
             ${staleDays}
           </div>
-          ${progressSteps?`<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:2px;align-items:center">${progressSteps}</div>`:''}
+          ${progressSteps?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;align-items:center;font-family:-apple-system,'PingFang TC',sans-serif">${progressSteps}</div>`:''}
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:500;color:${statusColor}">${s}</span>
             ${rel.writer?`<span style="font-size:11px;color:var(--text3)">✍ ${rel.writer.writerName||'—'}</span>`:''}
@@ -9544,6 +9573,11 @@ function _activateTask(taskId, clientId, contractId, ym){
     if(tdt) Object.assign(tdt, task);
   }
   _refreshPlan(clientId, contractId, ym);
+  // 啟動後自動展開該任務卡片
+  setTimeout(()=>{
+    const body = document.getElementById('task-body-'+taskId);
+    if(body) body.style.display = 'block';
+  }, 100);
   toast('任務已啟動', 'success');
 }
 
