@@ -3148,6 +3148,10 @@ window.loadAllData = async function(){
     }
 
     window._lastLoadTime = Date.now();
+    // 若測試模式已開啟，重建身份切換面板（確保 hr_members 資料最新）
+    if(window._testMode && document.getElementById('test-role-panel')){
+      showTestRolePanel();
+    }
     renderHome();
     // 若使用者切換到其他頁面後資料才回來，重新 render 當前頁面
     setTimeout(()=>{
@@ -3316,8 +3320,20 @@ function enableTestMode(){
 
   toast('🧪 測試模式已開啟 — 所有操作不會寫入資料庫', 'info');
   console.log('%c[🧪 TEST MODE ON]', 'background:#7c3aed;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold');
-  // 立即顯示角色切換控制台
-  showTestRolePanel();
+
+  // 若 D.members 尚未載入，先載入資料再顯示面板
+  const _hasMembers = (window.D?.members||[]).length > 0;
+  if(!_hasMembers){
+    toast('載入人員資料中…', 'info');
+    loadAllData().then(()=>{
+      showTestRolePanel();
+    }).catch(()=>{
+      // GAS 連線失敗，直接用 fallback 面板
+      showTestRolePanel();
+    });
+  } else {
+    showTestRolePanel();
+  }
 }
 
 function disableTestMode(){
@@ -3430,25 +3446,41 @@ function showTestRolePanel(){
   const old = document.getElementById('test-role-panel');
   if(old) old.remove();
 
-  // 蒐集可切換的身份
-  const staffRoles = [
-    { role:'staff', label:'👑 老闆', name:'老闆', email:'boss@lepharem.com', hrRole:'owner', color:'#dc2626' },
-    { role:'staff', label:'👩‍💼 主管', name:'主管', email:'manager@lepharem.com', hrRole:'manager', color:'#d97706' },
-    { role:'staff', label:'🧑‍💻 企劃', name:'企劃同仁', email:'staff@lepharem.com', hrRole:'employee', color:'#1D4ED8' },
-  ];
-  // 客戶（從 DB.clients 動態列出有 clientToken 的）
+  // ── 內部員工：從 hr_members 取實際人員 ──
+  const roleIcon  = { owner:'👑', manager:'👩‍💼', employee:'🧑‍💻', staff:'🧑‍💻' };
+  const roleColor = { owner:'#dc2626', manager:'#d97706', employee:'#1D4ED8', staff:'#1D4ED8' };
+  const hrMembers = (window.D?.members || []).filter(m => m.active===true || m.active==='TRUE' || m.active===1);
+
+  const staffRoles = hrMembers.length > 0
+    ? hrMembers.map(m => ({
+        role:   'staff',
+        label:  `${roleIcon[m.role]||'🧑‍💻'} ${m.name_zh||m.name}`,
+        name:   m.name_zh || m.name,
+        email:  m.email || `${m.id}@lepharem.com`,
+        hrRole: m.role || 'employee',
+        memberId: m.id,          // ← 真實 member id
+        color:  roleColor[m.role] || '#1D4ED8'
+      }))
+    : [
+        // hr_members 尚未載入時的 fallback（enableTestMode 會觸發 loadAllData 再重建）
+        { role:'staff', label:'👑 老闆（暫用）', name:'老闆', email:'boss@lepharem.com', hrRole:'owner', memberId:'', color:'#dc2626' },
+        { role:'staff', label:'👩‍💼 主管（暫用）', name:'主管', email:'manager@lepharem.com', hrRole:'manager', memberId:'', color:'#d97706' },
+        { role:'staff', label:'🧑‍💻 企劃（暫用）', name:'企劃同仁', email:'staff@lepharem.com', hrRole:'employee', memberId:'', color:'#1D4ED8' },
+      ];
+
+  // ── 客戶（進行中合約的客戶）──
   const clientRoles = DB.clients.filter(c=>c.status==='進行中').map(c=>({
     role:'client', label:`🏢 ${c.name}`, name:c.name,
     email: c.clientEmail||`client_${c.id}@test.com`,
     clientId: c.id, color:'#0891b2'
   }));
-  // 從 DB 取寫手
+  // ── 寫手（ref_freelancer_pricing，外包人員）──
   const writers = DB.freelancers.map(f=>({
     role:'writer', label:`✍️ ${f.name}`, name:f.name,
     email: f.email||`${f.id}@writer.test`,
     flId: f.id, color:'#5b21b6'
   }));
-  // 從 DB 取帳號商
+  // ── 帳號商（fin_vendor_companies）──
   const vendors = (DB.vendorCompanies||[]).map(v=>({
     role:'vendor', label:`📣 ${v.name}`, name:v.name,
     email: v.email||`${v.id}@vendor.test`,
@@ -3471,7 +3503,10 @@ function showTestRolePanel(){
   const header = document.createElement('div');
   header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0';
   header.innerHTML = `
-    <div style="font-size:12px;font-weight:700;color:#a5b4fc;letter-spacing:.06em">🧪 身份切換控制台</div>
+    <div>
+      <div style="font-size:12px;font-weight:700;color:#a5b4fc;letter-spacing:.06em">🧪 身份切換控制台</div>
+      <div style="font-size:10px;color:#6b7280;margin-top:1px">內部員工來自 hr_members</div>
+    </div>
     <button onclick="document.getElementById('test-role-panel').style.display='none'"
       style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:16px;padding:0;line-height:1">✕</button>`;
   panel.appendChild(header);
@@ -3492,10 +3527,11 @@ function showTestRolePanel(){
       r.name.toLowerCase().includes(filter.toLowerCase())
     );
     // 分群顯示
+    // 動態計算群組 label（顯示實際人數）
     const groups = [
-      { key:'staff',  label:'內部員工', icon:'🏢' },
+      { key:'staff',  label:`內部員工（${staffRoles.length} 人）`, icon:'🏢' },
       { key:'client', label:'客戶',     icon:'🏢' },
-      { key:'writer', label:'寫手',     icon:'✍️' },
+      { key:'writer', label:'外包寫手', icon:'✍️' },
       { key:'vendor', label:'帳號商',   icon:'📣' },
     ];
     groups.forEach(g=>{
@@ -3575,8 +3611,12 @@ function switchTestRole(roleConfig){
   _userRole = role;
 
   if(role === 'staff'){
-    _userProfile = { name, role: hrRole, email };
-    window.myMember = { id:'TEST_'+hrRole, name_zh:name, email, role:hrRole, active:true };
+    // 用真實 hr_members 資料建立 myMember
+    const _realMember = (window.D?.members||[]).find(m=>m.id===roleConfig.memberId);
+    _userProfile = _realMember || { name, role: hrRole, email };
+    window.myMember = _realMember
+      ? {..._realMember}  // 完整保留 hr_members 所有欄位
+      : { id: roleConfig.memberId||('TEST_'+hrRole), name_zh:name, email, role:hrRole, active:true };
     if(typeof hrApplyPermissions === 'function') hrApplyPermissions();
   } else if(role === 'writer'){
     const fl = DB.freelancers.find(f=>f.id===flId);
@@ -3604,8 +3644,10 @@ function switchTestRole(roleConfig){
     }
   }
 
-  const roleLabels = {staff:'內部員工',writer:'寫手',vendor:'帳號商',client:'客戶'};
-  toast(`🧪 已切換為：${name}（${roleLabels[role]||role}）`, 'info');
+  const roleHrLabels = {owner:'老闆',manager:'主管',employee:'企劃',staff:'員工'};
+  const roleLabels   = {staff:'內部員工',writer:'外包寫手',vendor:'帳號商',client:'客戶'};
+  const roleDisplay  = role==='staff' ? roleHrLabels[hrRole]||'員工' : roleLabels[role]||role;
+  toast(`🧪 已切換為：${name}（${roleDisplay}）`, 'info');
   console.log(`%c[🧪 ROLE] → ${name} (${role})`, `background:${color};color:#fff;padding:2px 8px;border-radius:4px`);
 
   // 只更新控制台列表的 active 狀態（不重建整個面板）
