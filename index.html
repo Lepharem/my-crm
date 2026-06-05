@@ -2165,27 +2165,35 @@ async function renderVendorTasks(){
           ${draftLink?`<div style="margin-bottom:10px"><a href="${draftLink}" target="_blank"
             style="font-size:12px;color:#6366f1;text-decoration:underline">📄 查看文章稿件 →</a></div>`:''}
 
+          <!-- 企劃設定的希望資訊（唯讀） -->
+          ${(t._va?.desiredDate||t._va?.desiredPlatform)?`
+            <div style="background:var(--surface2);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px">
+              <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:4px">📋 企劃指定資訊</div>
+              ${t._va.desiredDate?`<div>希望發布日期：<b>${t._va.desiredDate}</b></div>`:''}
+              ${t._va.desiredPlatform?`<div>論壇平台：<b>${t._va.desiredPlatform}</b>${t._va.desiredSection?' · '+t._va.desiredSection:''}</div>`:''}
+            </div>`:''}
+
           ${!hasReported ? `
             <!-- 回報上刊表單 -->
             <div id="vf-form-${t.id}" style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2)">
               <div style="font-size:12px;font-weight:600;margin-bottom:10px">📣 回報上刊結果</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
                 <div>
-                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">發布日期 *</label>
-                  <input id="vf-date-${t.id}" type="date" value="${new Date().toISOString().slice(0,10)}"
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">實際發布日期 *</label>
+                  <input id="vf-date-${t.id}" type="date" value="${t._va?.desiredDate||new Date().toISOString().slice(0,10)}"
                     style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
                 </div>
                 <div>
                   <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">論壇平台</label>
                   <select id="vf-platform-${t.id}"
                     style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
-                    ${['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google','其他'].map(p=>`<option value="${p}">${p}</option>`).join('')}
+                    ${['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google','其他'].map(p=>`<option value="${p}" ${p===t._va?.desiredPlatform?'selected':''}>${p}</option>`).join('')}
                   </select>
                 </div>
               </div>
               <div style="margin-bottom:8px">
                 <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">板塊 / 討論區</label>
-                <input id="vf-section-${t.id}" placeholder="例：感情板、美妝板"
+                <input id="vf-section-${t.id}" placeholder="例：感情板、美妝板" value="${t._va?.desiredSection||''}"
                   style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
               </div>
               <div style="margin-bottom:8px">
@@ -2271,6 +2279,11 @@ async function _vendorSubmitPost(taskId){
   if(task){ task.platform=platform; task.section=section; }
 
   await syncToGAS('vendor_assignments', va).catch(()=>{});
+  // 同步到 TEST_DATA（確保企劃端切回後也能讀到回報）
+  if(window._testMode && window.TEST_DATA){
+    const tdva = TEST_DATA.vendorAssignments.find(a=>a.id===va.id);
+    if(tdva) Object.assign(tdva, va);
+  }
   toast('✅ 已回報上刊，等待企劃確認', 'success');
   await renderVendorTasks();
 }
@@ -2438,7 +2451,7 @@ function _clientCutAngleCard(t){
       <div style="padding:12px 14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div style="font-size:13px;font-weight:600">${t.taskName||t.specType||'—'}</div>
-          <span style="font-size:11px;color:#92400e;font-weight:500">切角審核 · 第${rounds}次</span>
+          <span style="font-size:11px;color:#92400e;font-weight:500">切角審核${rounds>1?' · 第'+(rounds-1)+'次修改':' · 首次'}</span>
         </div>
         <div style="font-size:11px;color:#92400e;margin-bottom:10px">${pln.ym||''}</div>
 
@@ -2482,7 +2495,7 @@ function _clientDraftCard(t){
       <div style="padding:12px 14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div style="font-size:13px;font-weight:600">${t.taskName||t.specType||'—'}</div>
-          <span style="font-size:11px;color:#9a3412;font-weight:500">文章審核 · 第${rounds}次</span>
+          <span style="font-size:11px;color:#9a3412;font-weight:500">文章審核${rounds>1?' · 第'+(rounds-1)+'次修改':' · 首次'}</span>
         </div>
         <div style="font-size:11px;color:#9a3412;margin-bottom:10px">${pln.ym||''}</div>
 
@@ -3254,23 +3267,7 @@ function enableTestMode(){
   window._testOriginalUser    = _currentUser ? {..._currentUser} : null;
   window._testOriginalProfile = _userProfile ? {..._userProfile} : null;
 
-  // 注入 mock clients/contracts（確保切換到客戶角色時有名單）
-  // 若 GAS 已覆蓋，用靜態 mock 補回
-  const hasMockC001 = DB.clients.some(c=>c.id==='C001');
-  if(!hasMockC001){
-    const mockClients = [
-      {id:'C001',name:'彩御國際有限公司',brandName:'台北ihair',status:'進行中',clientEmail:'client@caiy.test'},
-      {id:'C002',name:'風華整外',brandName:'風華整形外科',status:'進行中',clientEmail:'client@fenghua.test',clientToken:'TEST_FENGHUA_TOKEN'},
-    ];
-    const mockContracts = [
-      {id:'CT001',clientId:'C001',name:'2026口碑操作合約',contractNo:'W60309M9',status:'進行中',start:'2026-04-11',end:'2026-12-31'},
-      {id:'CT002',clientId:'C002',name:'2026口碑操作合約',contractNo:'W60413M9',status:'進行中',start:'2026-04-13',end:'2026-12-31'},
-    ];
-    // 把 mock 客戶加到現有 clients 前面（不覆蓋，只補）
-    DB.clients = [...mockClients, ...DB.clients.filter(c=>!['C001','C002'].includes(c.id))];
-    DB.contracts = [...mockContracts, ...DB.contracts.filter(c=>!['CT001','CT002'].includes(c.id))];
-    console.log('[TEST] Injected mock clients/contracts');
-  }
+  // 不注入 mock clients，直接使用從 GAS 載入的真實 DB.clients
 
   // 確保登入畫面隱藏，讓後續介面可以正常顯示
   const loginScreen = document.getElementById('login-screen');
@@ -9022,7 +9019,7 @@ function _renderTaskCard(task, clientId, contractId, ym){
       </div>
 
       <!-- 卡片展開內容（預設隱藏）-->
-      <div id="task-body-${task.id}" style="display:none;border-top:1px solid var(--border)">
+      <div id="task-body-${task.id}" style="display:${task.activatedAt?'block':'none'};border-top:1px solid var(--border)">
         <!-- 任務資訊 -->
         <div style="padding:10px 14px;font-size:12px;color:var(--text2)">
           ${task.platform?`<span>📍 ${task.platform}</span>  `:''}
@@ -9148,11 +9145,22 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
 
     // 撰文中 case 已整合到「待指派寫手」下方
 
-    case '文章審核中':
+    case '文章審核中': {
+      const _lastDraft = (DB.draftHistory||[]).filter(h=>h.taskId===id).at(-1);
+      const _waitingWriter = _lastDraft && (_lastDraft.action==='rejected'||_lastDraft.action==='revision');
       return `<div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">寫手已送回稿件，審核通過才可指派帳號商。</div>
-        <button class="btn btn-primary btn-sm" onclick="_openDraftFlow('${id}','${clientId}','${contractId}','${ym}')">📝 審核文章 / 查看往返</button>
+        ${_waitingWriter
+          ? `<div style="font-size:12px;color:#f97316;margin-bottom:8px">
+              ✕ 已退回，等待寫手修改後重新送稿
+              ${_lastDraft.note?`<div style="font-size:11px;color:var(--text3);margin-top:4px">退回意見：${_lastDraft.note}</div>`:''}
+             </div>`
+          : `<div style="font-size:12px;color:var(--text3);margin-bottom:8px">寫手已送回稿件，審核通過才可指派帳號商。</div>`}
+        <button class="btn ${_waitingWriter?'btn-sm':'btn-primary btn-sm'}"
+          onclick="_openDraftFlow('${id}','${clientId}','${contractId}','${ym}')">
+          📝 ${_waitingWriter?'查看往返記錄':'審核文章 / 查看往返'}
+        </button>
       </div>`;
+    }
 
     case '待指派帳號商':
       return `<div>
@@ -9271,15 +9279,35 @@ function _writerSelect(taskId, clientId, contractId, ym){
 function _vendorSelect(taskId, clientId, contractId, ym){
   const vendors = (DB.vendorCompanies||[]);
   const options = vendors.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
-  return `<div style="display:flex;flex-direction:column;gap:6px">
+  const task = (DB.ops_tasks||[]).find(t=>t.id===taskId)||{};
+  const platforms = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google','其他'];
+  return `<div style="display:flex;flex-direction:column;gap:8px">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <select id="vendor-sel-${taskId}" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
         <option value="">— 選擇帳號商 —</option>
         ${options}
       </select>
-      <input id="vendor-fee-${taskId}" type="number" placeholder="費用（選填）" min="0"
-        style="width:110px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
       <button class="btn btn-primary btn-sm" onclick="_assignVendor('${taskId}','${clientId}','${contractId}','${ym}')">指派</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <div>
+        <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:2px">希望發布日期</label>
+        <input id="vendor-date-${taskId}" type="date"
+          style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:2px">論壇平台</label>
+        <select id="vendor-platform-${taskId}"
+          style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+          <option value="">— 選擇 —</option>
+          ${platforms.map(p=>`<option>${p}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:2px">板塊（選填）</label>
+        <input id="vendor-section-${taskId}" type="text" placeholder="例：感情板"
+          style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+      </div>
     </div>
   </div>`;
 }
@@ -9309,6 +9337,11 @@ function _activateTask(taskId, clientId, contractId, ym){
   task.dueDate         = dueDate;
   if(plannerId) task.assignedPlanner = plannerId;
   syncToGAS('tasks', task).catch(()=>{});
+  // 同步 TEST_DATA
+  if(window._testMode && window.TEST_DATA){
+    const tdt = TEST_DATA.tasks.find(t=>t.id===taskId);
+    if(tdt) Object.assign(tdt, task);
+  }
   _refreshPlan(clientId, contractId, ym);
   toast('任務已啟動', 'success');
 }
@@ -9357,6 +9390,11 @@ function _assignWriter(taskId, clientId, contractId, ym){
   DB.writerAssignments = DB.writerAssignments.filter(a=>a.taskId!==taskId);
   DB.writerAssignments.push(assignment);
   syncToGAS('writer_assignments', assignment).catch(()=>{});
+  // 同步 TEST_DATA
+  if(window._testMode && window.TEST_DATA){
+    TEST_DATA.writerAssignments = TEST_DATA.writerAssignments.filter(a=>a.taskId!==taskId);
+    TEST_DATA.writerAssignments.push(assignment);
+  }
   _refreshPlan(clientId, contractId, ym);
   toast(`已指派 ${writer.name}`, 'success');
 }
@@ -9378,19 +9416,28 @@ function _assignVendor(taskId, clientId, contractId, ym){
   const vendor = (DB.vendorCompanies||[]).find(v=>v.id===sel.value);
   if(!vendor) return;
 
-  const agreedFeeV = parseFloat(document.getElementById('vendor-fee-'+taskId)?.value||'0')||0;
+  const desiredDate    = document.getElementById('vendor-date-'+taskId)?.value||'';
+  const desiredPlatform= document.getElementById('vendor-platform-'+taskId)?.value||'';
+  const desiredSection = document.getElementById('vendor-section-'+taskId)?.value.trim()||'';
   const assignment = {
     id: 'VA_'+Date.now().toString(36),
     taskId, vendorId: vendor.id, vendorName: vendor.name,
     assignedAt: new Date().toISOString(),
     assignedBy: window.myMember?.id||'',
     confirmedAt: '',
-    agreedFee: agreedFeeV,
+    desiredDate, desiredPlatform, desiredSection,
+    postLink:'', account:'', platform:'', section:'',
+    publishDate:'', screenshotLinks:[], note:'',
   };
   if(!DB.vendorAssignments) DB.vendorAssignments = [];
   DB.vendorAssignments = DB.vendorAssignments.filter(a=>a.taskId!==taskId);
   DB.vendorAssignments.push(assignment);
   syncToGAS('vendor_assignments', assignment).catch(()=>{});
+  // 同步 TEST_DATA
+  if(window._testMode && window.TEST_DATA){
+    TEST_DATA.vendorAssignments = TEST_DATA.vendorAssignments.filter(a=>a.taskId!==taskId);
+    TEST_DATA.vendorAssignments.push(assignment);
+  }
   _refreshPlan(clientId, contractId, ym);
   toast(`已指派 ${vendor.name}`, 'success');
 }
@@ -9415,6 +9462,13 @@ function _confirmPublish(taskId, clientId, contractId, ym){
   syncToGAS('vendor_assignments', assignment).catch(()=>{});
   const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
   if(task){ task.publishedAt = new Date().toISOString().slice(0,10); syncToGAS('tasks', task).catch(()=>{}); }
+  // 同步 TEST_DATA
+  if(window._testMode && window.TEST_DATA){
+    const tdva = TEST_DATA.vendorAssignments.find(a=>a.id===assignment.id);
+    if(tdva) tdva.confirmedAt = assignment.confirmedAt;
+    const tdt = TEST_DATA.tasks.find(t=>t.id===taskId);
+    if(tdt && task) tdt.publishedAt = task.publishedAt;
+  }
   _refreshPlan(clientId, contractId, ym);
   toast('✓ 已確認上刊', 'success');
 }
@@ -9529,7 +9583,9 @@ function _openCutAngleFlow(taskId, clientId, contractId, ym){
   const historyHtml = Object.keys(rounds).sort((a,b)=>a-b).map(round=>{
     const items = rounds[round];
     return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
-      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">第 ${round} 輪</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">
+        ${Number(round)===1?'首次送審':('第 '+(Number(round)-1)+' 次修改')}
+      </div>
       ${items.map(h=>`
         <div style="padding:4px 0;font-size:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:baseline">
           <span style="color:${h.action==='approved'?'#22c55e':h.action==='rejected'?'#ef4444':'#6366f1'};flex-shrink:0">
@@ -9562,6 +9618,8 @@ function _openCutAngleFlow(taskId, clientId, contractId, ym){
       </div>`:``}
 
     ${!lastApproved?`
+      <!-- 客戶退回意見顯示 -->
+      ${(()=>{ const lastRej=(DB.cutAngleHistory||[]).filter(h=>h.taskId===taskId&&h.action==='rejected').at(-1); return lastRej?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:12px;color:#7f1d1d">✕ 客戶退回：${lastRej.note||'（無說明）'}</div>`:''; })()}
       <div style="margin-bottom:12px">
         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">切角方向說明</label>
         <textarea id="cut-content-${taskId}" rows="3" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical" placeholder="填寫切角方向..."></textarea>
@@ -9603,6 +9661,8 @@ function _submitCutAngle(taskId, action, clientId, contractId, ym, round){
   if(!DB.cutAngleHistory) DB.cutAngleHistory = [];
   DB.cutAngleHistory.push(record);
   syncToGAS('cutangle_history', record).catch(()=>{});
+  // 同步 TEST_DATA
+  if(window._testMode && window.TEST_DATA) TEST_DATA.cutAngleHistory.push(record);
   closeModal();
   _refreshPlan(clientId, contractId, ym);
   toast(action==='approved'?'✓ 切角確認完成':'切角已送客戶審核', 'success');
@@ -9623,7 +9683,10 @@ function _openDraftFlow(taskId, clientId, contractId, ym){
   const historyHtml = Object.keys(rounds).sort((a,b)=>a-b).map(round=>{
     const items = rounds[round];
     return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
-      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">第 ${round} 輪${items.find(h=>h.draftLink)?` <a href="${items.find(h=>h.draftLink).draftLink}" target="_blank" style="color:#6366f1;font-size:10px">查看稿件 →</a>`:''}</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">
+        ${Number(round)===1?'首次送稿':('第 '+(Number(round)-1)+' 次修改')}
+        ${items.find(h=>h.draftLink)?` <a href="${items.find(h=>h.draftLink).draftLink}" target="_blank" style="color:#6366f1;font-size:10px">查看稿件 →</a>`:''}
+      </div>
       ${items.map(h=>`
         <div style="padding:4px 0;font-size:12px;display:flex;gap:6px;flex-wrap:wrap">
           <span style="color:${h.action==='approved'?'#22c55e':h.action==='rejected'?'#ef4444':h.action==='revision'?'#f97316':'#6366f1'};flex-shrink:0">
@@ -9686,6 +9749,8 @@ function _submitDraftAction(taskId, action, by, clientId, contractId, ym, round)
   if(!DB.draftHistory) DB.draftHistory = [];
   DB.draftHistory.push(record);
   syncToGAS('draft_history', record).catch(()=>{});
+  // 同步 TEST_DATA
+  if(window._testMode && window.TEST_DATA) TEST_DATA.draftHistory.push(record);
   closeModal();
   _refreshPlan(clientId, contractId, ym);
 
