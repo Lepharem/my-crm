@@ -2382,10 +2382,17 @@ function renderClientDashboard(){
   });
 
   // 需要客戶確認的切角（切角進行中且企劃已送審）
+  // 待確認切角：企劃已送審（submitted by planner），客戶尚未回覆
   const pendingCutAngle = tasksWithStatus.filter(t=>{
     if(t._status !== '切角進行中') return false;
     const lastCut = t._cut.at(-1);
     return lastCut && lastCut.action === 'submitted' && lastCut.by === 'planner';
+  });
+  // 企劃修改中（客戶退回，企劃尚未重送）：不計入待確認，但顯示在合約進度頁
+  const pendingCutRevision = tasksWithStatus.filter(t=>{
+    if(t._status !== '切角進行中') return false;
+    const lastCut = t._cut.at(-1);
+    return lastCut && lastCut.action === 'rejected' && lastCut.by === 'client';
   });
 
   // 需要客戶確認的文章（文章審核中且企劃已送審）
@@ -2443,8 +2450,8 @@ function renderClientDashboard(){
         !pendingCutAngle.find(p=>p.id===t.id)
       );
       if(!confirmed.length) return '';
-      return `<details style="margin-bottom:12px">
-        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#6b7280;
+      return `<details open style="margin-bottom:12px">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#166534;
           list-style:none;display:flex;align-items:center;gap:4px;user-select:none;padding:4px 0">
           ✓ 已確認切角（${confirmed.length}）<span style="margin-left:auto">▾</span>
         </summary>
@@ -8861,12 +8868,15 @@ function renderSopOmPage(){
   }
 
   // 測試模式：只在尚未初始化時建立假資料（避免跳頁重置）
-  if(window._testMode && contracts.length){
-    const _hasPlan = (DB.ops_monthly_plans||[]).some(p=>p.contractId===contracts[0].id && p.ym===ym);
-    if(!_hasPlan) _testInitPlan(clientId, contracts[0].id, ym);
-    // 確保 DB 同步 TEST_DATA（防止跳頁後 DB 被清空）
+  if(window._testMode){
+    if(contracts.length){
+      const _hasPlan = (DB.ops_monthly_plans||[]).some(p=>p.contractId===contracts[0].id && p.ym===ym);
+      if(!_hasPlan) _testInitPlan(clientId, contracts[0].id, ym);
+    }
+    // 每次 render 都確保 DB 與 TEST_DATA 同步（防止任何操作後的不一致）
     if(TEST_DATA.tasks.length) DB.ops_tasks = TEST_DATA.tasks;
     if(TEST_DATA.plans.length) DB.ops_monthly_plans = TEST_DATA.plans;
+    // 這四個是動態增長的，每次都要同步
     DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
     DB.draftHistory      = TEST_DATA.draftHistory;
     DB.writerAssignments = TEST_DATA.writerAssignments;
@@ -9070,55 +9080,70 @@ function _renderTaskCard(task, clientId, contractId, ym){
   }
 
   // 進度步驟——已啟動任務才顯示
-  // 進度步驟——已啟動任務才顯示，反映目前進行中的步驟
+  // 進度步驟——接力棒邏輯，顯示已完成步驟和當前步驟
   const progressSteps = task.activatedAt && s!=='待啟動' ? (() => {
-    const steps = [];
     const cut = rel.cut||[], draft = rel.draft||[], wa = rel.writer, va = rel.vendor;
-    // 切角（需要時才顯示）
+    const parts = [];
+
+    // 切角（需要時）
     if(task.requireCutAngle){
       const approved = cut.some(h=>h.action==='approved');
-      const lastCut = cut.at(-1);
-      const waitClient = lastCut?.action==='submitted' && lastCut?.by==='planner';
-      steps.push({ label:'切角審核', done:approved, active:s==='切角進行中',
-        sub: approved?'✓': waitClient?'等客戶': lastCut?.action==='rejected'?'退回':'待送審' });
+      const lastCut  = cut.at(-1);
+      const waitCl   = lastCut?.action==='submitted' && lastCut?.by==='planner';
+      const label    = approved ? '✓ 切角'
+                     : s==='切角進行中' ? (waitCl?'🔸 切角（等客戶)':'▶ 切角審核')
+                     : '○ 切角';
+      const color    = approved?'#22c55e': s==='切角進行中'?'#f59e0b':'#94a3b8';
+      parts.push({label, color, fw: s==='切角進行中'?600:400});
     }
-    // 指派寫手
-    steps.push({ label:'指派寫手', done:!!wa, active:s==='待指派寫手', sub: wa?wa.writerName:'' });
-    // 文章
-    const draftApproved = draft.some(h=>h.action==='approved');
-    const lastDraft = draft.at(-1);
-    steps.push({ label:'文章', done:draftApproved, active:['撰文中','文章審核中'].includes(s),
-      sub: draftApproved?'✓': lastDraft?.action==='submitted'?'審核中': lastDraft?.action==='rejected'?'退回':'撰文' });
-    // 帳號商
-    steps.push({ label:'上刊', done:s==='已上刊', active:['待指派帳號商','待上刊'].includes(s),
-      sub: s==='已上刊'?'✓': va?.postLink?'待確認': va?'待上刊':'' });
 
-    // 找當前步驟（active=true 或最後一個未完成的）
-    const activeIdx = steps.findIndex(st=>st.active);
-    return steps.map((st,i)=>{
-      const isCurrent = i===activeIdx;
-      const c = st.done?'#22c55e': isCurrent?'#f97316':'#94a3b8';
-      const fw = isCurrent?600:400;
-      return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:10px;color:${c};font-weight:${fw}">
-        ${st.done?'✓': isCurrent?'▶':'○'} ${st.label}${st.sub&&!st.done?' ('+st.sub+')':''}
-        ${i<steps.length-1?`<span style="color:#d1d5db;margin:0 2px">›</span>`:''}
-      </span>`;
-    }).join('');
+    // 指派寫手
+    if(s!=='切角進行中'){
+      const writerLabel = wa
+        ? (s==='待指派寫手'?'▶ 指派寫手':'✓ '+wa.writerName)
+        : (s==='待指派寫手'?'▶ 指派寫手':'○ 指派');
+      const wc = wa&&s!=='待指派寫手'?'#22c55e': s==='待指派寫手'?'#3b82f6':'#94a3b8';
+      parts.push({label:writerLabel, color:wc, fw:s==='待指派寫手'?600:400});
+    }
+
+    // 文章（已有寫手後才顯示）
+    if(wa||['撰文中','文章審核中','待指派帳號商','待上刊','已上刊'].includes(s)){
+      const draftOk = draft.some(h=>h.action==='approved');
+      const lastD   = draft.at(-1);
+      const isRej   = lastD?.action==='rejected';
+      const waitPM  = lastD?.action==='submitted' && lastD?.by==='writer';
+      const dLabel  = draftOk ? '✓ 文章通過'
+                    : ['撰文中','文章審核中'].includes(s)
+                      ? (isRej?'▶ 文章（待修改)': waitPM?'▶ 文章（待審核)':'▶ 撰文中')
+                    : '○ 文章';
+      const dc = draftOk?'#22c55e':['撰文中','文章審核中'].includes(s)?'#8b5cf6':'#94a3b8';
+      parts.push({label:dLabel, color:dc, fw:['撰文中','文章審核中'].includes(s)?600:400});
+    }
+
+    // 上刊
+    if(['待指派帳號商','待上刊','已上刊'].includes(s)||va){
+      const published = s==='已上刊';
+      const vLabel = published?'✓ 已上刊': va?.postLink?'▶ 待企劃確認': va?'▶ 待上刊':'○ 上刊';
+      const vc = published?'#22c55e':va?'#eab308':'#94a3b8';
+      parts.push({label:vLabel, color:vc, fw:va&&!published?600:400});
+    }
+
+    return parts.map((p,i)=>`<span style="display:inline-flex;align-items:center;gap:1px;font-size:10px;color:${p.color};font-weight:${p.fw}">
+      ${p.label}${i<parts.length-1?'<span style="color:#d1d5db;margin:0 3px">›</span>':''}
+    </span>`).join('');
   })() : '';
 
-  // 切角標籤——依照當前進程顯示不同狀態
-  const cutBadge = task.requireCutAngle ? (() => {
+  // cutBadge——只在「等客戶確認」時顯示提示標籤
+  const cutBadge = (() => {
+    if(!task.requireCutAngle) return '';
     if(s==='切角進行中'){
       const lastCut=(DB.cutAngleHistory||[]).filter(h=>h.taskId===task.id).at(-1);
       const isWaitClient=lastCut?.action==='submitted'&&lastCut?.by==='planner';
-      return `<span style="font-size:10px;background:${isWaitClient?'#fef3c7':'#fef2f2'};color:${isWaitClient?'#92400E':'#7f1d1d'};padding:1px 6px;border-radius:10px;margin-left:4px">
-        ${isWaitClient?'等客戶確認':'客戶退回，待修改'}</span>`;
+      if(isWaitClient) return `<span style="font-size:10px;background:#fef3c7;color:#92400E;padding:1px 6px;border-radius:10px;margin-left:4px">等客戶確認</span>`;
+      return `<span style="font-size:10px;background:#fef2f2;color:#7f1d1d;padding:1px 6px;border-radius:10px;margin-left:4px">客戶退回</span>`;
     }
-    if(['待指派寫手','撰文中','文章審核中','待指派帳號商','待上刊','已上刊'].includes(s)){
-      return `<span style="font-size:10px;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:10px;margin-left:4px">✓ 切角通過</span>`;
-    }
-    return `<span style="font-size:10px;background:#fef3c7;color:#92400E;padding:1px 6px;border-radius:10px;margin-left:4px">需切角確認</span>`;
-  })() : '';
+    return '';
+  })();
 
   // 行動按鈕
   const actionBtn = _getTaskActionBtn(task, s, clientId, contractId, ym);
@@ -9466,7 +9491,15 @@ function _getContainerId(contractId){
 }
 
 function _refreshPlan(clientId, contractId, ym){
-  renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId));
+  // 測試模式：先把 TEST_DATA 完整同步到 DB，確保狀態不被舊資料覆蓋
+  if(window._testMode && window.TEST_DATA){
+    if(TEST_DATA.tasks.length) DB.ops_tasks = TEST_DATA.tasks;
+    if(TEST_DATA.plans.length) DB.ops_monthly_plans = TEST_DATA.plans;
+    DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
+    DB.draftHistory      = TEST_DATA.draftHistory;
+    DB.writerAssignments = TEST_DATA.writerAssignments;
+    DB.vendorAssignments = TEST_DATA.vendorAssignments;
+  }
   if(typeof renderHome==='function') setTimeout(renderHome, 300);
 }
 
@@ -9731,9 +9764,12 @@ function _submitNewTask(clientId, contractId, ym){
   if(!DB.ops_tasks) DB.ops_tasks = [];
   DB.ops_tasks.push(task);
   syncToGAS('tasks', task).catch(()=>{});
-  closeModal();
-  renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId));
-  toast('任務已新增', 'success');
+  if(window._testMode && window.TEST_DATA) TEST_DATA.tasks.push(task);
+  // 先關閉 modal，再輕量刷新（不跳頁）
+  setTimeout(()=>{
+    _refreshPlan(clientId, contractId, ym);
+    toast('任務已新增', 'success');
+  }, 50);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -9885,14 +9921,15 @@ function _openDraftFlow(taskId, clientId, contractId, ym){
       </div>`:''}
 
     ${!lastApproved?`
+      ${(()=>{const lastD=(DB.draftHistory||[]).filter(h=>h.taskId===taskId).at(-1);const waitPM=lastD?.action==='submitted'&&lastD?.by==='writer';return waitPM?'':`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:12px;color:#7f1d1d">已退回給寫手，等待重新送稿</div>`;})()}
       <div style="margin-bottom:12px">
         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">審核意見（退回時必填）</label>
         <textarea id="draft-note-${taskId}" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical" placeholder="填寫給寫手的修改意見..."></textarea>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-sm" onclick="_submitDraftAction('${taskId}','approved','planner','${clientId}','${contractId}','${ym}',${round})">✓ 企劃直接通過</button>
+        <button class="btn btn-primary btn-sm" onclick="_submitDraftAction('${taskId}','approved','planner','${clientId}','${contractId}','${ym}',${round})">✓ 直接通過</button>
         <button class="btn btn-sm" style="border-color:#6366f1;color:#6366f1" onclick="_submitDraftAction('${taskId}','submitted','planner','${clientId}','${contractId}','${ym}',${round})">→ 送客戶審核</button>
-        <button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444" onclick="_submitDraftAction('${taskId}','rejected','planner','${clientId}','${contractId}','${ym}',${round})">✕ 退回寫手重寫</button>
+        <button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444" onclick="_submitDraftAction('${taskId}','rejected','planner','${clientId}','${contractId}','${ym}',${round})">✕ 退回重寫</button>
       </div>`:`
       <div style="font-size:12px;color:var(--text3)">文章已通過，可指派帳號商。</div>
     `}
