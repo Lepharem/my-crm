@@ -1995,6 +1995,9 @@ function _renderWriterTaskList(tasks){
 
 function _writerTaskCard(t, collapsed=false){
   const sc = {'撰文中':'#8b5cf6','文章審核中':'#f97316','切角進行中':'#f59e0b','已上刊':'#22c55e','待上刊':'#eab308','待指派帳號商':'#06b6d4'}[t._status]||'#94a3b8';
+  // 計算送稿次數（首次＋修改次數）
+  const draftSubmits = t._draft?.filter(h=>h.action==='submitted'&&h.by==='writer').length||0;
+  const draftRound = draftSubmits===0?'':draftSubmits===1?'首次送稿':`第${draftSubmits-1}次修改`;
 
   // 根據狀態決定行動區
   let actionHtml = '';
@@ -2061,7 +2064,7 @@ function _writerTaskCard(t, collapsed=false){
       <div style="padding:12px 14px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
           <div style="font-size:13px;font-weight:600">${t.taskName||t.specType||'—'}</div>
-          <span style="font-size:11px;font-weight:500;color:${sc};flex-shrink:0">${t._status}</span>
+          <span style="font-size:11px;font-weight:500;color:${sc};flex-shrink:0">${t._status}${draftRound?" · "+draftRound:""}</span>
         </div>
         <div style="font-size:11px;color:var(--text3);margin-top:3px">
           ${t.clientName||'—'}${t.month?' · '+t.month:''}${t.dueDate?' · 截止 '+t.dueDate:''}
@@ -2122,8 +2125,8 @@ async function renderVendorTasks(){
     const badge = document.getElementById('vendor-name-badge');
     if(badge) badge.textContent = vcName;
 
-    const pending  = tasks.filter(t=>t._status==='待上刊');
-    const confirm  = tasks.filter(t=>t._status==='待上刊'&&t._va?.postLink);
+    const pending  = tasks.filter(t=>t._status==='待上刊'&&!t._va?.postLink);
+    const reported = tasks.filter(t=>t._status==='待上刊'&&t._va?.postLink);
     const done     = tasks.filter(t=>t._status==='已上刊');
 
     if(!tasks.length){
@@ -2139,7 +2142,7 @@ async function renderVendorTasks(){
           <div style="font-size:11px;color:var(--text3)">待上刊</div>
         </div>
         <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
-          <div style="font-size:22px;font-weight:600;color:#06b6d4">${confirm.length}</div>
+          <div style="font-size:22px;font-weight:600;color:#06b6d4">${reported.length}</div>
           <div style="font-size:11px;color:var(--text3)">待企劃確認</div>
         </div>
         <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center">
@@ -2171,6 +2174,7 @@ async function renderVendorTasks(){
               <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:4px">📋 企劃指定資訊</div>
               ${t._va.desiredDate?`<div>希望發布日期：<b>${t._va.desiredDate}</b></div>`:''}
               ${t._va.desiredPlatform?`<div>論壇平台：<b>${t._va.desiredPlatform}</b>${t._va.desiredSection?' · '+t._va.desiredSection:''}</div>`:''}
+              ${t._va.desiredNote?`<div style="margin-top:4px;padding-top:4px;border-top:1px solid #fde68a;color:#451a03">備註：${t._va.desiredNote}</div>`:''}
             </div>`:''}
 
           ${!hasReported ? `
@@ -2184,17 +2188,11 @@ async function renderVendorTasks(){
                     style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
                 </div>
                 <div>
-                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">論壇平台</label>
-                  <select id="vf-platform-${t.id}"
-                    style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
-                    ${['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google','其他'].map(p=>`<option value="${p}" ${p===t._va?.desiredPlatform?'selected':''}>${p}</option>`).join('')}
-                  </select>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">使用平台（依企劃指定）</label>
+                  <div style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface2);color:var(--text2)">
+                    ${t._va?.desiredPlatform||'企劃未指定'}${t._va?.desiredSection?' · '+t._va.desiredSection:''}
+                  </div>
                 </div>
-              </div>
-              <div style="margin-bottom:8px">
-                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">板塊 / 討論區</label>
-                <input id="vf-section-${t.id}" placeholder="例：感情板、美妝板" value="${t._va?.desiredSection||''}"
-                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
               </div>
               <div style="margin-bottom:8px">
                 <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">上文連結 *</label>
@@ -2212,9 +2210,9 @@ async function renderVendorTasks(){
                   style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
               </div>
               <div style="margin-bottom:8px">
-                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">備註</label>
-                <input id="vf-note-${t.id}" placeholder="選填"
-                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">備註（選填，如有特殊說明）</label>
+                <textarea id="vf-note-${t.id}" rows="2" placeholder="特殊需求、補充說明..."
+                  style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>
               </div>
               <button class="btn btn-primary btn-sm" style="width:100%" onclick="_vendorSubmitPost('${t.id}')">📣 回報上刊完成</button>
             </div>
@@ -2270,7 +2268,8 @@ async function _vendorSubmitPost(taskId){
   const va = (DB.vendorAssignments||[]).find(a=>a.taskId===taskId);
   if(!va){ toast('找不到指派記錄', 'error'); return; }
 
-  Object.assign(va, { postLink:link, account, platform, section,
+  // 平台/板塊用企劃指定值，section 從指派記錄取
+  Object.assign(va, { postLink:link, account, platform:va.desiredPlatform||platform, section:va.desiredSection||section,
     screenshotLinks:screenshot?[screenshot]:[],
     publishDate:date, note });
 
@@ -2425,8 +2424,36 @@ function renderClientDashboard(){
     ` : ''}
 
     ${!pendingCutAngle.length && !pendingDraft.length ? `
-      <div style="text-align:center;padding:32px;color:#8a8680;font-size:13px">✅ 目前沒有待確認的項目</div>
+      <div style="text-align:center;padding:20px;color:#8a8680;font-size:13px">✅ 目前沒有待確認的項目</div>
     ` : ''}
+
+    <!-- 已確認的切角（收闔留存） -->
+    ${(()=>{
+      const confirmed = tasksWithStatus.filter(t=>
+        t.requireCutAngle &&
+        t._cut.some(h=>h.action==='approved') &&
+        !pendingCutAngle.find(p=>p.id===t.id)
+      );
+      if(!confirmed.length) return '';
+      return `<details style="margin-bottom:12px">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#6b7280;
+          list-style:none;display:flex;align-items:center;gap:4px;user-select:none;padding:4px 0">
+          ✓ 已確認切角（${confirmed.length}）<span style="margin-left:auto">▾</span>
+        </summary>
+        <div style="margin-top:8px">
+          ${confirmed.map(t=>{
+            const pln=(DB.ops_monthly_plans||[]).find(p=>p.id===t.planId)||{};
+            return `<div style="border:1px solid #86efac;border-radius:8px;padding:8px 12px;margin-bottom:6px;background:#f0fdf4;font-size:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:500">${t.taskName||t.specType||'—'}</span>
+                <span style="color:#22c55e;font-size:11px">✓ 切角已確認</span>
+              </div>
+              <div style="color:#6b7280;font-size:11px;margin-top:2px">${pln.ym||''} · 目前狀態：${t._status}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </details>`;
+    })()}
 
     <!-- 合約列表 -->
     ${contracts.length ? `
@@ -2446,6 +2473,27 @@ function _clientCutAngleCard(t){
   const lastCut = t._cut.at(-1);
   const rounds  = t._cut.filter(h=>h.action==='submitted').length;
   const pln     = (DB.ops_monthly_plans||[]).find(p=>p.id===t.planId)||{};
+
+  // 歷程紀錄（所有往返）
+  const historyHtml = t._cut.length > 0 ? `
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:#92400e;margin-bottom:6px">往返紀錄（${t._cut.length} 筆）</div>
+      ${t._cut.map((h,i)=>`
+        <div style="padding:5px 8px;border-radius:6px;margin-bottom:4px;font-size:12px;
+          background:${h.by==='planner'?'#fffbeb':'#f0fdf4'};border:1px solid ${h.by==='planner'?'#fde68a':'#86efac'}">
+          <div style="display:flex;gap:6px;align-items:baseline;flex-wrap:wrap">
+            <span style="font-weight:600;color:${h.action==='approved'?'#166534':h.action==='rejected'?'#7f1d1d':'#92400e'}">
+              ${h.by==='planner'?'企劃':'客戶'}
+              ${h.action==='approved'?'✓ 確認':h.action==='rejected'?'✕ 退回':'→ 送審'}
+            </span>
+            <span style="color:#6b7280;font-size:10px">${h.createdAt?.slice(0,10)||''}</span>
+          </div>
+          ${h.content?`<div style="color:#451a03;margin-top:2px">${h.content}</div>`:''}
+          ${h.draftLink?`<a href="${h.draftLink}" target="_blank" style="font-size:11px;color:#6366f1">查看連結 →</a>`:''}
+          ${h.note&&h.note!=='客戶確認'?`<div style="color:#6b7280;font-size:11px;margin-top:2px">意見：${h.note}</div>`:''}
+        </div>`).join('')}
+    </div>` : '';
+
   return `
     <div style="border:1px solid #fde68a;border-left:3px solid #f59e0b;border-radius:10px;margin-bottom:10px;background:#fffbeb;overflow:hidden">
       <div style="padding:12px 14px">
@@ -2455,9 +2503,12 @@ function _clientCutAngleCard(t){
         </div>
         <div style="font-size:11px;color:#92400e;margin-bottom:10px">${pln.ym||''}</div>
 
-        <!-- 切角內容 -->
+        ${historyHtml}
+
+        <!-- 最新切角內容 -->
         ${lastCut?.content ? `
           <div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:10px;font-size:13px;color:#451a03">
+            <div style="font-size:10px;color:#92400e;font-weight:600;margin-bottom:4px">最新切角方向</div>
             ${lastCut.content}
           </div>` : ''}
         ${lastCut?.draftLink ? `
@@ -8980,15 +9031,54 @@ function _renderTaskCard(task, clientId, contractId, ym){
 
   // 卡了幾天
   let staleDays = '';
-  if(task.activatedAt && s!=='已上刊'){
+  if(task.activatedAt && s!=='已上刊' && s!=='待啟動'){
     const days = Math.floor((Date.now()-new Date(task.activatedAt))/(1000*60*60*24));
     if(days>0) staleDays = `<span style="font-size:10px;color:${days>7?'#ef4444':'#f97316'};margin-left:6px">已進行 ${days} 天</span>`;
   }
 
-  // 切角開關顯示
-  const cutBadge = task.requireCutAngle
-    ? `<span style="font-size:10px;background:#fef3c7;color:#92400E;padding:1px 6px;border-radius:10px;margin-left:4px">需切角確認</span>`
-    : '';
+  // 進度步驟——已啟動任務才顯示
+  const progressSteps = task.activatedAt && s!=='待啟動' ? (() => {
+    const steps = [];
+    const cut = rel.cut||[], draft = rel.draft||[], wa = rel.writer, va = rel.vendor;
+    // 切角
+    if(task.requireCutAngle){
+      const lastCut = cut.at(-1);
+      const approved = cut.find(h=>h.action==='approved');
+      steps.push({ label:'切角', done:!!approved, active:s==='切角進行中',
+        sub: approved?'客戶確認': lastCut?.action==='submitted'?'等客戶':'待提交' });
+    }
+    // 指派寫手
+    steps.push({ label:'指派', done:!!wa, active:s==='待指派寫手', sub: wa?wa.writerName:'' });
+    // 文章
+    const lastDraft = draft.at(-1);
+    const draftApproved = draft.some(h=>h.action==='approved');
+    steps.push({ label:'文章', done:draftApproved, active:['撰文中','文章審核中'].includes(s),
+      sub: draftApproved?'通過': lastDraft?.action==='submitted'?'審核中': lastDraft?.action==='rejected'?'退回':'撰文中' });
+    // 帳號商
+    steps.push({ label:'上刊', done:s==='已上刊', active:['待指派帳號商','待上刊'].includes(s),
+      sub: s==='已上刊'?'完成': va?.postLink?'待確認': va?'待上刊':'' });
+
+    return steps.map((st,i)=>`
+      <span style="display:inline-flex;align-items:center;gap:2px;font-size:10px;
+        color:${st.done?'#22c55e':st.active?'#f97316':'#94a3b8'};font-weight:${st.active?600:400}">
+        ${st.done?'✓':st.active?'●':'○'} ${st.label}${st.sub?' ('+st.sub+')':''}
+        ${i<steps.length-1?'<span style="color:#d1d5db;margin:0 2px">›</span>':''}
+      </span>`).join('');
+  })() : '';
+
+  // 切角標籤——依照當前進程顯示不同狀態
+  const cutBadge = task.requireCutAngle ? (() => {
+    if(s==='切角進行中'){
+      const lastCut=(DB.cutAngleHistory||[]).filter(h=>h.taskId===task.id).at(-1);
+      const isWaitClient=lastCut?.action==='submitted'&&lastCut?.by==='planner';
+      return `<span style="font-size:10px;background:${isWaitClient?'#fef3c7':'#fef2f2'};color:${isWaitClient?'#92400E':'#7f1d1d'};padding:1px 6px;border-radius:10px;margin-left:4px">
+        ${isWaitClient?'等客戶確認':'客戶退回，待修改'}</span>`;
+    }
+    if(['待指派寫手','撰文中','文章審核中','待指派帳號商','待上刊','已上刊'].includes(s)){
+      return `<span style="font-size:10px;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:10px;margin-left:4px">✓ 切角通過</span>`;
+    }
+    return `<span style="font-size:10px;background:#fef3c7;color:#92400E;padding:1px 6px;border-radius:10px;margin-left:4px">需切角確認</span>`;
+  })() : '';
 
   // 行動按鈕
   const actionBtn = _getTaskActionBtn(task, s, clientId, contractId, ym);
@@ -8997,11 +9087,11 @@ function _renderTaskCard(task, clientId, contractId, ym){
   const historySummary = _renderHistorySummary(rel);
 
   return `
-    <div id="task-card-${task.id}" style="border:1px solid var(--border);border-radius:10px;
-         margin-bottom:10px;background:var(--surface1);overflow:hidden;
-         border-left:3px solid ${statusColor}">
+    <div id="task-card-${task.id}" style="border:1px solid ${s==='待啟動'?'var(--border)':statusColor+'44'};border-radius:8px;
+         margin-bottom:${s==='待啟動'?'4px':'10px'};background:${s==='待啟動'?'var(--surface2)':'var(--surface1)'};overflow:hidden;
+         border-left:3px solid ${s==='待啟動'?'#d1d5db':statusColor}">
       <!-- 卡片標頭 -->
-      <div style="padding:12px 14px;display:flex;align-items:flex-start;gap:10px;cursor:pointer"
+      <div style="padding:${s==='待啟動'?'7px 12px':'12px 14px'};display:flex;align-items:flex-start;gap:10px;cursor:pointer"
            onclick="_toggleTaskCard('${task.id}')">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
@@ -9009,6 +9099,7 @@ function _renderTaskCard(task, clientId, contractId, ym){
             ${cutBadge}
             ${staleDays}
           </div>
+          ${progressSteps?`<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:2px;align-items:center">${progressSteps}</div>`:''}
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:500;color:${statusColor}">${s}</span>
             ${rel.writer?`<span style="font-size:11px;color:var(--text3)">✍ ${rel.writer.writerName||'—'}</span>`:''}
@@ -9096,19 +9187,15 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
 
   switch(status){
     case '待啟動':
-      return `<div style="display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
-            <input type="checkbox" id="cut-toggle-${id}" ${task.requireCutAngle?'checked':''}
-              onchange="_toggleCutAngle('${id}',this.checked,'${clientId}','${contractId}','${ym}')">
-            需要切角確認
-          </label>
-          ${_dueDateInput(id, task.dueDate, clientId, contractId, ym)}
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          ${_plannerSelect(id, task.assignedPlanner, clientId, contractId, ym)}
-          <button class="btn btn-primary btn-sm" onclick="_activateTask('${id}','${clientId}','${contractId}','${ym}')">▶ 啟動任務</button>
-        </div>
+      return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="cut-toggle-${id}" ${task.requireCutAngle?'checked':''}
+            onchange="_toggleCutAngle('${id}',this.checked,'${clientId}','${contractId}','${ym}')">
+          需切角
+        </label>
+        ${_dueDateInput(id, task.dueDate, clientId, contractId, ym)}
+        ${_plannerSelect(id, task.assignedPlanner, clientId, contractId, ym)}
+        <button class="btn btn-primary btn-sm" onclick="_activateTask('${id}','${clientId}','${contractId}','${ym}')">▶ 啟動</button>
       </div>`;
 
     case '切角進行中':
@@ -9129,16 +9216,20 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
 
     case '撰文中': {
       const _wr = task._rel?.writer;
-      return `<div style="display:flex;flex-direction:column;gap:6px">
+      const _lastRej = (DB.draftHistory||[]).filter(h=>h.taskId===id&&h.action==='rejected').at(-1);
+      return `<div style="display:flex;flex-direction:column;gap:8px">
         <div style="font-size:12px;color:#8b5cf6;display:flex;align-items:center;gap:6px">
           ✍️ <b>${_wr?.writerName||'—'}</b> 撰文中
           ${_wr?.assignedAt?`<span style="color:var(--text3);font-size:11px">（${_wr.assignedAt.slice(0,10)} 指派）</span>`:''}
         </div>
+        ${_lastRej?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;font-size:11px;color:#7f1d1d">
+          ✕ 已退回給寫手：${_lastRej.note||'（未填意見）'}
+        </div>`:''}
         <div style="display:flex;gap:6px">
-          <button class="btn btn-sm" style="font-size:11px;color:var(--text3)"
-            onclick="_reassignWriter('${id}','${clientId}','${contractId}','${ym}')">重新指派寫手</button>
           <button class="btn btn-primary btn-sm" style="font-size:11px"
-            onclick="_openDraftFlow('${id}','${clientId}','${contractId}','${ym}')">📝 查看稿件往返</button>
+            onclick="_openDraftFlow('${id}','${clientId}','${contractId}','${ym}')">📝 審核 / 查看稿件往返</button>
+          <button class="btn btn-sm" style="font-size:11px;color:var(--text3)"
+            onclick="_reassignWriter('${id}','${clientId}','${contractId}','${ym}')">重新指派</button>
         </div>
       </div>`;
     }
@@ -9289,6 +9380,12 @@ function _vendorSelect(taskId, clientId, contractId, ym){
       </select>
       <button class="btn btn-primary btn-sm" onclick="_assignVendor('${taskId}','${clientId}','${contractId}','${ym}')">指派</button>
     </div>
+    <div>
+      <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:2px">特殊需求備註（選填）</label>
+      <input id="vendor-note-${taskId}" type="text" placeholder="例：需使用特定帳號、特殊發文格式..."
+        style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+    </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
       <div>
         <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:2px">希望發布日期</label>
@@ -9426,6 +9523,7 @@ function _assignVendor(taskId, clientId, contractId, ym){
     assignedBy: window.myMember?.id||'',
     confirmedAt: '',
     desiredDate, desiredPlatform, desiredSection,
+    desiredNote: document.getElementById('vendor-note-'+taskId)?.value.trim()||'',
     postLink:'', account:'', platform:'', section:'',
     publishDate:'', screenshotLinks:[], note:'',
   };
