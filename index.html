@@ -2338,450 +2338,326 @@ function renderClientDashboard(){
   const cl = _userProfile;
   if(!cl){ el.innerHTML='<div style="padding:40px;text-align:center;color:#8a8680">找不到客戶資料</div>'; return; }
 
-  const _clId = window._clientId || cl.id || '';
-  // 優先從 DB.clients 取完整客戶資料（避免 _userProfile 欄位不完整）
-  const _clFull = DB.clients.find(c=>c.id===_clId) || cl;
-  const contracts = DB.contracts.filter(c=>c.clientId===_clId&&c.status==='進行中');
+  const clId = window._clientId || cl.id || '';
+  const clFull = (DB.clients||[]).find(c=>c.id===clId) || cl;
+  const contracts = (DB.contracts||[]).filter(c=>c.clientId===clId && c.status==='進行中');
   const ym = new Date().toISOString().slice(0,7);
-  const allOm = (DB.omRecords||[]).filter(r=>r.clientId===_clId);
 
-  // 待確認切角 + 已回覆（客戶全合約，本月）
-  // 顯示所有需要客戶互動的記錄，confirmed 以灰色保留在畫面上
-  const pendingConfirm = allOm.filter(r=>{
-    const inMonth=(r.month||'').slice(0,7)===ym;
-    if(!inMonth) return false;
-    // 需客戶互動：pending/rejected 或 切角審核（文稿過稿）
-    return r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||r.status==='切角審核';
+  // 從新架構取任務
+  const allTasks    = (DB.ops_tasks||[]).filter(t=>t.clientId===clId);
+  const cutHist     = DB.cutAngleHistory || [];
+  const draftHist   = DB.draftHistory   || [];
+  const wAssigns    = DB.writerAssignments || [];
+  const vAssigns    = DB.vendorAssignments || [];
+
+  // 計算每個任務的狀態
+  const tasksWithStatus = allTasks.map(t=>{
+    const cut   = cutHist.filter(h=>h.taskId===t.id);
+    const draft = draftHist.filter(h=>h.taskId===t.id);
+    const wa    = wAssigns.find(a=>a.taskId===t.id);
+    const va    = vAssigns.find(a=>a.taskId===t.id);
+    const st    = getTaskStatus(t, cut, draft, wa, va);
+    const pln   = (DB.ops_monthly_plans||[]).find(p=>p.id===t.planId)||{};
+    return {...t, _status:st, _cut:cut, _draft:draft, _wa:wa, _va:va, _ym:pln.ym||''};
   });
-  const confirmedThisMonth = allOm.filter(r=>(r.month||'').slice(0,7)===ym&&r.clientConfirmStatus==='confirmed'&&(r.status==='切角確認'||r.status==='待派帳號商'||r.status==='切角審核'));
-  // 本月整體上刊
-  const thisMonthDone = allOm.filter(r=>(r.publishDate||r.date||'').slice(0,7)===ym&&['已上刊','觀察中','完成'].includes(r.status)).length;
-  const thisMonthTotal = allOm.filter(r=>(r.month||'').slice(0,7)===ym).length;
+
+  // 需要客戶確認的切角（切角進行中且企劃已送審）
+  const pendingCutAngle = tasksWithStatus.filter(t=>{
+    if(t._status !== '切角進行中') return false;
+    const lastCut = t._cut.at(-1);
+    return lastCut && lastCut.action === 'submitted' && lastCut.by === 'planner';
+  });
+
+  // 需要客戶確認的文章（文章審核中且企劃已送審）
+  const pendingDraft = tasksWithStatus.filter(t=>{
+    if(t._status !== '文章審核中') return false;
+    const lastDraft = t._draft.at(-1);
+    return lastDraft && lastDraft.action === 'submitted' && lastDraft.by === 'planner';
+  });
+
+  const published = tasksWithStatus.filter(t=>t._status==='已上刊' && t._ym===ym);
 
   el.innerHTML = `
     <div style="margin-bottom:20px">
-      <div style="font-size:20px;font-weight:700;color:#1a1917;margin-bottom:4px">${_clFull.brandName||_clFull.name||cl.name}</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px">${clFull.brandName||clFull.name||cl.name}</div>
       <div style="font-size:12px;color:#8a8680">客戶儀錶板 · ${ym}</div>
     </div>
 
     <!-- 快速統計 -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
       <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:#1B4FD8">${contracts.length}</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">進行中合約</div>
-      </div>
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:#166534">${thisMonthDone}</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">本月已上刊</div>
-      </div>
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid ${pendingConfirm.length?'#fcd34d':'#e8e6e1'};text-align:center">
-        <div style="font-size:22px;font-weight:700;color:${pendingConfirm.length?'#92400E':'#1a1917'}">${pendingConfirm.length}</div>
+        <div style="font-size:22px;font-weight:700;color:#f59e0b">${pendingCutAngle.length}</div>
         <div style="font-size:11px;color:#8a8680;margin-top:2px">待確認切角</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#f97316">${pendingDraft.length}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">待確認文章</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#22c55e">${published.length}</div>
+        <div style="font-size:11px;color:#8a8680;margin-top:2px">本月已上刊</div>
       </div>
     </div>
 
-    ${pendingConfirm.length?`
-    <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:16px;margin-bottom:16px">
-      <div style="font-size:14px;font-weight:700;color:#92400E;margin-bottom:12px">📋 有 ${pendingConfirm.length} 篇切角待確認</div>
-       ${pendingConfirm.map(r=>{
-         const cs = r.clientConfirmStatus||'pending';
-         const borderCol = cs==='confirmed'?'#86efac':cs==='rejected'?'#fca5a5':'#fcd34d';
-         const bgCol = cs==='confirmed'?'#f0fdf4':cs==='rejected'?'#fff3f3':'#fff';
-         const _rh1=Array.isArray(r.reviewHistory)?r.reviewHistory:[];
-         const history = (_rh1.length)
-           ? `<details open style="margin-top:8px"><summary style="cursor:pointer;font-size:10px;font-weight:600;color:#8a8680;list-style:none">📋 往返記錄（${_rh1.length}次）</summary><div style="margin-top:4px">${
-               _rh1.map(h=>`<div style="padding:4px 8px;border-left:2px solid ${h.action==='confirmed'?'#16a34a':h.action==='rejected'?'#dc2626':'#1D4ED8'};margin-bottom:4px;font-size:11px;color:#4a4845">
-                 <span style="font-weight:600">${h.action==='confirmed'?'✓ 確認':h.action==='rejected'?'✕ 更動建議':'🔄 企劃重送'}</span> · ${(h.at||'').slice(0,10)}
-                 ${h.note?`<div style="margin-top:2px;color:#1a1917">${h.note}</div>`:''}
-               </div>`).join('')
-             }</div></details>`
-           : '';
-         const noteArea = cs==='rejected'
-           ? (r.clientNote
-             ? `<div style="margin-top:8px;padding:8px 10px;background:#fff3f3;border:1px solid #fca5a5;border-radius:6px">
-                 <div style="font-size:11px;font-weight:600;color:#991B1B;margin-bottom:4px">您的更動建議：</div>
-                 <div style="font-size:12px;color:#1a1917;white-space:pre-wrap">${r.clientNote}</div>
-                 <div style="display:flex;gap:6px;margin-top:8px">
-                   <button onclick="(function(){document.getElementById('client-revise-wrap-${r.id}').style.display='block';})()" style="font-size:11px;padding:4px 10px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:5px;cursor:pointer">✏️ 補充修改</button>
-                 </div>
-                 <div id="client-revise-wrap-${r.id}" style="display:none;margin-top:8px">
-                   <textarea id="client-note-${r.id}" rows="2" placeholder="補充說明…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fcd34d;border-radius:5px;font-size:11px;resize:vertical">${r.clientNote||''}</textarea>
-                   <button onclick="_clientSubmitSuggestion('${r.id}')" style="margin-top:4px;padding:4px 10px;background:#d97706;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">送出</button>
-                 </div>
-               </div>`
-             : `<div style="margin-top:8px">
-                 <textarea id="client-note-${r.id}" rows="3" placeholder="請填寫需要更動或改變的地方…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:12px;resize:vertical"></textarea>
-                 <button onclick="_clientSubmitSuggestion('${r.id}')" style="margin-top:6px;padding:5px 12px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">送出更動建議</button>
-               </div>`)
-           : `<div id="client-suggest-wrap-${r.id}" style="display:none;margin-top:8px">
-               <textarea id="client-note-${r.id}" rows="3" placeholder="請填寫需要更動或改變的地方…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:12px;resize:vertical"></textarea>
-               <button onclick="_clientSubmitSuggestion('${r.id}')" style="margin-top:6px;padding:5px 12px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">送出更動建議</button>
-             </div>`;
-         return `
-         <div id="client-task-card-${r.id}" style="border:1px solid ${borderCol};border-radius:8px;padding:10px 12px;margin-bottom:8px;background:${bgCol}">
-           <div style="display:flex;align-items:flex-start;gap:8px">
-             <div style="flex:1">
-               <div style="font-size:11px;color:#8a8680;margin-bottom:2px">${r.status==='切角審核'?'📝 文稿審核':'✏️ 切角確認'}</div>
-               <div style="font-size:12px;font-weight:500">${r.specType} ／ ${r.platform||'—'} ${r.section?'·'+r.section:''}</div>
-               ${r.status==='切角審核'
-                 ? (r.draftLink?`<a href="${r.draftLink}" target="_blank" style="font-size:11px;color:#1B4FD8;margin-top:4px;display:inline-block">📄 查看稿件 ↗</a>`:'<div style="font-size:11px;color:#8a8680;margin-top:4px">（稿件連結待補）</div>')
-                 : `<div style="font-size:11px;color:#4a4845;margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${r.content||r.title||'（尚無內容）'}</div>`
-               }
-             </div>
-             <div id="client-task-btns-${r.id}" style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-               ${(r.status==='切角審核'||cs==='pending')
-                 ? `<button onclick="_clientConfirmTask('${r.id}','ok')" style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✓ OK</button>
-                    <button onclick="_clientConfirmTask('${r.id}','suggest')" style="padding:6px 14px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">✏️ 更動建議</button>`
-                 : cs==='rejected'
-                 ? `<div style="font-size:11px;color:#991B1B;font-weight:600">✕ 已送出更動，等待企劃調整</div>`
-                 : '<span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>'
-               }
-             </div>
-           </div>
-           ${history}
-           ${noteArea}
-         </div>`;
-       }).join('')}
-    </div>`:''}  <!-- end pendingConfirm -->
-    ${contracts.map(ct=>{
-      const omRecs = (DB.omRecords||[]).filter(r=>r.contractId===ct.id&&(r.month||'').slice(0,7)===ym);
-      const done   = omRecs.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
-      const total  = omRecs.length;
-      const pct    = total>0?Math.round(done/total*100):0;
-      const start=ct.start?new Date(ct.start):null, end=ct.end?new Date(ct.end):null;
-      const now=new Date(), totalMs=start&&end?end-start:0;
-      const progress=totalMs>0?Math.min(1,(now-start)/totalMs):0;
-      return `<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #e8e6e1;cursor:pointer"
-        onclick="_clientNavTo('contract_${ct.id}')">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <div>
-            <div style="font-size:13px;font-weight:600">${ct.name}</div>
-            <div style="font-size:11px;color:#8a8680;font-family:monospace">${ct.contractNo||''}</div>
-          </div>
-          <span style="font-size:12px;background:#dcfce7;color:#166534;padding:3px 10px;border-radius:20px">${pct}% 完成</span>
-        </div>
-        <div style="background:#f4f3f0;border-radius:6px;overflow:hidden;height:6px;margin-bottom:8px">
-          <div style="background:#1B4FD8;height:100%;width:${Math.round(progress*100)}%;transition:.3s"></div>
-        </div>
-        <div style="font-size:11px;color:#8a8680">${(ct.start||'').slice(0,10)} → ${(ct.end||'').slice(0,10)} · 點擊查看詳情 →</div>
-      </div>`;
-    }).join('')}
+    <!-- 需要你確認的切角 -->
+    ${pendingCutAngle.length ? `
+      <div style="font-size:12px;font-weight:600;color:#f59e0b;margin-bottom:10px">🎯 待確認切角（${pendingCutAngle.length}）</div>
+      ${pendingCutAngle.map(t=>_clientCutAngleCard(t)).join('')}
+    ` : ''}
 
-    ${!pendingConfirm.length&&contracts.length?`<div style="text-align:center;padding:20px;color:#8a8680;font-size:12px">✓ 目前沒有待確認事項</div>`:''}
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:#c0bdb7">
-      ${window._testMode?'🧪 測試模式 · 資料來自本地DB':''}
+    <!-- 需要你確認的文章 -->
+    ${pendingDraft.length ? `
+      <div style="font-size:12px;font-weight:600;color:#f97316;margin:${pendingCutAngle.length?'16px':0} 0 10px">📝 待確認文章（${pendingDraft.length}）</div>
+      ${pendingDraft.map(t=>_clientDraftCard(t)).join('')}
+    ` : ''}
+
+    ${!pendingCutAngle.length && !pendingDraft.length ? `
+      <div style="text-align:center;padding:32px;color:#8a8680;font-size:13px">✅ 目前沒有待確認的項目</div>
+    ` : ''}
+
+    <!-- 合約列表 -->
+    ${contracts.length ? `
+      <div style="font-size:12px;font-weight:600;color:#8a8680;margin:16px 0 10px;text-transform:uppercase;letter-spacing:.06em">進行中合約</div>
+      ${contracts.map(ct=>`
+        <div style="border:1px solid #e8e6e1;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;background:#fff"
+          onclick="_clientNavTo('contract_${ct.id}')">
+          <div style="font-size:13px;font-weight:600">${ct.contractNo||ct.id}</div>
+          <div style="font-size:12px;color:#8a8680;margin-top:2px">${ct.name||''}</div>
+        </div>`).join('')}
+    ` : ''}
+  `;
+}
+
+// ── 客戶確認切角的任務卡 ──
+function _clientCutAngleCard(t){
+  const lastCut = t._cut.at(-1);
+  const rounds  = t._cut.filter(h=>h.action==='submitted').length;
+  const pln     = (DB.ops_monthly_plans||[]).find(p=>p.id===t.planId)||{};
+  return `
+    <div style="border:1px solid #fde68a;border-left:3px solid #f59e0b;border-radius:10px;margin-bottom:10px;background:#fffbeb;overflow:hidden">
+      <div style="padding:12px 14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:600">${t.taskName||t.specType||'—'}</div>
+          <span style="font-size:11px;color:#92400e;font-weight:500">切角審核 · 第${rounds}次</span>
+        </div>
+        <div style="font-size:11px;color:#92400e;margin-bottom:10px">${pln.ym||''}</div>
+
+        <!-- 切角內容 -->
+        ${lastCut?.content ? `
+          <div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:10px;font-size:13px;color:#451a03">
+            ${lastCut.content}
+          </div>` : ''}
+        ${lastCut?.draftLink ? `
+          <a href="${lastCut.draftLink}" target="_blank"
+            style="display:block;font-size:12px;color:#6366f1;margin-bottom:10px">查看切角連結 →</a>` : ''}
+
+        <!-- 回覆意見欄 -->
+        <div style="margin-bottom:10px">
+          <label style="font-size:11px;color:#92400e;display:block;margin-bottom:4px">修改意見（退回時請填）</label>
+          <textarea id="cc-note-${t.id}" rows="2" placeholder="若有需要調整的地方請說明..."
+            style="width:100%;padding:8px;border:1px solid #fde68a;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;background:#fffbeb;box-sizing:border-box"></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button onclick="_clientApproveCutAngle('${t.id}')"
+            style="flex:1;padding:8px;background:#f59e0b;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">
+            ✓ 確認切角方向
+          </button>
+          <button onclick="_clientRejectCutAngle('${t.id}')"
+            style="flex:1;padding:8px;background:#fff;border:1px solid #ef4444;border-radius:8px;color:#ef4444;font-size:13px;font-weight:500;cursor:pointer">
+            ✕ 退回修改
+          </button>
+        </div>
+      </div>
     </div>`;
+}
+
+// ── 客戶確認文章的任務卡 ──
+function _clientDraftCard(t){
+  const lastDraft = t._draft.at(-1);
+  const rounds    = t._draft.filter(h=>h.action==='submitted').length;
+  const pln       = (DB.ops_monthly_plans||[]).find(p=>p.id===t.planId)||{};
+  return `
+    <div style="border:1px solid #fdba74;border-left:3px solid #f97316;border-radius:10px;margin-bottom:10px;background:#fff7ed;overflow:hidden">
+      <div style="padding:12px 14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:600">${t.taskName||t.specType||'—'}</div>
+          <span style="font-size:11px;color:#9a3412;font-weight:500">文章審核 · 第${rounds}次</span>
+        </div>
+        <div style="font-size:11px;color:#9a3412;margin-bottom:10px">${pln.ym||''}</div>
+
+        ${lastDraft?.draftLink ? `
+          <a href="${lastDraft.draftLink}" target="_blank"
+            style="display:inline-block;margin-bottom:10px;padding:6px 12px;background:#fff;border:1px solid #fdba74;border-radius:6px;font-size:12px;color:#6366f1;text-decoration:none">
+            📄 查看文章稿件 →
+          </a>` : ''}
+
+        <div style="margin-bottom:10px">
+          <label style="font-size:11px;color:#9a3412;display:block;margin-bottom:4px">修改意見（退回時請填）</label>
+          <textarea id="cd-note-${t.id}" rows="2" placeholder="若有需要調整的地方請說明..."
+            style="width:100%;padding:8px;border:1px solid #fdba74;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;background:#fff7ed;box-sizing:border-box"></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button onclick="_clientApproveDraft('${t.id}')"
+            style="flex:1;padding:8px;background:#f97316;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">
+            ✓ 確認文章通過
+          </button>
+          <button onclick="_clientRejectDraft('${t.id}')"
+            style="flex:1;padding:8px;background:#fff;border:1px solid #ef4444;border-radius:8px;color:#ef4444;font-size:13px;font-weight:500;cursor:pointer">
+            ✕ 退回修改
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── 客戶確認切角 ──
+function _clientApproveCutAngle(taskId){
+  const record = {
+    id: 'CA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    taskId, round: _getLastCutRound(taskId),
+    action: 'approved', by: 'client',
+    content: '', note: '客戶確認',
+    createdAt: new Date().toISOString(),
+  };
+  if(!DB.cutAngleHistory) DB.cutAngleHistory = [];
+  DB.cutAngleHistory.push(record);
+  syncToGAS('cutangle_history', record).catch(()=>{});
+  toast('✓ 已確認切角方向，企劃將開始指派寫手', 'success');
+  renderClientDashboard();
+}
+
+function _clientRejectCutAngle(taskId){
+  const note = document.getElementById('cc-note-'+taskId)?.value.trim()||'';
+  if(!note){ toast('請填寫修改意見', 'warning'); return; }
+  const record = {
+    id: 'CA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    taskId, round: _getLastCutRound(taskId),
+    action: 'rejected', by: 'client',
+    content: '', note,
+    createdAt: new Date().toISOString(),
+  };
+  if(!DB.cutAngleHistory) DB.cutAngleHistory = [];
+  DB.cutAngleHistory.push(record);
+  syncToGAS('cutangle_history', record).catch(()=>{});
+  toast('已退回，企劃將收到你的意見', 'info');
+  renderClientDashboard();
+}
+
+function _getLastCutRound(taskId){
+  const cuts = (DB.cutAngleHistory||[]).filter(h=>h.taskId===taskId);
+  return Math.max(1, ...cuts.map(h=>h.round||1));
+}
+
+// ── 客戶確認文章 ──
+function _clientApproveDraft(taskId){
+  const drafts = (DB.draftHistory||[]).filter(h=>h.taskId===taskId);
+  const round  = Math.max(1, ...drafts.map(h=>h.round||1));
+  const record = {
+    id: 'DA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    taskId, round,
+    action: 'approved', by: 'client',
+    draftLink: '', note: '客戶確認',
+    createdAt: new Date().toISOString(),
+  };
+  if(!DB.draftHistory) DB.draftHistory = [];
+  DB.draftHistory.push(record);
+  syncToGAS('draft_history', record).catch(()=>{});
+  toast('✓ 文章確認通過，企劃將指派帳號商', 'success');
+  renderClientDashboard();
+}
+
+function _clientRejectDraft(taskId){
+  const note = document.getElementById('cd-note-'+taskId)?.value.trim()||'';
+  if(!note){ toast('請填寫修改意見', 'warning'); return; }
+  const drafts = (DB.draftHistory||[]).filter(h=>h.taskId===taskId);
+  const round  = Math.max(1, ...drafts.map(h=>h.round||1));
+  const record = {
+    id: 'DA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    taskId, round,
+    action: 'rejected', by: 'client',
+    draftLink: '', note,
+    createdAt: new Date().toISOString(),
+  };
+  if(!DB.draftHistory) DB.draftHistory = [];
+  DB.draftHistory.push(record);
+  syncToGAS('draft_history', record).catch(()=>{});
+  toast('已退回，寫手將收到你的意見', 'info');
+  renderClientDashboard();
 }
 
 function renderClientContractPage(contractId){
   const el = document.getElementById('client-content');
   if(!el) return;
-  const ct = DB.contracts.find(c=>c.id===contractId);
-  if(!ct){ el.innerHTML='<div style="padding:40px;text-align:center">找不到合約</div>'; return; }
-  const cl = _userProfile || DB.clients.find(c=>c.id===ct.clientId) || {};
-  const specs = DB.specItems.filter(s=>s.contractId===contractId);
-  const allOm = (DB.omRecords||[]).filter(r=>r.contractId===contractId);
-  const ym = new Date().toISOString().slice(0,7);
-  const now=new Date(), start=ct.start?new Date(ct.start):null, end=ct.end?new Date(ct.end):null;
-  const totalMs=start&&end?end-start:0;
-  const progress=totalMs>0?Math.min(1,(now-start)/totalMs):0;
-  const daysLeft=end?Math.max(0,Math.round((end-now)/86400000)):null;
+  const ct = (DB.contracts||[]).find(c=>c.id===contractId);
+  if(!ct){ el.innerHTML='<div style="padding:40px;color:#8a8680">找不到合約資料</div>'; return; }
+  const cl = (DB.clients||[]).find(c=>c.id===ct.clientId)||{};
 
-  // 規格執行統計（開文類）
-  const openSpecs = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name));
-  const specStats = openSpecs.map(s=>{
-    const recs = allOm.filter(r=>
-      r.specId===s.id ||
-      r.specType===s.name ||
-      (!r.specId && !r.specType)  // 未分類的也顯示在第一個 spec 下
-    );
-    const done  = recs.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
-    return {...s, done, pct:s.qty>0?done/s.qty:0, recs};
+  // 新架構：此合約的所有任務
+  const allTasks  = (DB.ops_tasks||[]).filter(t=>t.contractId===contractId);
+  const cutHist   = DB.cutAngleHistory || [];
+  const draftHist = DB.draftHistory   || [];
+  const wAssigns  = DB.writerAssignments || [];
+  const vAssigns  = DB.vendorAssignments || [];
+
+  const tasksWithStatus = allTasks.map(t=>{
+    const cut   = cutHist.filter(h=>h.taskId===t.id);
+    const draft = draftHist.filter(h=>h.taskId===t.id);
+    const wa    = wAssigns.find(a=>a.taskId===t.id);
+    const va    = vAssigns.find(a=>a.taskId===t.id);
+    const st    = getTaskStatus(t, cut, draft, wa, va);
+    const pln   = (DB.ops_monthly_plans||[]).find(p=>p.id===t.planId)||{};
+    return {...t, _status:st, _cut:cut, _draft:draft, _wa:wa, _va:va, _ym:pln.ym||''};
   });
 
-  // 依規格分組顯示論壇文章追蹤表
-  const specTable = (s) => {
-    const rows = s.recs;
-    if(!rows.length && s.pct===0){
-      return `<tr><td colspan="9" style="padding:12px;text-align:center;color:var(--text3);font-size:12px">尚無執行記錄</td></tr>`;
-    }
-    return rows.map((r,i)=>{
-      const statusColor = ['已上刊','觀察中','完成'].includes(r.status)?'#166534':
-                          r.status==='切角審核'?'#5b21b6':
-                          r.status==='文稿審核'?'#1B4FD8':'#92400E';
-      const statusBg    = ['已上刊','觀察中','完成'].includes(r.status)?'#dcfce7':
-                          r.status==='切角審核'?'#ede9fe':
-                          r.status==='文稿審核'?'#eff6ff':'#fef3c7';
-      const isReview = r.status==='切角審核';
-      const isPending = r.clientConfirmStatus==='pending'||isReview;
-      return `<tr id="client-task-card-${r.id}" style="border-bottom:1px solid #f0efe9;${isPending?'background:#fffbeb':''}">
-        <td style="padding:8px 10px;font-size:11px;color:#8a8680">${i+1}</td>
-        <td style="padding:8px 10px;font-size:12px;font-weight:600">${r.taskName||r.specType}</td>
-        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${(r.publishDate||r.date||'').slice(0,10)||'—'}</td>
-        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${r.platform||'—'}</td>
-        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${r.section||'—'}</td>
-        <td style="padding:8px 10px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.content||r.title||'').replace(/"/g,'')}">
-          ${r.content||r.title||'—'}
-        </td>
-        <td style="padding:8px 10px;font-size:11px;white-space:nowrap">${r.vendorName||r.writerName||'—'}</td>
-        <td style="padding:8px 10px">
-          ${r.draftLink?`<a href="${r.draftLink}" target="_blank" style="font-size:11px;color:#1B4FD8">稿件↗</a>`:'—'}
-        </td>
-        <td style="padding:8px 10px">
-          ${r.postLink?`<a href="${r.postLink}" target="_blank" style="font-size:11px;color:#166534">連結↗</a>`:'—'}
-        </td>
-        <td style="padding:8px 10px;white-space:nowrap">
-          <span style="font-size:11px;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:12px">${r.status}</span>
-          ${isPending?`<div style="margin-top:6px;display:flex;gap:4px">
-            <button onclick="_clientConfirmTask('${r.id}','ok')" style="font-size:11px;background:#16a34a;color:#fff;border:none;border-radius:5px;padding:3px 8px;cursor:pointer">✓ OK</button>
-            <button onclick="_clientConfirmTask('${r.id}','suggest')" style="font-size:11px;background:#fff;color:#d97706;border:1px solid #fcd34d;border-radius:5px;padding:3px 8px;cursor:pointer">✏️ 更動</button>
-          </div>`:''}
-          ${r.clientNote?`<div style="font-size:10px;color:#92400E;margin-top:3px">💬 ${r.clientNote.slice(0,30)}</div>`:''}
-          <div id="client-suggest-wrap-${r.id}" style="display:none;margin-top:6px">
-            <textarea id="client-note-${r.id}" rows="2" placeholder="更動建議…"
-              style="width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #fcd34d;border-radius:5px;font-size:11px;resize:vertical">${r.clientNote||''}</textarea>
-            <button onclick="_clientSubmitSuggestion('${r.id}')"
-              style="margin-top:4px;padding:4px 10px;background:#d97706;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">送出</button>
-          </div>
-        </td>
-      </tr>`;
-    }).join('');
+  // 按月份分組
+  const byMonth = {};
+  tasksWithStatus.forEach(t=>{
+    const m = t._ym || '未分類';
+    if(!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push(t);
+  });
+
+  const statusColor = {
+    '待啟動':'#94a3b8','切角進行中':'#f59e0b','待指派寫手':'#3b82f6',
+    '撰文中':'#8b5cf6','文章審核中':'#f97316','待指派帳號商':'#06b6d4',
+    '待上刊':'#eab308','已上刊':'#22c55e',
   };
 
-  // 待確認切角
-  const pendingConfirm = allOm.filter(r=>r.clientConfirmStatus==='pending'||r.status==='切角審核');
-
   el.innerHTML = `
-    <!-- 返回 + 標題 -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <button onclick="_clientNavTo('dashboard')" style="background:none;border:none;color:#8a8680;cursor:pointer;font-size:13px">← 返回</button>
-      <div>
-        <div style="font-size:18px;font-weight:700">${ct.name||cl.name}</div>
-        <div style="font-size:11px;color:#8a8680;font-family:monospace">${ct.contractNo||''} · ${(ct.start||'').slice(0,10)} ～ ${(ct.end||'').slice(0,10)}</div>
-      </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700">${ct.contractNo||ct.id}</div>
+      <div style="font-size:12px;color:#8a8680">${ct.name||''}</div>
     </div>
 
-    <!-- 概覽統計 -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#1B4FD8">${Math.round(progress*100)}%</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">合約進度</div>
+    ${Object.keys(byMonth).sort().reverse().map(m=>`
+      <div style="margin-bottom:20px">
+        <div style="font-size:11px;font-weight:600;color:#8a8680;letter-spacing:.06em;margin-bottom:8px">${m}</div>
+        ${byMonth[m].map(t=>{
+          const sc = statusColor[t._status]||'#94a3b8';
+          const needClientAction =
+            (t._status==='切角進行中' && t._cut.at(-1)?.action==='submitted' && t._cut.at(-1)?.by==='planner') ||
+            (t._status==='文章審核中' && t._draft.at(-1)?.action==='submitted' && t._draft.at(-1)?.by==='planner');
+          return `
+            <div style="border:1px solid ${needClientAction?'#fde68a':'#e8e6e1'};border-left:3px solid ${sc};
+              border-radius:8px;padding:10px 12px;margin-bottom:6px;background:${needClientAction?'#fffbeb':'#fff'};
+              cursor:${needClientAction?'pointer':'default'}"
+              ${needClientAction?`onclick="_clientNavTo('dashboard')"`:''}
+            >
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div style="font-size:13px;font-weight:500">${t.taskName||t.specType||'—'}</div>
+                <span style="font-size:11px;color:${sc};font-weight:500">${t._status}</span>
+              </div>
+              ${needClientAction?`<div style="font-size:11px;color:#92400e;margin-top:4px">→ 需要你確認，點擊前往</div>`:''}
+            </div>`;
+        }).join('')}
       </div>
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e8e6e1;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#166534">${allOm.filter(r=>['已上刊','觀察中','完成'].includes(r.status)&&(r.publishDate||r.date||'').slice(0,7)===ym).length}</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">本月已上刊</div>
-      </div>
-      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid ${daysLeft!==null&&daysLeft<=30?'#fcd34d':'#e8e6e1'};text-align:center">
-        <div style="font-size:20px;font-weight:700;color:${daysLeft!==null&&daysLeft<=30?'#92400E':'#1a1917'}">${daysLeft??'—'}</div>
-        <div style="font-size:11px;color:#8a8680;margin-top:2px">剩餘天數</div>
-      </div>
-    </div>
-
-    <!-- 走期進度條 -->
-    <div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1;margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:#4a4845;margin-bottom:6px">
-        <span>${(ct.start||'').slice(0,10)}</span><span>${(ct.end||'').slice(0,10)}</span>
-      </div>
-      <div style="background:#f4f3f0;border-radius:4px;overflow:hidden;height:8px">
-        <div style="background:#1B4FD8;height:100%;width:${Math.round(progress*100)}%;transition:.6s"></div>
-      </div>
-    </div>
-
-    <!-- 規格進度摘要 -->
-    <div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e8e6e1;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:12px">規格執行進度</div>
-      ${specStats.map(s=>`<div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="font-size:12px;font-weight:500">${s.name}</span>
-          <span style="font-size:12px;font-weight:600;color:${s.pct>=1?'#166534':'#4a4845'}">${s.done}/${s.qty}</span>
-        </div>
-        <div style="background:#f4f3f0;border-radius:3px;overflow:hidden;height:5px">
-          <div style="background:${s.pct>=1?'#16a34a':s.pct>=0.5?'#1B4FD8':'#d97706'};height:100%;width:${Math.round((s.pct||0)*100)}%"></div>
-        </div>
-      </div>`).join('')}
-    </div>
-
-    <!-- 待確認提醒 -->
-    ${pendingConfirm.length?`<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;padding:12px 16px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700;color:#92400E">📋 ${pendingConfirm.length} 篇待您確認</div>
-      <div style="font-size:11px;color:#92400E;margin-top:2px">請在下方規格表中查看詳情並確認</div>
-    </div>`:''}
-
-    <!-- 已確認記錄（本月，折疊顯示）-->
-    ${confirmedThisMonth.length?`<details style="margin-bottom:16px">
-      <summary style="cursor:pointer;font-size:12px;color:#8a8680;padding:8px 12px;background:#f8f7f5;border-radius:8px;list-style:none;display:flex;align-items:center;gap:6px">
-        ▶ 本月已確認 ${confirmedThisMonth.length} 筆切角（點開查看）
-      </summary>
-      <div style="margin-top:8px;padding:0 4px">
-        ${confirmedThisMonth.map(r=>`<div style="border:1px solid #86efac;border-radius:8px;padding:8px 12px;margin-bottom:6px;background:#f0fdf4;display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>
-          <span style="font-size:12px;font-weight:500;flex:1">${r.specType} ／ ${r.platform||'—'}</span>
-          <span style="font-size:11px;color:#8a8680">${r.status}</span>
-        </div>`).join('')}
-      </div>
-    </details>`:''}
-
-    <!-- 各規格執行追蹤表 -->
-    ${specStats.map(s=>`<div style="background:#fff;border-radius:12px;border:1px solid #e8e6e1;margin-bottom:16px;overflow:hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f8f7f5;border-bottom:1px solid #e8e6e1">
-        <div>
-          <span style="font-size:13px;font-weight:600">${s.name}</span>
-          <span style="font-size:11px;color:#8a8680;margin-left:8px">合約 ${s.qty} 篇 · 已完成 ${s.done} 篇</span>
-        </div>
-        <span style="font-size:12px;font-weight:600;background:${s.pct>=1?'#dcfce7':'#eff6ff'};color:${s.pct>=1?'#166534':'#1B4FD8'};padding:3px 10px;border-radius:20px">${Math.round((s.pct||0)*100)}%</span>
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
-          <thead><tr style="background:#1e293b;color:#fff">
-            <th style="padding:8px 10px;text-align:left;white-space:nowrap">#</th>
-            <th style="padding:8px 10px;text-align:left;white-space:nowrap">任務名稱</th>
-            <th style="padding:8px 10px;text-align:left;white-space:nowrap">上刊日期</th>
-            <th style="padding:8px 10px;text-align:left;white-space:nowrap">論壇平台</th>
-            <th style="padding:8px 10px;text-align:left;white-space:nowrap">板塊</th>
-            <th style="padding:8px 10px;text-align:left;min-width:150px">切角方向</th>
-            <th style="padding:8px 10px;text-align:left;white-space:nowrap">帳號商</th>
-            <th style="padding:8px 10px;text-align:left;white-space:nowrap">文稿</th>
-            <th style="padding:8px 10px;text-align:left;white-space:nowrap">上文連結</th>
-            <th style="padding:8px 10px;text-align:left;min-width:120px">狀態 / 確認</th>
-          </tr></thead>
-          <tbody>${specTable(s)}</tbody>
-        </table>
-      </div>
-    </div>`).join('')}
-
-    <div style="text-align:center;margin-top:8px;font-size:11px;color:#c0bdb7">
-      數據即時更新 · 如有疑問請聯繫樂法網路行銷
-    </div>`;
+    `).join('')}
+  `;
 }
 
 
-function _filterClientRecords(month, btn){
-  document.querySelectorAll('.client-records-filter-btn').forEach(b=>{b.style.background='#fff';b.style.color='#4a4845';b.style.borderColor='#d4d1cb';});
-  if(btn){btn.style.background='#1a1917';btn.style.color='#fff';btn.style.borderColor='#1a1917';}
-  document.querySelectorAll('.client-rec').forEach(r=>{
-    r.style.display=(!month||r.dataset.month===month)?'':'none';
-  });
-}
-
-function _clientConfirmTask(taskId, action){
-  const r = (DB.omRecords||[]).find(x=>x.id===taskId);
-  if(!r) return;
-  if(action==='ok'){
-    r.clientConfirmStatus='confirmed';
-    // 根據目前狀態決定下一步：
-    // 「切角審核」= 文稿送過來審的，過稿後進 '待派帳號商'
-    // 「待規劃」  = 切角規劃送來確認的，確認後進 '切角確認'
-    if(r.status==='切角審核'){
-      r.status='待派帳號商';
-    } else {
-      r.status='切角確認';
-    }
-    if(!r.reviewHistory) r.reviewHistory=[];
-    r.reviewHistory.push({action:'confirmed',by:'client_self',at:new Date().toISOString(),note:''});
-    syncToGAS('omRecords',r).catch(()=>{});
-    // 更新小卡 DOM（支援儀錶板 div 卡和合約頁 tr 兩種格式）
-    _clientUpdateTaskCard(taskId, r);
-    // 客戶頁操作不觸發 SOP 頁重渲染（兩個介面完全獨立）
-    return;
-  } else if(action==='suggest'){
-    const wrap=document.getElementById('client-suggest-wrap-'+taskId);
-    if(wrap) wrap.style.display=wrap.style.display==='none'?'block':'none';
-    return;
-  }
-}
-
-// 客戶頁：更新小卡 DOM，同時支援儀錶板 div 卡和合約頁 tr 卡
-function _clientUpdateTaskCard(taskId, r, keepOpen){
-  const card = document.getElementById('client-task-card-'+taskId);
-  if(!card) return;
-  const cs = r.clientConfirmStatus;
-
-  // 更新按鈕區：找 client-task-btns-{id}（儀錶板）或 td:last-child（合約頁）
-  const btnsEl = document.getElementById('client-task-btns-'+taskId);
-  if(btnsEl){
-    // 儀錶板 div 格式：替換按鈕區
-    if(cs==='confirmed'){
-      btnsEl.innerHTML = '<span style="font-size:11px;color:#166534;font-weight:600">✓ 已確認</span>';
-      card.style.background = '#f0fdf4';
-      card.style.borderColor = '#86efac';
-    } else if(cs==='rejected'){
-      btnsEl.innerHTML = '<span style="font-size:11px;color:#991B1B;font-weight:600">✕ 已送出更動</span>';
-      card.style.background = '#fef2f2';
-      card.style.borderColor = '#fca5a5';
-      // 展開更動建議 textarea
-      if(keepOpen){
-        const wrap = document.getElementById('client-suggest-wrap-'+taskId);
-        if(wrap) wrap.style.display = 'block';
-      }
-    }
-  } else {
-    // 合約頁 tr 格式：找 td:last-child
-    const lastTd = card.querySelector('td:last-child');
-    if(!lastTd) return;
-    const _stColor = ['已上刊','觀察中','完成','待派帳號商'].includes(r.status)?'#166534':
-                     ['切角審核','切角確認'].includes(r.status)?'#5b21b6':
-                     r.status==='文稿審核'?'#1B4FD8':'#92400E';
-    const _stBg    = ['已上刊','觀察中','完成','待派帳號商'].includes(r.status)?'#dcfce7':
-                     ['切角審核','切角確認'].includes(r.status)?'#ede9fe':
-                     r.status==='文稿審核'?'#eff6ff':'#fef3c7';
-    if(cs==='confirmed'){
-      lastTd.innerHTML = '<span style="font-size:11px;background:'+_stBg+';color:'+_stColor+';padding:2px 8px;border-radius:12px">'+r.status+'</span><div style="font-size:10px;color:#166534;margin-top:3px">✓ 已確認</div>';
-      card.style.background = '#f0fdf4';
-    } else if(cs==='rejected'){
-      lastTd.innerHTML = '<span style="font-size:11px;background:#fef3c7;color:#92400E;padding:2px 8px;border-radius:12px">'+r.status+'</span><div style="font-size:10px;color:#991B1B;margin-top:3px">✕ 更動建議已送出</div>'+(r.clientNote?'<div style="font-size:10px;color:#92400E;margin-top:2px;background:#fffbeb;border-radius:3px;padding:2px 5px">💬 '+r.clientNote.slice(0,40)+'</div>':'');
-      card.style.background = '#fef2f2';
-    }
-  }
-}
-// 舊版相容別名
-function _clientUpdateTaskRow(taskId, r, keepOpen){ _clientUpdateTaskCard(taskId, r, keepOpen); }
-function _clientSubmitSuggestion(taskId){
-  const r=(DB.omRecords||[]).find(x=>x.id===taskId);
-  if(!r) return;
-  const note=document.getElementById('client-note-'+taskId)?.value.trim()||'';
-  if(!note){ toast('請填寫更動建議'); return; }
-  r.clientNote=note;
-  r.clientFeedback=note;
-  r.clientFeedbackAt=new Date().toISOString();
-  r.clientConfirmStatus='rejected'; // 標記為已退回（移除 OK 按鈕）
-  // 切角審核（文稿送審）退回 → 回到文稿審核讓企劃修改；切角規劃退回 → 待規劃
-  r.status = (r.status==='切角審核') ? '文稿審核' : '待規劃';
-  if(!r.reviewHistory) r.reviewHistory=[];
-  r.reviewHistory.push({action:'rejected',by:'client_self',at:new Date().toISOString(),note});
-  syncToGAS('omRecords',r).catch(()=>{});
-  toast('更動建議已送出','success');
-  // 更新按鈕區顯示「✕ 已送出更動」
-  _clientUpdateTaskCard(taskId, r, false);
-  // 找到小卡的 noteArea 部分（textarea 和送出按鈕），替換成「已送出」訊息
-  const card = document.getElementById('client-task-card-'+taskId);
-  if(card){
-    // 隱藏所有 textarea 和送出按鈕
-    card.querySelectorAll('textarea, button').forEach(el=>{
-      // 保留「補充修改」等其他按鈕，只隱藏送出類的
-      if(el.tagName==='BUTTON' && (el.textContent.includes('送出') || el.textContent.includes('更動建議'))){
-        el.style.display='none';
-      }
-      if(el.tagName==='TEXTAREA') el.style.display='none';
-    });
-    // 顯示已送出的意見
-    const existingNote = card.querySelector('[data-note-display]');
-    if(!existingNote){
-      const noteDiv = document.createElement('div');
-      noteDiv.setAttribute('data-note-display','1');
-      noteDiv.style.cssText='margin-top:8px;padding:8px 10px;background:#fff3f3;border:1px solid #fca5a5;border-radius:6px;font-size:11px;color:#991B1B';
-      noteDiv.innerHTML='<span style="font-weight:600">您的更動建議：</span><div style="margin-top:3px;color:#1a1917">'+note+'</div>';
-      card.appendChild(noteDiv);
-    }
-  }
-  // 也嘗試隱藏 client-suggest-wrap
-  const wrap=document.getElementById('client-suggest-wrap-'+taskId);
-  if(wrap) wrap.style.display='none';
-  // 客戶頁操作不觸發 SOP 頁重渲染
-}
-function _clientSaveNote(taskId, note){
-  const r = (DB.omRecords||[]).find(x=>x.id===taskId);
-  if(r){ r.clientNote=note; syncToGAS('omRecords',r).catch(()=>{}); }
-}
 
 async function submitVendorPost(taskId){
   const link = document.getElementById('vf-link-'+taskId)?.value.trim();
@@ -3715,6 +3591,17 @@ function switchTestRole(roleConfig){
     _userProfile = cl || { id:roleConfig.clientId, name, email };
   }
 
+  // 切換身份時重置 SOP 頁面狀態（避免前一個企劃的資料殘留）
+  if(role === 'staff'){
+    // 清除月度作業的選擇狀態（企劃 A 的資料不應該顯示給企劃 B）
+    const sopClient = document.getElementById('sop-client');
+    const sopYm     = document.getElementById('sop-ym');
+    // 不清除 client 選擇，但重新 render 頁面（讓系統依新身份過濾）
+    const sopBody = document.getElementById('sop-contract-body');
+    if(sopBody) sopBody.innerHTML = '';
+    const sopOmContent = document.getElementById('sop-om-content');
+    if(sopOmContent) sopOmContent.innerHTML = '';
+  }
   // 套用介面
   try {
     _applyRoleInterface(role);
@@ -4329,8 +4216,8 @@ function _renderOpsTasksTodo(myId, role){
   }
 
   const SI = {
-    '切角進行中':  {icon:'🎯',color:'#f59e0b',label:'切角待確認'},
-    '文章審核中':  {icon:'📝',color:'#f97316',label:'文章待審核'},
+    '切角進行中':  {icon:'🎯',color:'#f59e0b',label:'切角審核中'},
+    '文章審核中':  {icon:'📝',color:'#f97316',label:'文章審核中'},
     '待指派寫手':  {icon:'✍️',color:'#3b82f6',label:'待指派寫手'},
     '待指派帳號商':{icon:'🚀',color:'#06b6d4',label:'待派帳號商'},
   };
@@ -8909,9 +8796,17 @@ function renderSopOmPage(){
     return;
   }
 
-  // 測試模式：自動初始化假資料
+  // 測試模式：只在尚未初始化時建立假資料（避免跳頁重置）
   if(window._testMode && contracts.length){
-    _testInitPlan(clientId, contracts[0].id, ym);
+    const _hasPlan = (DB.ops_monthly_plans||[]).some(p=>p.contractId===contracts[0].id && p.ym===ym);
+    if(!_hasPlan) _testInitPlan(clientId, contracts[0].id, ym);
+    // 確保 DB 同步 TEST_DATA（防止跳頁後 DB 被清空）
+    if(TEST_DATA.tasks.length) DB.ops_tasks = TEST_DATA.tasks;
+    if(TEST_DATA.plans.length) DB.ops_monthly_plans = TEST_DATA.plans;
+    DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
+    DB.draftHistory      = TEST_DATA.draftHistory;
+    DB.writerAssignments = TEST_DATA.writerAssignments;
+    DB.vendorAssignments = TEST_DATA.vendorAssignments;
   }
 
   // 無進行中合約
@@ -9071,6 +8966,15 @@ function _taskNeedsAction(status){
 function _renderTaskCard(task, clientId, contractId, ym){
   const s = task._status;
   const rel = task._rel;
+  const myId = window.myMember?.id || '';
+
+  // ── 任務鎖定：已啟動的任務只有指派企劃能操作 ──
+  const isActivated = !!task.activatedAt;
+  const isMyTask = !task.assignedPlanner ||  // 未指派企劃：任何人都能操作
+    task.assignedPlanner === myId ||
+    task.coPlanner === myId ||
+    ['owner','manager'].includes(window.myMember?.role||'');
+  const isLocked = isActivated && !isMyTask;
   const statusColor = {
     '待啟動':'#94a3b8','切角進行中':'#f59e0b','待指派寫手':'#3b82f6',
     '撰文中':'#8b5cf6','文章審核中':'#f97316','待指派帳號商':'#06b6d4',
@@ -9131,7 +9035,11 @@ function _renderTaskCard(task, clientId, contractId, ym){
 
         <!-- 行動區 -->
         <div style="padding:10px 14px;border-top:1px solid var(--border);background:var(--surface2)">
-          ${actionBtn}
+          ${isLocked
+            ? `<div style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px">
+                🔒 由 <b>${_memberName(task.assignedPlanner)}</b> 負責，你無法操作
+              </div>`
+            : actionBtn}
         </div>
       </div>
     </div>`;
@@ -9208,16 +9116,16 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
 
     case '切角進行中':
       return `<div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">等待客戶確認切角方向。每次往返均留存紀錄。</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">等待切角確認。每次往返均留存紀錄。</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="_openCutAngleFlow('${id}','${clientId}','${contractId}','${ym}')">✏️ 填寫切角 / 查看往返</button>
+          <button class="btn btn-primary btn-sm" onclick="_openCutAngleFlow('${id}','${clientId}','${contractId}','${ym}')">✏️ 填寫切角方向 / 查看往返</button>
           <button class="btn btn-sm" style="color:var(--text3)" onclick="_deactivateTask('${id}','${clientId}','${contractId}','${ym}')">↩ 撤銷啟動</button>
         </div>
       </div>`;
 
     case '待指派寫手':
       return `<div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">切角已確認，指派寫手後進入撰文。</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">切角確認，請指派寫手。</div>
         ${_writerSelect(id, clientId, contractId, ym)}
         <button class="btn btn-sm" style="color:var(--text3);margin-top:6px" onclick="_deactivateTask('${id}','${clientId}','${contractId}','${ym}')">↩ 撤銷啟動</button>
       </div>`;
@@ -9317,14 +9225,27 @@ function _setPlannerOnTask(taskId, plannerId){
 }
 
 function _deactivateTask(taskId, clientId, contractId, ym){
-  if(!confirm('確定撤銷啟動？任務將回到「待啟動」狀態。')) return;
   const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
   if(!task) return;
-  task.activatedAt      = '';
-  task.requireCutAngle  = false;  // 同時清除切角旗標
-  syncToGAS('tasks', task).catch(()=>{});
-  _refreshPlan(clientId, contractId, ym);
-  toast('已撤銷啟動', 'success');
+  const myRole = window.myMember?.role || _currentUser?.hrRole || 'employee';
+  const isManager = myRole==='owner' || myRole==='manager';
+
+  if(isManager){
+    // 主管/老闆：直接撤銷
+    task.activatedAt     = '';
+    task.requireCutAngle = false;
+    syncToGAS('tasks', task).catch(()=>{});
+    _refreshPlan(clientId, contractId, ym);
+    toast('已撤銷啟動', 'success');
+  } else {
+    // 組員：標記「申請撤銷」，等主管審核
+    task._deactivateRequested = true;
+    task._deactivateRequestBy = window.myMember?.id||'';
+    task._deactivateRequestAt = new Date().toISOString();
+    syncToGAS('tasks', task).catch(()=>{});
+    _refreshPlan(clientId, contractId, ym);
+    toast('已送出撤銷申請，等待主管審核', 'info');
+  }
 }
 
 function _dueDateInput(taskId, current, clientId, contractId, ym){
