@@ -2739,6 +2739,23 @@ async function gasApi(action, body={}){
     // ── 本地 DB 模擬更新 ──
     const id = body.id;
 
+    // 新架構表：測試模式攔截
+    if(['saveTask','saveMonthlyPlan','saveCutAngleHistory','saveDraftHistory',
+        'saveWriterAssignment','saveVendorAssignment'].includes(action)){
+      const _tableMap = {
+        'saveTask': 'ops_tasks', 'saveMonthlyPlan': 'ops_monthly_plans',
+        'saveCutAngleHistory': 'cutAngleHistory', 'saveDraftHistory': 'draftHistory',
+        'saveWriterAssignment': 'writerAssignments', 'saveVendorAssignment': 'vendorAssignments',
+      };
+      const _arr = _tableMap[action];
+      if(_arr){
+        if(!DB[_arr]) DB[_arr] = [];
+        const _existing = DB[_arr].find(r=>r.id===id);
+        if(_existing){ Object.assign(_existing, body); }
+        else { DB[_arr].push({...body, id}); }
+      }
+      return { ok: true, id };
+    }
     if(action === 'saveOmRecord' || (action === 'saveRecord' && body.sheet?.includes('om'))){
       // 反序列化 JSON 欄位（syncToGAS 序列化了，但 DB 要保持陣列）
       const _dbBody = {...body};
@@ -2903,6 +2920,14 @@ window.loadAllData = async function(){
     const adRaw = data.ad_records || data.ops_ad_records || [];
     if(adRaw.length) DB.adRecords = adRaw.filter(r => r.id);
     else if(!DB.adRecords) DB.adRecords = [];
+
+    // 新架構：六張 OPS 表
+    DB.ops_tasks            = (data.ops_tasks            || []).filter(r=>r.id);
+    DB.ops_monthly_plans    = (data.ops_monthly_plans    || []).filter(r=>r.id);
+    DB.cutAngleHistory      = (data.ops_cutangle_history || []).filter(r=>r.id);
+    DB.draftHistory         = (data.ops_draft_history    || []).filter(r=>r.id);
+    DB.writerAssignments    = (data.ops_writer_assignments || []).filter(r=>r.id);
+    DB.vendorAssignments    = (data.ops_vendor_assignments || []).filter(r=>r.id);
 
     // vendor_companies（廠商定價，新）
     // GAS 格式：{id, name, platforms(JSON), items(JSON flat: [{platform,name,price}])}
@@ -3152,6 +3177,19 @@ window.syncToGAS = async function(collection, obj){
     if(Array.isArray(payload.reviewHistory)) payload.reviewHistory = JSON.stringify(payload.reviewHistory);
     if(Array.isArray(payload.screenshotLinks)) payload.screenshotLinks = JSON.stringify(payload.screenshotLinks);
     obj = payload;
+  }
+  // 新架構表自動路由
+  const _newTableAction = {
+    'tasks': 'saveTask', 'ops_tasks': 'saveTask',
+    'monthly_plans': 'saveMonthlyPlan', 'ops_monthly_plans': 'saveMonthlyPlan',
+    'cutangle_history': 'saveCutAngleHistory', 'ops_cutangle_history': 'saveCutAngleHistory',
+    'draft_history': 'saveDraftHistory', 'ops_draft_history': 'saveDraftHistory',
+    'writer_assignments': 'saveWriterAssignment', 'ops_writer_assignments': 'saveWriterAssignment',
+    'vendor_assignments': 'saveVendorAssignment', 'ops_vendor_assignments': 'saveVendorAssignment',
+    'monthly_plans': 'saveMonthlyPlan',
+  };
+  if(_newTableAction[collection]){
+    return gasApi(_newTableAction[collection], obj);
   }
   const actionMap = {
     clients: 'saveClient',
@@ -8330,1397 +8368,876 @@ h2{font-size:18px;font-weight:bold;margin-bottom:4px}
 
 // ── SOP 狀態存儲（本地，不寫 GAS）──
 // DB.sopState[clientId][ym] = { line:'A'|'B', step:1..5, clientConfirmed:bool, planItems:[...] }
-function getSopState(clientId, ym, contractId){
-  if(!DB.sopState) DB.sopState = {};
-  if(!DB.sopState[clientId]) DB.sopState[clientId] = {};
-  if(!DB.sopState[clientId][ym]) DB.sopState[clientId][ym] = {};
-  const ctKey = contractId || '__unknown__';
-  if(!DB.sopState[clientId][ym][ctKey]){
-    // 嘗試從 localStorage 恢復草稿
-    const draftKey = 'sopDraft_'+clientId+'_'+ym+'_'+ctKey;
-    let restored = null;
-    try {
-      const saved = localStorage.getItem(draftKey);
-      if(saved) restored = JSON.parse(saved);
-    } catch(e){}
-    if(!restored){
-      // 從 DB.omRecords 反推 step 和 line
-      const existRecs = (DB.omRecords||[]).filter(r=>
-        r.contractId===(ctKey.includes('::')?ctKey.split('::')[0]:ctKey) &&
-        (r.month||'').slice(0,7)===ym &&
-        (ctKey.includes('::A') ? r.sopLine==='A' :
-         ctKey.includes('::B') ? r.sopLine==='B' : true)
-      );
-      if(existRecs.length){
-        const statuses = existRecs.map(r=>r.status);
-        const hasVendor = statuses.some(s=>['待上刊','待確認','已上刊','觀察中','完成'].includes(s));
-        const hasReview = statuses.some(s=>['文稿審核','切角審核','待派帳號商'].includes(s));
-        const hasWriter = statuses.some(s=>s==='撰文中');
-        const hasPlan   = statuses.some(s=>['待規劃','切角確認'].includes(s));
-        const sopLine   = ctKey.includes('::B') ? 'B' : (existRecs[0]?.sopLine||'A');
-        const inferStep = hasVendor ? (sopLine==='A'?5:3) : hasReview ? (sopLine==='A'?4:2) : hasWriter ? (sopLine==='A'?3:2) : hasPlan ? 2 : 1;
-        restored = { line:sopLine, step:inferStep, clientConfirmed:false, planItems:[], contractId:ctKey };
-      }
-    }
-    DB.sopState[clientId][ym][ctKey] = restored || { line:null, step:0, clientConfirmed:false, planItems:[], contractId: ctKey };
+// ════════════════════════════════════════════════════════════════
+//  口碑月度作業 — 新架構（v2）
+//  三層：合約 → 月度計畫 → 任務（每篇獨立生命週期）
+//  狀態由 getTaskStatus() 即時計算，不存資料庫
+// ════════════════════════════════════════════════════════════════
+
+// ── 核心：任務狀態計算（前端版，與 GAS 保持一致）──
+function getTaskStatus(task, cutAngleHistory, draftHistory, writerAssignment, vendorAssignment){
+  if(!task.activatedAt) return '待啟動';
+  const needCut = task.requireCutAngle===true || task.requireCutAngle==='true';
+  if(needCut){
+    const lastCut = (cutAngleHistory||[]).at(-1);
+    if(!lastCut || lastCut.action!=='approved') return '切角進行中';
   }
-  if(contractId) DB.sopState[clientId][ym][ctKey].contractId = contractId;
-  return DB.sopState[clientId][ym][ctKey];
+  if(!writerAssignment) return '待指派寫手';
+  const lastDraft = (draftHistory||[]).at(-1);
+  if(!lastDraft) return '撰文中';
+  if(lastDraft.action!=='approved') return '文章審核中';
+  if(!vendorAssignment) return '待指派帳號商';
+  if(!vendorAssignment.confirmedAt) return '待上刊';
+  return '已上刊';
 }
 
-// 儲存草稿到 localStorage（在規劃表渲染後呼叫）
-function _saveSopDraft(clientId, ym, lineKey){
-  try {
-    const state = DB.sopState?.[clientId]?.[ym]?.[lineKey];
-    if(!state) return;
-    localStorage.setItem('sopDraft_'+clientId+'_'+ym+'_'+lineKey, JSON.stringify(state));
-  } catch(e){}
+// ── DB 輔助：取得任務相關的所有子記錄 ──
+function getTaskRelated(taskId){
+  const cut    = (DB.cutAngleHistory    ||[]).filter(h=>h.taskId===taskId);
+  const draft  = (DB.draftHistory       ||[]).filter(h=>h.taskId===taskId);
+  const writer = (DB.writerAssignments  ||[]).find( a=>a.taskId===taskId);
+  const vendor = (DB.vendorAssignments  ||[]).find( a=>a.taskId===taskId);
+  return { cut, draft, writer, vendor };
 }
 
-// 清除草稿（送出後呼叫）
-function _clearSopDraft(clientId, ym, lineKey){
-  try { localStorage.removeItem('sopDraft_'+clientId+'_'+ym+'_'+lineKey); } catch(e){}
-}
+// ── 測試模式：假資料（讓系統可以在沒有 GAS 的情況下完整運作）──
+const TEST_DATA = {
+  plans: [],
+  tasks: [],
+  cutAngleHistory: [],
+  draftHistory: [],
+  writerAssignments: [],
+  vendorAssignments: [],
+};
 
-// 從通知/外部跳轉到 SOP 月度作業，自動設好客戶和月份
-// 帶 contractId（含 ::A/::B）跳轉，確保選線記憶正確
-function _sopNavWithClientAndLine(clientId, contractId, ym){
-  if(!contractId){ _sopNavWithClient(clientId, ym); return; }
-  // 先設選線記憶，防止跳轉後顯示選線卡
-  const baseCtId = contractId.includes('::')?contractId.split('::')[0]:contractId;
-  const line     = contractId.includes('::A')?'A':contractId.includes('::B')?'B':null;
-  if(line){
-    if(!window._sopUserChoseLine) window._sopUserChoseLine = {};
-    if(!window._sopActiveLine)    window._sopActiveLine    = {};
-    window._sopUserChoseLine[baseCtId] = line;
-    window._sopActiveLine[baseCtId]    = line;
-  }
-  // 設定當前合約
-  if(!window._sopActiveContractId) window._sopActiveContractId = {};
-  window._sopActiveContractId[clientId] = baseCtId;
-  navTo('sop-om');
-  setTimeout(()=>{
-    const ymEl     = document.getElementById('sop-ym');
-    const clientEl = document.getElementById('sop-client');
-    if(ymEl && ym) ymEl.value = ym;
-    window._sopPendingClientId = clientId;
-    renderSopOmPage();
-    if(clientEl && clientId){
-      if(![...clientEl.options].some(o=>o.value===clientId)){
-        const cl = DB.clients.find(c=>c.id===clientId)||{};
-        const opt = document.createElement('option');
-        opt.value = clientId; opt.textContent = cl.name||clientId;
-        clientEl.appendChild(opt);
-      }
-      clientEl.value = clientId;
-      [...clientEl.options].forEach(o=>{ o.selected = o.value===clientId; });
-      if(clientEl.value === clientId) renderSopOmPage();
+function _testInitPlan(clientId, contractId, ym){
+  // 從 DB.specItems 建立假的月度計畫和任務
+  const specs = (DB.specItems||[]).filter(s=>
+    s.contractId===contractId && (s.category==='口碑'||!s.category)
+  );
+  if(!specs.length) return;
+
+  specs.forEach(s=>{
+    const qty = Number(s.monthlyQty||s.qty||0);
+    if(!qty) return;
+    const planId = 'TEST_PLAN_'+s.id;
+    const existPlan = TEST_DATA.plans.find(p=>p.id===planId);
+    if(!existPlan){
+      TEST_DATA.plans.push({
+        id: planId, contractId, clientId,
+        ym, specId: s.id, specType: s.name,
+        plannedQty: qty, activatedQty: 0, completedQty: 0,
+        status: '確認', createdAt: new Date().toISOString(),
+      });
     }
-    window._sopPendingClientId = null;
-  }, 150);
+    // 建假任務（每個規格 qty 篇，預設「待啟動」）
+    for(let i=1; i<=qty; i++){
+      const taskId = `TEST_TASK_${s.id}_${i}`;
+      if(!TEST_DATA.tasks.find(t=>t.id===taskId)){
+        TEST_DATA.tasks.push({
+          id: taskId, planId, contractId, clientId,
+          specType: s.name, taskName: `${s.name}#${i}`,
+          requireCutAngle: false,
+          isExtraTask: false,
+          dueDate: '',
+          activatedAt: '',
+          assignedPlanner: window.myMember?.id||'',
+          coPlanner: '',
+          platform: '', section: '',
+          publishedAt: '',
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+  });
+  // 同步到 DB
+  DB.ops_tasks         = TEST_DATA.tasks;
+  DB.ops_monthly_plans = TEST_DATA.plans;
+  DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
+  DB.draftHistory      = TEST_DATA.draftHistory;
+  DB.writerAssignments = TEST_DATA.writerAssignments;
+  DB.vendorAssignments = TEST_DATA.vendorAssignments;
 }
 
-function _sopNavWithClient(clientId, ym){
-  navTo('sop-om');
-  setTimeout(()=>{
-    const ymEl = document.getElementById('sop-ym');
-    const clientEl = document.getElementById('sop-client');
-    if(ymEl && ym) ymEl.value = ym;
-    // renderSopOmPage 會重建 options，所以先設 _pendingClientId
-    // renderSopOmPage 結束後再確認 select 有選到正確的值
-    window._sopPendingClientId = clientId;
-    renderSopOmPage();
-    // renderSopOmPage 可能重建了 select，再設一次確保選中
-    if(clientEl && clientId){
-      if(![...clientEl.options].some(o=>o.value===clientId)){
-        const cl = DB.clients.find(c=>c.id===clientId)||{};
-        const opt = document.createElement('option');
-        opt.value = clientId; opt.textContent = cl.name||clientId;
-        clientEl.appendChild(opt);
-      }
-      clientEl.value = clientId;
-      if(clientEl.value !== clientId){
-        // select 設值失敗（option 存在但 value 不對），強制選中
-        [...clientEl.options].forEach(o=>{ o.selected = o.value===clientId; });
-      }
-      // 若設好後值有變，再渲染一次
-      if(clientEl.value === clientId) renderSopOmPage();
-    }
-    window._sopPendingClientId = null;
-  }, 150);
-}
+// ════════════════════════════════════════════════════════════════
+//  renderSopOmPage：口碑月度作業入口
+// ════════════════════════════════════════════════════════════════
 
 function renderSopOmPage(){
-  const ymEl = document.getElementById('sop-ym');
-  const clientEl = document.getElementById('sop-client');
-  if(ymEl && !ymEl.value) ymEl.value = new Date().toISOString().slice(0,7);
-  // 填充客戶下拉（只列客戶，不含合約）
-  if(clientEl){
-    // 若有待設定的 clientId（來自通知跳轉），優先使用
-    const cur = window._sopPendingClientId || clientEl.value;
-    clientEl.innerHTML = '<option value="">— 選擇客戶 —</option>';
-    const seenClients = new Set();
-    DB.contracts.filter(c=>c.status==='進行中').forEach(ct=>{
-      if(seenClients.has(ct.clientId)) return;
-      seenClients.add(ct.clientId);
-      const cl = DB.clients.find(c=>c.id===ct.clientId)||{};
-      const opt = document.createElement('option');
-      opt.value = ct.clientId;
-      opt.textContent = cl.name||'—';
-      if(opt.value===cur) opt.selected=true;
-      clientEl.appendChild(opt);
-    });
-    // 若上方沒有找到對應 option，動態加入
-    if(cur && !seenClients.has(cur)){
-      const cl = DB.clients.find(c=>c.id===cur)||{};
-      const opt = document.createElement('option');
-      opt.value = cur; opt.textContent = cl.name||cur; opt.selected = true;
-      clientEl.appendChild(opt);
-    }
-    if(cur) clientEl.value = cur;
-  }
-  const ym = ymEl?.value;
-  const clientId = clientEl?.value;
-  const el = document.getElementById('sop-om-content');
-  if(!ym || !clientId){ el.innerHTML = '<div class="empty-state" style="padding:60px"><p>請選擇客戶與月份</p></div>'; return; }
-  // 切換客戶時，清除舊客戶的合約選線記憶（讓新客戶合約重新出現選線卡）
-  // 不清除新客戶本身的記憶（若已選過仍保持）
-  if(window._sopLastClient && window._sopLastClient !== clientId){
-    // 找舊客戶的合約，清除其 _sopUserChoseLine
-    const oldContracts = (DB.contracts||[]).filter(c=>c.clientId===window._sopLastClient);
-    oldContracts.forEach(c=>{ delete window._sopUserChoseLine?.[c.id]; });
-  }
-  window._sopLastClient = clientId;
+  // 取頁面容器
+  const wrap = document.getElementById('sop-om-content');
+  if(!wrap) return;
 
-  // 取該客戶所有進行中合約
-  const contracts = DB.contracts.filter(c=>c.clientId===clientId&&c.status==='進行中');
-  if(!contracts.length){ el.innerHTML = '<div class="empty-state" style="padding:60px"><p>此客戶無進行中合約</p></div>'; return; }
+  const clientId  = document.getElementById('sop-client')?.value||'';
+  const ym        = document.getElementById('sop-ym')?.value||'';
+  const cl        = (DB.clients||[]).find(c=>c.id===clientId)||{};
+  const contracts = (DB.contracts||[]).filter(c=>c.clientId===clientId && c.status==='進行中');
 
-  // 若只有一個合約，直接顯示
-  if(contracts.length===1){
-    renderSopFlow(clientId, contracts[0].id, ym);
-    return;
+  // 更新 sub 標題
+  const sub = document.getElementById('sop-om-sub');
+  if(sub){
+    if(clientId && ym) sub.textContent = `${cl.name||''} ／ ${ym}`;
+    else sub.textContent = '選擇客戶與月份開始作業';
   }
 
-  // 多個合約：顯示頁籤
-  const activeCtId = window._sopActiveContractId?.[clientId] || contracts[0].id;
-  const tabsHtml = contracts.map(ct=>{
-    const isActive = ct.id === activeCtId;
-    // 用已記錄的 activeLine 查正確線別的 state
-    const ctActiveLine = window._sopActiveLine?.[ct.id];
-    const ctLineKey = ctActiveLine ? ct.id+'::'+ctActiveLine : ct.id+'::none';
-    const ymStates4Tab = DB.sopState?.[clientId]?.[ym]||{};
-    const stA4Tab = ymStates4Tab[ct.id+'::A'], stB4Tab = ymStates4Tab[ct.id+'::B'];
-    const detectedLine = ctActiveLine || (stA4Tab&&stA4Tab.step>0?'A':stB4Tab&&stB4Tab.step>0?'B':null);
-    const state = detectedLine ? (ymStates4Tab[ct.id+'::'+detectedLine]||{}) : {};
-    // 合約 tab 點擊：不清除 _sopUserChoseLine（切換回來要保持已選的線）
-    // 僅清除非 active 合約的顯示，保持 active 合約的選線記憶
-    const tabLineBadge = (() => {
-      const cl = window._sopUserChoseLine?.[ct.id];
-      if(!cl) return '';
-      return ` <span style="font-size:10px;background:${cl==='A'?'#eff6ff':'#f0fdf4'};color:${cl==='A'?'#1D4ED8':'#166534'};padding:1px 5px;border-radius:4px">${cl}線</span>`;
-    })();
-    return `<div onclick="window._sopActiveContractId=window._sopActiveContractId||{};window._sopActiveContractId['${clientId}']='${ct.id}';renderSopOmPage()"
-      style="padding:8px 16px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;border-bottom:2px solid ${isActive?'#1D4ED8':'transparent'};color:${isActive?'#1D4ED8':'var(--text3)'};transition:.15s">
-      ${ct.contractNo||ct.name}${tabLineBadge}
+  // 尚未選擇客戶或月份
+  if(!clientId || !ym){
+    wrap.innerHTML = `<div class="empty-state" style="padding:60px">
+      <p>請選擇客戶與月份</p>
     </div>`;
-  }).join('');
-
-  el.innerHTML = `<div style="border-bottom:1px solid var(--border);display:flex;gap:0;overflow-x:auto;background:#fff;sticky:top 0" id="sop-contract-tabs">${tabsHtml}</div>
-    <div id="sop-contract-body"></div>`;
-  // 切換合約 tab 時，一律傳 baseCtId（無後綴），讓 renderSopFlow 自行判斷：
-  // - 若 DB.omRecords 有此合約本月的記錄 → 自動帶入對應線
-  // - 若完全沒有記錄 → 顯示選線卡（用戶選擇 A 或 B）
-  // - 若 _sopActiveLine 有記憶（用戶本次 session 選過）→ 帶入記憶
-  renderSopFlow(clientId, activeCtId, ym, 'sop-contract-body');
-}
-
-// ── 主流程渲染 ──
-function renderSopFlow(clientId, contractId, ym, containerId){
-  const el = document.getElementById(containerId||'sop-om-content');
-  if(!el){ console.error('[SOP] el not found, containerId=', containerId); return; }
-  if(!contractId){
-    el.innerHTML = '<div class="empty-state" style="padding:60px"><p style="color:var(--red)">找不到合約，請重新選擇客戶</p></div>';
     return;
   }
-  try { _renderSopFlowInner(clientId, contractId, ym, containerId, el); }
-  catch(e){
-    console.error('[SOP] renderSopFlow crashed:', e);
-    el.innerHTML = '<div style="padding:32px;text-align:center;color:#991B1B"><b>⚠ 渲染錯誤</b><br><pre style="font-size:11px;text-align:left;margin-top:8px;color:#6b7280;white-space:pre-wrap">'+e.stack+'</pre></div>';
+
+  // 測試模式：自動初始化假資料
+  if(window._testMode && contracts.length){
+    _testInitPlan(clientId, contracts[0].id, ym);
+  }
+
+  // 無進行中合約
+  if(!contracts.length){
+    wrap.innerHTML = `<div class="empty-state" style="padding:60px">
+      <p style="color:var(--red)">此客戶目前無進行中合約</p>
+    </div>`;
+    return;
+  }
+
+  // 多合約：顯示 tab
+  if(contracts.length > 1){
+    const activeCtId = window._activeContractTab?.[clientId] || contracts[0].id;
+    const tabs = contracts.map(ct=>`
+      <button class="tab-btn${ct.id===activeCtId?' active':''}"
+        onclick="window._activeContractTab=window._activeContractTab||{};window._activeContractTab['${clientId}']='${ct.id}';renderSopOmPage()"
+        style="padding:8px 16px;border:none;background:${ct.id===activeCtId?'var(--accent)':'transparent'};
+               color:${ct.id===activeCtId?'#fff':'var(--text2)'};border-radius:6px;cursor:pointer;font-size:13px;font-weight:500">
+        ${ct.contractNo||ct.id}
+      </button>`).join('');
+    wrap.innerHTML = `<div style="display:flex;gap:6px;padding:12px 16px;border-bottom:1px solid var(--border)">${tabs}</div>
+      <div id="sop-contract-body"></div>`;
+    renderMonthlyPlan(clientId, activeCtId, ym, 'sop-contract-body');
+  } else {
+    wrap.innerHTML = `<div id="sop-contract-body"></div>`;
+    renderMonthlyPlan(clientId, contracts[0].id, ym, 'sop-contract-body');
   }
 }
-function _renderSopFlowInner(clientId, contractId, ym, containerId, el){
-  // ── A/B 線 key：只有 contractId 明確帶 ::A 或 ::B 才設線 ──
-  // 切換客戶/合約 tab 時一律顯示選線卡，用戶明確點擊才算開始
-  if(!window._sopActiveLine) window._sopActiveLine = {};
-  if(!window._sopUserChoseLine) window._sopUserChoseLine = {};
-  let activeLine = null;
-  let baseCtId = contractId;
-  if(contractId.includes('::A')){ activeLine='A'; baseCtId=contractId.replace('::A',''); }
-  else if(contractId.includes('::B')){ activeLine='B'; baseCtId=contractId.replace('::B',''); }
-  // 明確點選才記住，其餘情況不讀記憶（確保每次切換合約都顯示選線卡）
-  if(activeLine){
-    window._sopActiveLine[baseCtId] = activeLine;
-    window._sopUserChoseLine[baseCtId] = activeLine; // 用戶本次明確選線
+
+// ════════════════════════════════════════════════════════════════
+//  renderMonthlyPlan：月度計畫總覽
+// ════════════════════════════════════════════════════════════════
+
+function renderMonthlyPlan(clientId, contractId, ym, containerId){
+  const el = document.getElementById(containerId||'sop-om-content');
+  if(!el) return;
+
+  try {
+    _renderMonthlyPlanInner(clientId, contractId, ym, el);
+  } catch(e){
+    console.error('[SOP] renderMonthlyPlan error:', e);
+    el.innerHTML = `<div style="padding:32px;text-align:center;color:#991B1B">
+      <b>⚠ 渲染錯誤</b><br>
+      <pre style="font-size:11px;text-align:left;margin-top:8px;color:#6b7280;white-space:pre-wrap">${e.stack||e.message}</pre>
+    </div>`;
   }
-  // 若用戶本次已明確選線，讀記憶繼續呈現（不跳選線卡）
-  if(!activeLine && window._sopUserChoseLine?.[baseCtId]){
-    activeLine = window._sopUserChoseLine[baseCtId];
-  }
-  const lineKey = baseCtId + '::' + (activeLine || 'none');
-  // 重新指向 lineKey，確保所有 ${contractId} 插值都用正確的 lineKey
-  contractId = lineKey;
-  let state = getSopState(clientId, ym, lineKey);
-  if(!state.contractId) state.contractId = baseCtId;
-  // 若從 A/B tab 點進來，自動進入步驟1（顯示規劃表或選線表單）
-  if(activeLine && state.line===null) state.line = activeLine;
-  if(activeLine && state.step === 0) state.step = 1;
-  const contractId2 = baseCtId; // 後續用 contractId2 代替原 contractId
-  // contractId（函式參數）邏輯上改為 baseCtId（去掉 ::A/::B 後綴）
-  const ct = DB.contracts.find(c=>c.id===baseCtId)||{};
-  const cl = DB.clients.find(c=>c.id===clientId)||{};
-  const specs = (DB.specItems||[]).filter(s=>s.contractId===baseCtId&&(s.category==='口碑'||!s.category));
-  // 開文規格（傳給規劃表使用，純回文不建行）
-  const specsOpen = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name));
-  // thisMonthOm 只包含本線（A/B）的記錄，避免互相干擾
-  const _sopLine = state.line;  // 'A' | 'B' | null
-  const thisMonthOm = (DB.omRecords||[]).filter(r=>{
-    if(r.contractId!==baseCtId) return false;
-    if((r.month||'').slice(0,7)!==ym) return false;
-    // 線別過濾：嚴格比對 sopLine，避免多合約記錄互相混入
-    // 空字串 sopLine 視為 A 線（相容舊記錄，但仍需先有 baseCtId 比對通過）
-    // sopLine 必須明確符合，空值記錄不混入已選線的視圖
-    if(_sopLine==='A') return r.sopLine==='A';
-    if(_sopLine==='B') return r.sopLine==='B' || (!r.sopLine && r.status==='文稿審核');
-    // 尚未選線（顯示全部，含無 sopLine 的舊記錄）
-    return true;
+}
+
+function _renderMonthlyPlanInner(clientId, contractId, ym, el){
+  const ct = (DB.contracts||[]).find(c=>c.id===contractId);
+  if(!ct){ el.innerHTML='<div class="empty-state" style="padding:40px"><p>找不到合約</p></div>'; return; }
+
+  // 取本月計畫
+  const plans = (DB.ops_monthly_plans||[]).filter(p=>p.contractId===contractId && p.ym===ym);
+  // 取本月任務（全部）
+  const allTasks = (DB.ops_tasks||[]).filter(t=>t.contractId===contractId);
+  const monthTasks = allTasks.filter(t=>{
+    const plan = plans.find(p=>p.id===t.planId);
+    return plan || (t.ym===ym);
   });
 
-  // 更新 sub title
-  const subEl = document.getElementById('sop-om-sub');
-  if(subEl) subEl.textContent = `${cl.name} ／ ${ym} ／ ${ct.contractNo||ct.name}`;
+  // 計算各任務即時狀態
+  const tasksWithStatus = monthTasks.map(t=>{
+    const rel = getTaskRelated(t.id);
+    const status = getTaskStatus(t, rel.cut, rel.draft, rel.writer, rel.vendor);
+    return {...t, _status: status, _rel: rel};
+  });
 
-  // 統計
-  const lineLabel = state.line==='A'?'規劃線（A）':state.line==='B'?'直發線（B）':'尚未選擇';
-  const doneCount = thisMonthOm.filter(r=>['已上刊','觀察中','完成'].includes(r.status)).length;
-  const totalCount = thisMonthOm.length;
+  const planned   = plans.reduce((s,p)=>s+Number(p.plannedQty||0), 0);
+  const activated = tasksWithStatus.filter(t=>t.activatedAt).length;
+  const completed = tasksWithStatus.filter(t=>t._status==='已上刊').length;
+  const needAction= tasksWithStatus.filter(t=>_taskNeedsAction(t._status)).length;
 
-  // ── 步驟卡片元件 ──
-  const stepCard = (num, title, status, content, isLast=false) => {
-    // status: 'done' | 'active' | 'waiting' | 'paused'
-    const colors = { done:'#16a34a', active:'#1D4ED8', waiting:'#9ca3af', paused:'#d97706' };
-    const icons  = { done:'✓', active:'▶', waiting:'—', paused:'⏸' };
-    const bgs    = { done:'#f0fdf4', active:'#eff6ff', waiting:'var(--surface2)', paused:'#fffbeb' };
-    const borders= { done:'#86efac', active:'#93c5fd', waiting:'var(--border)', paused:'#fcd34d' };
-    const col = colors[status], bg = bgs[status], bd = borders[status];
-    return `<div style="margin-bottom:${isLast?0:14}px">
-      <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:${bg};border:1px solid ${bd};border-radius:${content?'var(--r) var(--r) 0 0':'var(--r)'};cursor:pointer" onclick="_sopToggleStep(${num})">
-        <span style="width:28px;height:28px;border-radius:50%;background:${col};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;${status==='active'?'animation:sop-pulse 2s infinite':''}">${icons[status]}</span>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:600;color:${col}">步驟 ${num}　${title}</div>
-          <div style="font-size:11px;color:${col};opacity:.75;margin-top:2px">${
-            status==='done'?'✓ 已完成':status==='active'?'← 目前步驟':status==='paused'?'⏸ 等待中（暫停）':'等待前序步驟'}</div>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="2.5" id="sop-arrow-${num}" style="transition:.2s;opacity:.6"><path d="M6 9l6 6 6-6"/></svg>
-      </div>
-      ${content?`<div id="sop-step-body-${num}" style="padding:16px;border:1px solid ${bd};border-top:none;border-radius:0 0 var(--r) var(--r);background:#fff">${content}</div>`:''}
-    </div>`;
+  // ── 無計畫時顯示初始化按鈕 ──
+  if(!plans.length){
+    el.innerHTML = `
+      <div style="padding:32px;text-align:center">
+        <div style="font-size:40px;margin-bottom:16px">📋</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">尚未建立本月計畫</div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:24px">${ym} 的口碑執行計畫</div>
+        <button class="btn btn-primary" onclick="_generatePlan('${clientId}','${contractId}','${ym}')">
+          📋 套用月度規格建立計畫
+        </button>
+        <span style="margin:0 12px;color:var(--text3)">或</span>
+        <button class="btn" onclick="_addSingleTask('${clientId}','${contractId}','${ym}')">
+          ＋ 新增單篇任務
+        </button>
+      </div>`;
+    return;
+  }
+
+  // ── 計畫總覽卡 ──
+  const statusColors = {
+    '待啟動':'#94a3b8','切角進行中':'#f59e0b','待指派寫手':'#3b82f6',
+    '撰文中':'#8b5cf6','文章審核中':'#f97316','待指派帳號商':'#06b6d4',
+    '待上刊':'#eab308','已上刊':'#22c55e',
   };
 
-  // ── 步驟1：選擇執行線 + 展開表單 ──
-  let s1Status = 'active', s1Content = '';
-  if(state.line && state.step > 1) s1Status = 'done';
-  if(state.line === null){
-    // 尚未選擇：s1Content 留空，由 stepsHtml 的大選線卡處理
-    s1Content = '';
-  } else if(state.line === 'A' && state.step === 1){
-    // A 線步驟1：顯示專案規劃表
-    s1Content = _renderSopPlanTable(clientId, lineKey, ym, specsOpen, thisMonthOm, state);
-    _saveSopDraft(clientId, ym, lineKey); // 自動存草稿
-  } else if(state.line === 'B' && state.step === 1){
-    // B 線步驟1：直接選規格+寫手
-    s1Content = _renderSopDirectForm(clientId, lineKey, ym, specs, state);
-    _saveSopDraft(clientId, ym, lineKey); // 自動存草稿
-  } else {
-    // 已完成步驟1：摘要
-    s1Content = `<div style="font-size:12px;color:#166534">✓ 已選擇 ${state.line==='A'?'A 線（規劃）':'B 線（直發）'}，本月共 ${totalCount} 筆任務</div>`;
-  }
+  const taskCards = tasksWithStatus.map(t=>_renderTaskCard(t, clientId, contractId, ym)).join('');
 
-  // ── A 線步驟2：等待客戶確認 ──
-  let s2Status = 'waiting', s2Content = '';
-  if(state.line === 'A'){
-    if(state.step > 2) s2Status = 'done';
-    else if(state.step === 2) s2Status = 'active';  // 展開顯示，讓企劃看到待確認清單
-    if(state.step >= 2){
-      // 步驟2只顯示切角規劃確認階段（待規劃、切角確認）的記錄
-      // 文稿審核後的記錄（status=撰文中/文稿審核/切角審核等）只在步驟4顯示
-      // 步驟2記錄：去重複（相同 taskName+specType 只保留最有意義的狀態）
-      const _s2Raw = thisMonthOm.filter(r=>['待規劃','切角確認'].includes(r.status)||(!r.status&&r.clientConfirmStatus));
-      const _s2Map = new Map();
-      _s2Raw.forEach(r=>{
-        const key = (r.taskName||r.specType)+'__'+r.specType;
-        const ex = _s2Map.get(key);
-        if(!ex){ _s2Map.set(key,r); return; }
-        const pri = s=>s==='rejected'?3:s==='confirmed'?2:1;
-        if(pri(r.clientConfirmStatus||'pending') > pri(ex.clientConfirmStatus||'pending')) _s2Map.set(key,r);
-      });
-      const s2Records = [..._s2Map.values()];
-      const pending   = s2Records.filter(r=>r.clientConfirmStatus==='pending'||!r.clientConfirmStatus);
-      const confirmed = s2Records.filter(r=>r.clientConfirmStatus==='confirmed');
-      const rejected  = s2Records.filter(r=>r.clientConfirmStatus==='rejected');
-      s2Content = ''
-        + '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">客戶逐筆確認各切角方向。企劃可代為操作（✓確認 / ✕退回），或等客戶在客戶頁自行回覆。</div>'
-        + '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
-        + '<span class="tag tag-amber" style="font-size:11px">⏳ 待確認 '+pending.length+' 筆</span>'
-        + '<span class="tag tag-green" style="font-size:11px">✓ 已確認 '+confirmed.length+' 筆</span>'
-        + (rejected.length?'<span class="tag tag-red" style="font-size:11px">✕ 退回 '+rejected.length+' 筆</span>':'')
-        + '</div>'
-        + s2Records.map(r=>{
-            const cs=r.clientConfirmStatus||'pending';
-            const borderCol=cs==='confirmed'?'#86efac':cs==='rejected'?'#fca5a5':'#fcd34d';
-            const bgCol=cs==='confirmed'?'#f0fdf4':cs==='rejected'?'#fef2f2':'#fffbeb';
-            const tagCls=cs==='confirmed'?'tag-green':cs==='rejected'?'tag-red':'tag-amber';
-            const tagTxt=cs==='confirmed'?'✓ 確認':cs==='rejected'?'✕ 退回':'待確認';
-            const contentHtml=(r.content||r.title)
-              ?'<div style="font-size:11px;color:var(--text3);margin-top:4px;background:#fff;border-radius:4px;padding:5px 8px;white-space:pre-wrap;max-height:80px;overflow-y:auto">'+(r.content||r.title).slice(0,200)+'</div>'
-              :'';
-            const noteHtml=r.clientNote
-              ?'<div style="font-size:11px;color:#d97706;margin-top:4px;padding:4px 8px;background:#fffbeb;border-radius:4px">💬 客戶意見：'+r.clientNote+'</div>'
-              :'';
-            const rejectForm=cs==='rejected'
-              ?'<div style="margin-top:10px;padding:10px;background:#fff3f3;border:1px dashed #fca5a5;border-radius:6px">'
-               +'<div style="font-size:11px;font-weight:600;color:#991B1B;margin-bottom:6px">💬 客戶意見：'+(r.clientNote||'（無文字意見）')+'</div>'
-               +'<div style="font-size:11px;color:var(--text3);margin-bottom:6px">👇 修正切角內容後按「重新送交」：</div>'
-               +'<textarea id="planner-cutangle-'+r.id+'" rows="3" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #d4d1cb;border-radius:6px;font-size:12px;resize:vertical">'
-               +(r.content||r.cutAngle||'')
-               +'</textarea>'
-               +'<button class="btn btn-xs btn-primary" style="margin-top:6px" onclick="_sopResubmitToClient(\''+r.id+'\')" >🔄 修正完成，重新送交客戶</button>'
-               +'</div>'
-              :'';
-            const _rha2=Array.isArray(r.reviewHistory)?r.reviewHistory:[];
-            const historyHtml=(_rha2.length
-              ?'<details open style="margin-top:8px"><summary style="cursor:pointer;font-size:10px;font-weight:600;color:var(--text3);list-style:none">📋 往返記錄（'+_rha2.length+'次）</summary>'
-               +'<div style="margin-top:4px">'
-               +_rha2.map(h=>'<div style="font-size:10px;color:var(--text3);padding:3px 6px;background:var(--surface2);border-radius:4px;margin-bottom:2px">'
-                 +(h.action==='confirmed'?'✓ 客戶確認':h.action==='rejected'?'✕ 客戶退回':'🔄 企劃重送')
-                 +' · '+(h.at||'').slice(0,10)+(h.note?' ：'+h.note.slice(0,40):'')
-                 +'</div>').join('')
-               +'</div></details>'
-              :'');
-            return '<div style="border:1px solid '+borderCol+';border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:'+bgCol+'">'
-              +'<div style="display:flex;align-items:flex-start;gap:8px">'
-              +'<span class="tag '+tagCls+'" style="font-size:10px;flex-shrink:0;margin-top:1px">'+tagTxt+'</span>'
-              +'<div style="flex:1">'
-              +'<div style="font-size:12px;font-weight:600">'+(r.taskName||r.specType||'—')+'</div>'
-              +'<div style="font-size:11px;color:var(--text3);margin-top:1px">'+(r.platform||'')+' '+(r.section?'· '+r.section:'')+' '+(r.publishDate?r.publishDate.slice(0,10):'')+'</div>'
-              +contentHtml+noteHtml
-              +'</div></div>'
-              +rejectForm+historyHtml+'</div>';
-          }).join('')
-        + (state.step===2 ? '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
-        + (s2Records.length>0&&!s2Records.some(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
-          ? '<button id="btn-s2-done" class="btn btn-primary" style="flex:1" onclick="document.getElementById(\'btn-s2-done\').disabled=true;_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')">✓ 全部回覆完成，進行步驟3</button>'
-          : '')
-        + (confirmed.length>0&&s2Records.some(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
-          ? '<button id="btn-s2-part" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="document.getElementById(\'btn-s2-part\').disabled=true;_sopStep2PartialContinue(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')">⚡ 已確認 '+confirmed.length+'/'+thisMonthOm.length+' 筆，先進行步驟3</button>'
-          : '')
-        + (s2Records.length>0&&!confirmed.length&&s2Records.every(r=>r.clientConfirmStatus==='pending'||r.clientConfirmStatus==='rejected'||!r.clientConfirmStatus)
-          ? '<button id="btn-s2-force" class="btn btn-sm" style="color:#6b7280;border-color:#d1d5db" onclick="document.getElementById(\'btn-s2-force\').disabled=true;_sopStep2Complete(\''+clientId+'\',\''+contractId+'\',\''+ym+'\')">→ 略過客戶回覆，直接進行步驟3</button>'
-          : '')
-          : '' )
-        + (state.step===2 ? '</div>' : '') ;
-    }  // if(state.step >= 2)
-
-  // ── 指派寫手步驟（A線步3，B線步2）──
-  }  // if(state.line === 'A')
-  // A線有 writerStep，B線步驟1完成後直接進文稿審核
-  const writerStep = state.line==='A' ? 3 : null;
-  let swStatus = 'waiting', swContent = '';
-  const writerActive = writerStep !== null && state.step === writerStep;
-  const writerDone   = writerStep !== null && state.step > writerStep;
-  if(writerDone) swStatus = 'done';
-  else if(writerActive) swStatus = 'active';
-  if(writerDone){
-    // 步驟3已完成：只顯示摘要
-    const _doneWriters = thisMonthOm.filter(r=>r.writerId);
-    swContent = `<div style="font-size:12px;color:#166534">✓ 已指派 ${_doneWriters.length} 位寫手</div>
-      ${_doneWriters.map(r=>`<div style="font-size:11px;color:var(--text3);margin-top:2px">· ${r.taskName||r.specType} → ${r.writerName||'—'}</div>`).join('')}`;
-  } else if(writerActive){
-    const cutDocLink3 = ct.driveLink || '';  // 切角 DOC 連結（來自合約）
-    const writerOpts = DB.freelancers.filter(f=>f.type==='口碑').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
-    const platformOpts3 = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
-    const needWriter = thisMonthOm.filter(r=>
-      !r.writerId && ['待規劃','切角確認','待派寫手'].includes(r.status) &&
-      (state.partialConfirm ? r.clientConfirmStatus==='confirmed' : (r.clientConfirmStatus==='confirmed'||!r.clientConfirmStatus||_sopIsMonitor(r.specType)||_sopIsGoogle(r.specType)))
-    );
-    const hasWriter = thisMonthOm.filter(r=>r.writerId&&['撰文中','文稿審核','切角審核','待派帳號商','待上刊','已上刊','觀察中','完成'].includes(r.status));
-    swContent = `
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">為每筆開文指派寫手（回文已綁定在開文行），指派後狀態推進至「撰文中」。</div>
-      ${cutDocLink3?`<div style="margin-bottom:10px"><a href="${cutDocLink3}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 14px;text-decoration:none;font-weight:500">📄 開啟切角DOC</a></div>`:''}
-      ${needWriter.map(r=>{
-        const isOpen  = _sopIsOpenPost(r.specType);
-        const isMon   = _sopIsMonitor(r.specType);
-        const isGoogle= _sopIsGoogle(r.specType);
-        const needW   = isOpen||isMon||isGoogle;
-        const cardBorder = isOpen?'#c4b5fd':isMon?'#bae6fd':isGoogle?'#fde68a':'#d1fae5';
-        const cardBg     = isOpen?'#f5f3ff':isMon?'#f0f9ff':isGoogle?'#fffbeb':'#f0fdf4';
-        // 用字串拼接避免 template literal 嵌套問題
-        let wFields = '';
-        if(needW){
-          const cols = isOpen ? '1fr 1fr 1fr auto' : '1fr auto';
-          wFields += '<div style="display:grid;grid-template-columns:'+cols+';gap:6px;align-items:end;margin-bottom:6px">';
-          wFields += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">指派寫手 *</div>'
-            + '<select id="sw-writer-'+r.id+'" class="form-input" style="font-size:12px;width:100%">'
-            + '<option value="">— 選擇 —</option>'+writerOpts+'</select></div>';
-          if(isOpen){
-            wFields += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">論壇平台</div>'
-              + '<select id="sw-platform-'+r.id+'" class="form-input" style="font-size:12px;width:100%">'
-              + '<option value="'+(r.platform||'')+'">'+(r.platform||'— 選擇 —')+'</option>'
-              + platformOpts3+'</select></div>'
-              + '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">版塊</div>'
-              + '<input id="sw-section-'+r.id+'" value="'+(r.section||'')+'" placeholder="版塊" class="form-input" style="font-size:12px;width:100%"></div>';
-          }
-          wFields += '<button class="btn btn-sm btn-primary" style="white-space:nowrap;align-self:end"'
-            + ' onclick="_sopAssignWriter(\''+r.id+'\')">指派</button></div>';
-          // 切角DOC按鈕（每個任務）
-          const rDriveLink = r.driveLink || cutDocLink3 || '';
-          if(rDriveLink){
-            wFields += '<div style="margin-top:6px"><a href="'+rDriveLink+'" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 10px;text-decoration:none">📄 切角DOC</a></div>';
-          } else {
-            wFields += '<div style="margin-top:6px"><div style="font-size:10px;color:var(--text3);margin-bottom:2px">切角方向</div>'
-              + '<textarea id="sw-cutangle-'+r.id+'" rows="2" placeholder="切角方向…" class="form-input" style="font-size:11px;width:100%;resize:vertical">'
-              + (r.content||r.cutAngle||'')
-              + '</textarea></div>';
-          }
-          wFields += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">備註</div>'
-            + '<input id="sw-note-'+r.id+'" value="'+(r.note||'')+'" placeholder="備註（選填）" class="form-input" style="font-size:11px;width:100%"></div>';
-        } else {
-          wFields = '<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">回文備註</div>'
-            + '<input id="sw-note-'+r.id+'" value="'+(r.note||'')+'" placeholder="回文備註（選填）" class="form-input" style="font-size:11px;width:100%">'
-            + '<button class="btn btn-xs" style="margin-top:4px" onclick="_sopSaveNote(\''+r.id+'\',\'sw-note-'+r.id+'\')">儲存</button></div>';
-        }
-        return '<div style="border:1px solid '+cardBorder+';border-radius:var(--r);padding:12px;margin-bottom:8px;background:'+cardBg+'">'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'
-          + '<span style="font-size:13px;font-weight:600">'+(r.taskName||r.specType)+'</span>'
-          + (r.replyCount?'<span style="font-size:11px;background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:12px">含 '+r.replyCount+' 回文</span>':'')
-          + '</div>' + wFields + '</div>';
-      }).join('')}
-      ${hasWriter.map(r=>{
-        const fl=DB.freelancers.find(f=>f.id===r.writerId);
-        return `<div style="border:1px solid #bbf7d0;border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:#f0fdf4;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="font-size:12px;font-weight:500;flex:1">${r.taskName||r.specType}</span>
-          ${r.replyCount?`<span style="font-size:10px;color:#5b21b6">+${r.replyCount}回</span>`:''}
-          <span style="font-size:11px;color:var(--text3)">${r.platform||''}${r.section?' · '+r.section:''}</span>
-          <span class="tag tag-green" style="font-size:10px">✓ ${fl?.name||r.writerName}</span>
-          <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:10px">${r.status}</span>
-        </div>`;
-      }).join('')}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${!needWriter.length&&hasWriter.length?`<button id="sop-writer-next-btn" class="btn btn-primary" style="flex:1" onclick="var b=document.getElementById('sop-writer-next-btn');if(b)b.style.display='none';_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部指派完成，進行下一步</button>`:''}
-        ${hasWriter.length>0&&needWriter.length>0?`<button id="sop-writer-partial-btn" class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="var b=document.getElementById('sop-writer-partial-btn');if(b)b.style.display='none';_sopStep3PartialContinue('${clientId}','${contractId}','${ym}')">⚡ 已指派部分（${hasWriter.length}筆），先進行下一步</button>`:''}
-      </div>`;
-  }
-
-  // ── 文稿審核步驟（A線步4，B線步3）──
-  const reviewStep = state.line==='A' ? 4 : 2;  // B線無writerStep，文稿審核是步驟2
-  let srStatus = 'waiting', srContent = '';
-  if(state.step > reviewStep) srStatus = 'done';
-  else if(state.step === reviewStep) srStatus = 'active';
-  if(state.step >= reviewStep){
-    const reviewing = thisMonthOm.filter(r=>['撰文中','文稿審核','切角審核'].includes(r.status));
-    const reviewed  = thisMonthOm.filter(r=>['待派帳號商','待上刊','待確認','已上刊','觀察中','完成'].includes(r.status));
-    srContent = `
-      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">確認寫手回傳的稿件，可送客戶審核或直接通過。</div>
-      ${reviewing.map(r=>`
-        <div style="border:1px solid #93c5fd;border-radius:var(--r);padding:10px 12px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-            <span class="tag ${OM_STATUS_COLOR[r.status]||'tag-gray'}" style="font-size:10px">${r.status}</span>
-            <span style="font-size:12px;font-weight:600;flex:1">${r.taskName||r.specType}</span>
-            <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}${r.platform?' · '+r.platform:''}${r.section?' · '+r.section:''}</span>
-            ${r.draftLink?`<a href="${r.draftLink}" target="_blank" class="btn btn-xs">稿件</a>`:''}
-          </div>
-          ${(()=>{ const rh=Array.isArray(r.reviewHistory)?r.reviewHistory:[]; return rh.length?'<details open style="margin-bottom:8px"><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--text3);list-style:none">📋 往返記錄（'+rh.length+'次）</summary><div style="margin-top:4px">'+rh.map(h=>'<div style="padding:4px 8px;border-left:2px solid '+(h.action==='confirmed'?'#16a34a':h.action==='rejected'?'#dc2626':'#1D4ED8')+';margin-bottom:3px;font-size:11px;color:#4a4845"><span style="font-weight:600">'+(h.action==='confirmed'?'✓ 確認':h.action==='rejected'?'✕ 退回':'🔄 重送')+'</span> · '+(h.at||'').slice(0,10)+(h.note?'<div style="margin-top:2px">'+h.note+'</div>':'')+'</div>').join('')+'</div></details>':''; })()}
-          ${r.status==='文稿審核'?`<div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-sm" onclick="(function(){const rc=(DB.omRecords||[]).find(x=>x.id==='${r.id}');if(rc){rc.clientConfirmStatus='pending';syncToGAS('omRecords',rc).catch(()=>{});}omAdvanceStatus('${r.id}','切角審核');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);})()">→ 送客戶審核</button>
-            <button class="btn btn-sm btn-primary" onclick="omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200)">✓ 文稿直接通過</button>
-          </div>`:r.status==='切角審核'?`<div>
-            <div style="font-size:11px;background:#ede9fe;color:#5b21b6;border-radius:6px;padding:6px 10px;margin-bottom:8px">⏸ 已送客戶審核，等待回覆中…</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-              <button class="btn btn-sm btn-primary" onclick="(function(){const rec=(DB.omRecords||[]).find(x=>x.id==='${r.id}');if(rec){if(!rec.reviewHistory)rec.reviewHistory=[];rec.reviewHistory.push({action:'confirmed',by:'planner',at:new Date().toISOString(),note:''});rec.clientConfirmStatus='confirmed';syncToGAS('omRecords',rec).catch(()=>{});}omAdvanceStatus('${r.id}','待派帳號商');setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);})()">✓ 客戶確認通過</button>
-              <button class="btn btn-sm" style="background:#fff;color:#991B1B;border-color:#fca5a5" onclick="document.getElementById('sr-rj-${r.id}').style.display='block'">↩ 退回給寫手修改</button>
-            </div>
-            <div id="sr-rj-${r.id}" style="display:none">
-              <textarea id="sr-rj-note-${r.id}" rows="2" placeholder="修改意見（給寫手參考）…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px;resize:vertical"></textarea>
-              <button class="btn btn-xs" style="margin-top:4px;color:#991B1B;border-color:#fca5a5" onclick="(function(){
-                const note=document.getElementById('sr-rj-note-${r.id}')?.value.trim()||'';
-                const rec=(DB.omRecords||[]).find(x=>x.id==='${r.id}');
-                if(rec){
-                  if(!rec.reviewHistory) rec.reviewHistory=[];
-                  rec.reviewHistory.push({action:'rejected',by:'planner',at:new Date().toISOString(),note:note});
-                  rec.clientNote=note;
-                  rec.clientConfirmStatus='pending'; // 重置客戶確認狀態，讓寫手重新提交
-                  syncToGAS('omRecords',rec).catch(()=>{});
-                }
-                omAdvanceStatus('${r.id}','撰文中'); // 退回給寫手，改回撰文中狀態
-                setTimeout(()=>renderSopFlow('${clientId}','${contractId}','${ym}',_sopGetContainerId()),200);
-              })()">✓ 確認退回（寫手重新撰文）</button>
-            </div></div>`:r.status==='撰文中'?`<div style="font-size:11px;color:var(--text3)">等待寫手完稿…</div>`:''}
-        </div>`).join('')}
-      ${reviewed.map(r=>`
-        <div style="border:1px solid #bbf7d0;border-radius:var(--r);padding:8px 12px;margin-bottom:8px;background:#f0fdf4;display:flex;align-items:center;gap:8px">
-          <span style="font-size:12px;font-weight:500;flex:1">${r.taskName||r.specType}</span>
-          <span style="font-size:11px;color:var(--text3)">${r.writerName||'—'}</span>
-          <span class="tag tag-green" style="font-size:10px">✓ 文稿通過</span>
-        </div>`).join('')}
-      <div id="sop-review-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${state.step===reviewStep&&!reviewing.length&&reviewed.length?`<button class="btn btn-primary" style="flex:1" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">✓ 全部文稿確認，進行下一步</button>`:''}
-        ${state.step===reviewStep&&reviewing.length>0&&reviewed.length>0?`<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">⚡ 已審核 ${reviewed.length} 筆，先進行下一步</button>`:''}
-        ${state.step===reviewStep&&reviewing.length>0&&reviewing.every(r=>r.status==='切角審核')&&!reviewed.length?`<button class="btn btn-sm" style="border-color:#7c3aed;color:#5b21b6;background:#f5f3ff" onclick="this.disabled=true;_sopStepNext('${clientId}','${contractId}','${ym}')">→ 全部已送審，先進行下一步</button>`:''}
-      </div>`;
-  }
-
-  // ── 指派帳號商步驟（A線步5，B線步4）──
-  const vendorStep = state.line==='A' ? 5 : 3;  // B線無writerStep，指派帳號商是步驟3
-  let svStatus = 'waiting', svContent = '';
-  if(state.step > vendorStep) svStatus = 'done';
-  else if(state.step === vendorStep) svStatus = 'active';
-  // 指派帳號商：只在前序文稿審核「全部通過」後才真正 active（防止跳步）
-  // 判斷：reviewing 清單是否清空（無 撰文中/文稿審核/切角審核）
-  const _reviewingBlocking = thisMonthOm.filter(r=>['撰文中','文稿審核','切角審核'].includes(r.status));
-  const vendorBlocked = state.step === vendorStep && _reviewingBlocking.length > 0;
-  if(vendorBlocked) svStatus = 'paused';  // 前序未完成：顯示為暫停狀態
-  if(state.step >= vendorStep){
-    const needVendor = thisMonthOm.filter(r=>r.status==='待派帳號商');
-    const hasVendor  = thisMonthOm.filter(r=>['待上刊','待確認','已上刊','觀察中','完成'].includes(r.status));
-    const vendorOpts = (DB.vendorCompanies||[]).map(v=>'<option value="'+v.id+'">'+v.name+'</option>').join('');
-    const specGroupsV = {};
-    needVendor.forEach(r=>{ const k=r.specType||'其他'; if(!specGroupsV[k]) specGroupsV[k]=[]; specGroupsV[k].push(r); });
-    svContent = (vendorBlocked
-      ? '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400E">⚠️ 尚有 '+_reviewingBlocking.length+' 篇文稿審核未完成，請先完成文稿審核步驟。</div>'
-      : '')
-      + '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">選擇帳號商後推進至「待上刊」，可同規格批次指派。</div>\n'
-      // 批次指派區
-      + Object.entries(specGroupsV).map(([specType,tasks])=>{
-          const bKey = specType.replace(/[^a-zA-Z0-9]/g,'_');
-          let html = '<div style="border:1px solid #fcd34d;border-radius:var(--r);padding:12px;margin-bottom:10px;background:#fffbeb">'
-            + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'
-            + '<div style="font-size:13px;font-weight:600;color:#92400E">'+specType+' <span style="font-size:11px;font-weight:400;color:var(--text3)">('+tasks.length+' 筆)</span></div>'
-            + '<div style="display:flex;gap:6px;align-items:center">'
-            + '<select id="sv-batch-vendor-'+bKey+'" class="form-input" style="font-size:12px;width:auto">'
-            + '<option value="">— 批次選帳號商 —</option>'+vendorOpts+'</select>'
-            + '<button class="btn btn-sm btn-primary" onclick="_sopBatchAssignVendor(\''+specType+'\',\''+clientId+'\',\''+ym+'\',\''+contractId+'\')" >批次指派</button>'
-            + '</div></div>';
-          html += tasks.map(r=>{
-            return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #fef08a;border-radius:6px;margin-bottom:6px;flex-wrap:wrap">'
-              + '<span style="font-size:12px;font-weight:500;min-width:100px">'+(r.taskName||r.specType)+'</span>'
-              + '<span style="font-size:11px;color:var(--text3)">'+(r.writerName||'—')+'</span>'
-              + '<select id="sv-vendor-'+r.id+'" class="form-input" style="flex:1;min-width:100px;font-size:12px">'
-              + '<option value="">— 帳號商 —</option>'+vendorOpts+'</select>'
-              + '<button class="btn btn-xs btn-primary" onclick="_sopAssignVendor(\''+r.id+'\',\''+contractId+'\',\''+ym+'\')" >指派</button>'
-              + '</div>';
-          }).join('');
-          html += '</div>';
-          return html;
-        }).join('')
-      // 已指派列表（含回報記錄）
-      + hasVendor.map(r=>{
-          const vc=(DB.vendorCompanies||[]).find(v=>v.id===r.vendorId);
-          const isPosted=['待確認','已上刊','觀察中','完成'].includes(r.status);
-          const isReported=r.postLink||r.publishDate;
-          return '<div style="border:1px solid '+(isPosted?'#86efac':'#fde68a')+';border-radius:var(--r);padding:10px 12px;margin-bottom:6px;background:'+(isPosted?'#f0fdf4':'#fffbeb')+'">'
-            + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(isReported?'8':'0')+'px;flex-wrap:wrap">'
-            + '<span style="font-size:12px;font-weight:500;flex:1">'+(r.taskName||r.specType)+'</span>'
-            + '<span style="font-size:11px;color:var(--text3)">'+(vc?.name||r.vendorName||'—')+'</span>'
-            + '<span class="tag '+(OM_STATUS_COLOR[r.status]||'tag-gray')+'" style="font-size:10px">'+r.status+'</span></div>'
-            + (isReported
-              ? '<div style="font-size:11px;color:#4a4845;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">'
-                + (r.publishDate?'<span>📅 '+r.publishDate.slice(0,10)+'</span>':'')
-                + (r.platform?'<span>📍 '+r.platform+(r.section?' · '+r.section:'')+'</span>':'')
-                + (r.account?'<span>👤 '+r.account+'</span>':'')
-                + (r.postLink?'<a href="'+r.postLink+'" target="_blank" style="color:#1B4FD8;font-weight:500">🔗 查看上文</a>':'')
-                + '</div>'
-                + (r.status==='待確認'
-                  ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
-                    + '<button class="btn btn-xs btn-primary" onclick="omAdvanceStatus(\''+r.id+'\',\'已上刊\');setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId()),200)">✓ 確認上刊</button>'
-                    + '<button class="btn btn-xs" style="color:#991B1B;border-color:#fca5a5" onclick="document.getElementById(\'sv-rj-wrap-'+r.id+'\').style.display=\'block\'">↩ 退回修改</button>'
-                    + '</div>'
-                    + '<div id="sv-rj-wrap-'+r.id+'" style="display:none">'
-                    + '<textarea id="sv-rj-note-'+r.id+'" rows="2" placeholder="退回原因（給帳號商參考）…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:12px;resize:vertical"></textarea>'
-                    + '<button class="btn btn-xs" style="margin-top:4px;color:#991B1B;border-color:#fca5a5" onclick="(function(){var n=document.getElementById(\'sv-rj-note-'+r.id+'\')?.value.trim();;if(n){var rc=(DB.omRecords||[]).find(x=>x.id===\''+r.id+'\');if(rc){rc.rejectReason=n;if(!rc.reviewHistory)rc.reviewHistory=[];rc.reviewHistory.push({action:\'rejected\',by:\'planner\',at:new Date().toISOString(),note:n});syncToGAS(\'omRecords\',rc).catch(()=>{});}}omAdvanceStatus(\''+r.id+'\',\'待上刊\');setTimeout(()=>renderSopFlow(\''+clientId+'\',\''+contractId+'\',\''+ym+'\',_sopGetContainerId()),200);})()">確認退回</button></div>'
-                  : '')
-              : '<div style="font-size:11px;color:#92400E">等待帳號商回報…</div>')
-            + '</div>';
-        }).join('')
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
-      + (!needVendor.length&&hasVendor.length?'<div style="font-size:12px;color:#16a34a">✓ 所有任務均已指派帳號商</div>':'')
-      + (hasVendor.length>0&&needVendor.length>0?'<button class="btn btn-sm" style="border-color:#d97706;color:#92400E;background:#fffbeb" onclick="_sopStepNext(\\\''+clientId+'\\\',\\\''+contractId+'\\\',\\\''+ym+'\\\')" id="sop-vendor-next-btn" >⚡ 已指派 '+hasVendor.length+' 筆，先進行下一步</button>':'')
-      + '</div>';
-  }  // ← if(state.step >= vendorStep) 結尾
-  // ── 組裝最終 HTML ──
-  const allDone = state.step > vendorStep;
-
-  let stepsHtml = '';
-  stepsHtml += stepCard(1, state.line==='A'?'選線 + 填寫專案規劃表':state.line==='B'?'選線 + 指派寫手':'選擇執行線', s1Status, s1Content);
-
-  if(state.line==='A'){
-    stepsHtml += stepCard(2, '等待客戶逐筆確認', s2Status, s2Content);
-    stepsHtml += stepCard(3, '指派寫手', swStatus, swContent);
-    stepsHtml += stepCard(4, '文稿審核', srStatus, srContent);
-    stepsHtml += stepCard(5, '指派帳號商', svStatus, svContent, true);
-  } else if(state.line==='B'){
-    stepsHtml += stepCard(2, '文稿審核', srStatus, srContent);
-    stepsHtml += stepCard(3, '指派帳號商', svStatus, svContent, true);
-  } else {
-    // 尚未選線：顯示選線提示卡
-    // 查 DB.omRecords 提示哪條線有現有記錄
-    // 查 DB.omRecords 提示哪條線有現有記錄
-    const _hasA = (DB.omRecords||[]).some(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym&&r.sopLine==='A');
-    const _hasB = (DB.omRecords||[]).some(r=>r.contractId===baseCtId&&(r.month||'').slice(0,7)===ym&&r.sopLine==='B');
-    stepsHtml = `<div style="background:#f8f7f5;border:2px dashed var(--border);border-radius:var(--r2);padding:32px 24px;text-align:center">
-      <div style="font-size:15px;font-weight:700;color:#1a1917;margin-bottom:6px">請選擇本月作業線</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:24px">${ct.contractNo||ct.name} ／ ${ym}</div>
-      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
-        <button onclick="_sopSelectLine('${clientId}','${baseCtId}::A','${ym}','A','${containerId||_sopGetContainerId()}')"
-          style="padding:16px 32px;background:#eff6ff;border:2px solid ${_hasA?'#1D4ED8':'#93c5fd'};border-radius:var(--r2);cursor:pointer;text-align:left;min-width:200px">
-          <div style="font-size:15px;font-weight:700;color:#1D4ED8">📋 A 線（規劃）</div>
-          <div style="font-size:11px;color:#1D4ED8;opacity:.8;margin-top:4px">先送客戶確認切角，再指派寫手</div>
-          ${_hasA?'<div style="margin-top:8px;font-size:11px;background:#1D4ED8;color:#fff;border-radius:4px;padding:2px 8px;display:inline-block">本月已有記錄</div>':''}
-        </button>
-        <button onclick="_sopSelectLine('${clientId}','${baseCtId}::B','${ym}','B','${containerId||_sopGetContainerId()}')"
-          style="padding:16px 32px;background:#f0fdf4;border:2px solid ${_hasB?'#0f6e56':'#86efac'};border-radius:var(--r2);cursor:pointer;text-align:left;min-width:200px">
-          <div style="font-size:15px;font-weight:700;color:#166534">⚡ B 線（直發）</div>
-          <div style="font-size:11px;color:#166534;opacity:.8;margin-top:4px">直接指派寫手，快速執行</div>
-          ${_hasB?'<div style="margin-top:8px;font-size:11px;background:#0f6e56;color:#fff;border-radius:4px;padding:2px 8px;display:inline-block">本月已有記錄</div>':''}
-        </button>
-      </div>
-    </div>`;
-  }
-
-  // ── A/B 線子 tab（直接查 DB.sopState 不呼叫 getSopState，避免建空 state 和重填 planItems）──
-  const currentLine = window._sopUserChoseLine?.[baseCtId] || window._sopActiveLine?.[baseCtId];
-  const _ymStates = DB.sopState?.[clientId]?.[ym] || {};
-  const stateA = _ymStates[baseCtId+'::A'] || {};
-  const stateB = _ymStates[baseCtId+'::B'] || {};
-  const hasA = stateA.step > 0 || stateA.line==='A';
-  const hasB = stateB.step > 0 || stateB.line==='B';
-  const _aActive = currentLine==='A', _bActive = currentLine==='B';
-  const _aStep = stateA.step>0?'<span style="font-size:10px;color:#1D4ED8;margin-left:4px">步驟'+stateA.step+'</span>':'';
-  const _bStep = stateB.step>0?'<span style="font-size:10px;color:#0f6e56;margin-left:4px">步驟'+stateB.step+'</span>':'';
-  const _ac = 'padding:9px 20px;cursor:pointer;font-size:12px;font-weight:600;border-bottom:2px solid ';
-  const lineTabHtml = '<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;background:#fff;">'
-    + '<div onclick="_sopSelectLine(\''+clientId+'\',\''+baseCtId+'::A\',\''+ym+'\',\'A\',\''+containerId+'\')" style="'+_ac+(_aActive?'#1D4ED8':'transparent')+';color:'+(_aActive?'#1D4ED8':'var(--text3)')+';transition:.15s">📋 A 線（規劃）'+_aStep+'</div>'
-    + '<div onclick="_sopSelectLine(\''+clientId+'\',\''+baseCtId+'::B\',\''+ym+'\',\'B\',\''+containerId+'\')" style="'+_ac+(_bActive?'#0f6e56':'transparent')+';color:'+(_bActive?'#0f6e56':'var(--text3)')+';transition:.15s">⚡ B 線（直發）'+_bStep+'</div>'
-    + '</div>';
-
-  let _sopHtml = `
-    <style>@keyframes sop-pulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.4)}70%{box-shadow:0 0 0 6px rgba(29,78,216,0)}}</style>
-    <div style="padding:20px 24px">
-      ${lineTabHtml}
-      <div style="background:var(--surface2);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  el.innerHTML = `
+    <!-- 月度計畫標頭 -->
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div>
-          <div style="font-size:13px;font-weight:600">${cl.name} ／ ${ym}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">${ct.contractNo||ct.name} ／ ${lineLabel}</div>
+          <div style="font-size:15px;font-weight:600">${(DB.clients||[]).find(c=>c.id===clientId)?.name||''} ／ ${ym}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${ct.contractNo||ct.id} ／ ${ct.name||''}</div>
         </div>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          ${totalCount?`<span style="font-size:12px;color:var(--text3)">共 ${totalCount} 筆任務 ／ 完成 ${doneCount} 筆</span>`:''}
-          ${state.line?`<button class="btn btn-sm" style="font-size:11px;color:var(--red);border-color:var(--red)" onclick="_sopReset('${clientId}','${baseCtId}::${currentLine||'none'}','${ym}','${containerId||''}')">↺ 重置此月</button>`:''}
-          <button class="btn btn-sm" onclick="renderSopFlow('${clientId}','${baseCtId}::${currentLine||'none'}','${ym}','${containerId||''}')" style="font-size:11px">🔄 重整</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="_addSingleTask('${clientId}','${contractId}','${ym}')">＋ 加篇</button>
+          <button class="btn btn-sm" style="color:var(--text3)" onclick="renderMonthlyPlan('${clientId}','${contractId}','${ym}','${el.id}')">↻ 重整</button>
         </div>
       </div>
-      
-      ${stepsHtml}
-    </div>`;
-  el.innerHTML = _sopHtml;
-}
 
-// ── 專案規劃表渲染（A 線步驟1）──
-
-function _renderSopPlanTable(clientId, contractId, ym, specs, thisMonthOm, state){
-  const [yr, mo] = ym.split('-').map(Number);
-  const firstDay = new Date(yr, mo-1, 1);
-  const lastDay  = new Date(yr, mo, 0);
-  // 週監控：每月最多4週（一週7天，一月最多4個完整週）
-  const weeksRaw = Math.ceil((lastDay.getDate() + firstDay.getDay()) / 7);
-  const weeks = Math.min(weeksRaw, 4); // 一個月不超過4週
-  // contractId 可能是 lineKey（如 CT001::A），查 DB 用 baseCtId
-  const baseCtIdPT = contractId.includes('::')?contractId.split('::')[0]:contractId;
-  const ct = DB.contracts.find(c=>c.id===baseCtIdPT)||{};
-  const cutAngleDocLink = ct.driveLink||'';
-  const platformOpts = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
-
-  // 規格統計（只算開文）
-  const specStats = specs.filter(s=>_sopIsOpenPost(s.name)||_sopIsMonitor(s.name)||_sopIsGoogle(s.name)).map(s=>{
-    const done = thisMonthOm.filter(r=>r.specId===s.id&&['已上刊','觀察中','完成'].includes(r.status)).length;
-    return { ...s, done, remain:(s.qty||0)-done };
-  });
-
-  // 初次進入：只對開文/監控/Google星評預填行，純回文規格不建行
-  if(!state.planItems.length){
-    const contractStart = new Date(ct.start||ym+'-01');
-    const contractEnd   = new Date(ct.end||(yr+'-12-31'));
-    const totalMonths   = Math.max(1, Math.round((contractEnd-contractStart)/(1000*60*60*24*30)));
-
-    state.planItems = specs.flatMap(s=>{
-      const isMonitor   = _sopIsMonitor(s.name);
-      const isGoogle    = _sopIsGoogle(s.name);
-      const isOpenPost  = _sopIsOpenPost(s.name);
-      // 純回文規格不建行（回文數由開文綁定）
-      if(!isMonitor && !isGoogle && !isOpenPost) return [];
-
-      if(isMonitor){
-        const isDailyMon   = /日監控/.test(s.name);
-        const isBiWeekMon  = /雙週監控/.test(s.name);
-        let count = isDailyMon ? lastDay.getDate() : isBiWeekMon ? Math.ceil(weeks/2) : weeks;
-        return Array.from({length:count},(_,i)=>({
-          id:`pi_${s.id}_m${i}`, specId:s.id, specType:s.name,
-          taskName:`${s.name}#${i+1}`, weekNum:i+1,
-          isMonitor:true, isOpenPost:false,
-          date:'', platform:'', section:'', replyCount:0, cutAngle:'', note:''
-        }));
-      }
-
-      // 每月應執行數量：優先用 monthlyQty 欄位，否則 qty/月數（最少1）
-      const rawMonthly = Number(s.monthlyQty) || ((s.qty||1) / totalMonths);
-      const monthQty = Math.max(1, Math.round(rawMonthly));
-      return Array.from({length:monthQty},(_,i)=>({
-        id:`pi_${s.id}_${i}`, specId:s.id, specType:s.name,
-        taskName:`${s.name}#${i+1}`,
-        isOpenPost:true, isMonitor:false, isGoogle,
-        date:'', platform:'', section:'',
-        replyCount: isGoogle ? 0 : _sopDefaultReply(s.name),
-        cutAngle:'', note:''
-      }));
-    });
-  }
-
-  const rows = state.planItems;
-
-  return `
-    <div style="margin-bottom:12px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
-        依合約規格預填本月開文任務（回文數已綁定在開文行），填寫切角方向後送交客戶確認。
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-        ${specStats.map(s=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px">
-          <span style="font-weight:600">${s.name}</span> 合約${s.qty} ／完成${s.done} ／剩${s.remain}
-        </div>`).join('')}
-        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:4px 10px;font-size:11px">本月 <strong>${weeks}</strong> 週</div>
+      <!-- 進度摘要 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px">
+        ${_statBox('計畫', planned, '#6366f1')}
+        ${_statBox('已啟動', activated, '#3b82f6')}
+        ${_statBox('需行動', needAction, needAction>0?'#f97316':'#22c55e')}
+        ${_statBox('已上刊', completed, '#22c55e')}
       </div>
     </div>
-    <div style="overflow-x:auto;margin-bottom:14px">
-      <table style="width:100%;min-width:720px;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:var(--navy);color:#fff">
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap;min-width:110px">任務名稱</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">預定日期</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">論壇平台</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">版塊</th>
-          <th style="padding:8px 10px;text-align:center;white-space:nowrap">回文數</th>
-          <th style="padding:8px 10px;text-align:left;min-width:180px">切角方向</th>
-          <th style="padding:8px 10px;text-align:left;white-space:nowrap">備註</th>
-          <th style="padding:8px 4px"></th>
-        </tr></thead>
-        <tbody>
-          ${rows.map((row,idx)=>{
-            const isMon = row.isMonitor || _sopIsMonitor(row.specType);
-            const isG   = row.isGoogle  || _sopIsGoogle(row.specType);
-            return `<tr style="border-bottom:1px solid var(--border);background:${idx%2?'var(--surface2)':'#fff'}">
-              <td style="padding:6px 8px">
-                <input value="${row.taskName||''}" class="form-input" style="font-size:11px;padding:4px;width:100px;font-weight:600"
-                  data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
-                ${!isMon&&!isG?`<div style="font-size:10px;color:var(--text3);margin-top:2px">${row.specType}</div>`:`<div style="font-size:10px;color:var(--text3);margin-top:2px">${row.specType}${row.weekNum?' · 第'+row.weekNum+'週':''}</div>`}
-              </td>
-              <td style="padding:6px 8px"><input type="date" value="${row.date||''}" class="form-input" style="font-size:11px;padding:4px;width:120px" data-pi="${row.id}" data-f="date" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)"></td>
-              <td style="padding:6px 8px">${(isMon||isG)?'<span style="color:var(--text3);font-size:11px">—</span>':`<select class="form-input" style="font-size:11px;padding:4px" data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)"><option></option>${platformOpts.replace('>'+row.platform+'<',' selected>'+row.platform+'<')}</select>`}</td>
-              <td style="padding:6px 8px">${(isMon||isG)?'<span style="color:var(--text3);font-size:11px">—</span>':`<input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:11px;padding:4px;width:72px" data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">`}</td>
-              <td style="padding:6px 8px;text-align:center">${(isMon||isG)?'<span style="color:var(--text3);font-size:11px">—</span>':`<div style="display:inline-flex;align-items:center;gap:3px">
-                <button onclick="_sopReplyAdj('${clientId}','${contractId}','${ym}','${row.id}',-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center">−</button>
-                <span id="pi-reply-${row.id}" style="font-size:13px;font-weight:600;min-width:24px;text-align:center">${row.replyCount??0}</span>
-                <button onclick="_sopReplyAdj('${clientId}','${contractId}','${ym}','${row.id}',1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center">＋</button>
-              </div>`}</td>
-              <td style="padding:6px 8px">${cutAngleDocLink?`<a href="${cutAngleDocLink}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;white-space:nowrap;text-decoration:none">📄 切角DOC</a>`:`<textarea rows="2" placeholder="議題切角方向…" class="form-input" style="font-size:11px;padding:4px;width:100%;min-width:180px;resize:vertical" data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">${row.cutAngle||''}</textarea>`}</td>
-              <td style="padding:6px 8px"><input value="${row.note||''}" placeholder="備註" class="form-input" style="font-size:11px;padding:4px;width:72px" data-pi="${row.id}" data-f="note" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)"></td>
-              <td style="padding:6px 4px"><button onclick="_sopPlanDeleteRow('${clientId}','${contractId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
+
+    <!-- 任務列表 -->
+    <div style="padding:12px 16px" id="task-list-${contractId}">
+      ${tasksWithStatus.length
+        ? taskCards
+        : `<div style="text-align:center;padding:32px;color:var(--text3)">
+             本月計畫已建立，點「＋ 加篇」開始新增任務
+           </div>`}
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="_sopPlanAddRow('${clientId}','${ym}','${contractId}')">＋ 新增開文</button>
-      <button class="btn btn-sm btn-primary" onclick="_sopSubmitPlan('${clientId}','${contractId}','${ym}')">
-        📨 送交客戶確認
+
+    <!-- 浮動按鈕：加任務 -->
+    <div style="padding:0 16px 16px">
+      <button class="btn btn-sm" style="width:100%;border-style:dashed"
+        onclick="_addSingleTask('${clientId}','${contractId}','${ym}')">
+        ＋ 新增任務
       </button>
     </div>`;
 }
 
-// ── 回文數量默認值 ──
-function _sopDefaultReply(specType){
-  if(!specType) return 0;
-  if(specType==='長圖文') return 10;
-  if(specType==='短議題文'||specType==='短圖文') return 5;
-  return 0;
+function _statBox(label, val, color){
+  return `<div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+    <div style="font-size:22px;font-weight:700;color:${color}">${val}</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:2px">${label}</div>
+  </div>`;
 }
 
-// ── 判斷特殊規格 ──
-function _sopIsMonitor(specType){ return /監控|週監控/.test(specType||''); }
-function _sopIsGoogle(specType){ return /Google星評|星評/.test(specType||''); }
-// ── 判斷「開文」規格（非純回文/監控）──
-function _sopIsOpenPost(specType){
-  if(!specType) return false;
-  if(_sopIsMonitor(specType)||_sopIsGoogle(specType)) return false;
-  // 純回文/贈送/監控/報告型規格不是「開文」
-  if(/回文|監控|報告|季報|月報|按讚|追蹤|投票|KOL|KOC/.test(specType)) return false;
-  return true;
-}
-// ── 判斷「回文」規格 ──
-function _sopIsReplyType(specType){
-  return /回文/.test(specType||'') || _sopIsMonitor(specType||'');
+function _taskNeedsAction(status){
+  return ['切角進行中','文章審核中','待指派寫手','待指派帳號商'].includes(status);
 }
 
-// ── 回文數調整按鈕 ──
-function _sopReplyAdj(clientId, contractId, ym, rowId, delta){
-  const state = getSopState(clientId, ym, contractId);
-  const row = state.planItems.find(r=>r.id===rowId);
-  if(!row) return;
-  row.replyCount = Math.max(0, (row.replyCount||0)+delta);
-  // 同時嘗試 pi- 和 di- 前綴
-  ['pi-reply-','di-reply-'].forEach(pfx=>{
-    const el = document.getElementById(pfx+rowId);
-    if(el) el.textContent = row.replyCount;
-  });
-}
+// ════════════════════════════════════════════════════════════════
+//  任務卡片：每篇任務的完整生命週期顯示
+// ════════════════════════════════════════════════════════════════
 
-// ── B 線直發表單 ──
-function _renderSopDirectForm(clientId, contractId, ym, specs, state){
-  // contractId 可能是 lineKey（如 CT001::B），查 DB 用 baseCtId
-  const baseCtIdDF = contractId.includes('::')?contractId.split('::')[0]:contractId;
-  const ct = DB.contracts.find(c=>c.id===baseCtIdDF)||{};
-  const cutAngleDocLink = ct.driveLink||'';
-  const platformOpts = ['Dcard','PTT','Facebook','Threads','Mobile01','Babyhome','Google星評'].map(p=>`<option>${p}</option>`).join('');
-  const writerList = DB.freelancers.filter(f=>f.type==='口碑');
-  const writerOpts = writerList.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
-  const rows = state.planItems;
+function _renderTaskCard(task, clientId, contractId, ym){
+  const s = task._status;
+  const rel = task._rel;
+  const statusColor = {
+    '待啟動':'#94a3b8','切角進行中':'#f59e0b','待指派寫手':'#3b82f6',
+    '撰文中':'#8b5cf6','文章審核中':'#f97316','待指派帳號商':'#06b6d4',
+    '待上刊':'#eab308','已上刊':'#22c55e',
+  }[s]||'#94a3b8';
 
-  // 取得某寫手的服務項目（從 ref_freelancer_pricing 讀取，只取名稱）
-  const getWriterItems = (writerId) => {
-    const fl = (DB.freelancerPricing||DB.freelancers||[]).find(f=>f.id===writerId);
-    if(!fl) return [];
-    // fl.items 格式：[{item:'長圖文',price:1100},...] 或直接是陣列
-    let itemList = [];
-    if(Array.isArray(fl.items)) {
-      itemList = fl.items;
-    } else if(typeof fl.items === 'string') {
-      try { itemList = JSON.parse(fl.items); } catch(e){ itemList = []; }
-    }
-    // 只取名稱（排除純報告類、結算類，保留實際執行項目）
-    return itemList.filter(it=>{
-      const n = it.item||it.name||'';
-      return n && !/結算|對帳|行政/.test(n);
-    }).map(it=>({ item: it.item||it.name||'' }));
-  };
+  // 卡了幾天
+  let staleDays = '';
+  if(task.activatedAt && s!=='已上刊'){
+    const days = Math.floor((Date.now()-new Date(task.activatedAt))/(1000*60*60*24));
+    if(days>0) staleDays = `<span style="font-size:10px;color:${days>7?'#ef4444':'#f97316'};margin-left:6px">已進行 ${days} 天</span>`;
+  }
 
-  // 渲染單一發文卡片
-  const renderRow = (row, idx) => {
-    const fl = writerList.find(f=>f.id===row.writerId);
-    const writerItems = row.writerId ? getWriterItems(row.writerId) : [];
-    const itemOpts = writerItems.length
-      ? writerItems.map(it=>`<option value="${it.item}"${row.specType===it.item?' selected':''}>${it.item}</option>`).join('')
-      : `<option value="${row.specType||''}">${row.specType||'—'}</option>`;
-    return `<div id="direct-row-${row.id}" style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;background:#fff">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:700;background:#e0e7ff;color:#3730a3;padding:3px 9px;border-radius:20px;flex-shrink:0">#${idx+1}</span>
-        <input value="${row.taskName||''}" placeholder="任務名稱（可輸入主題）" class="form-input"
-          style="font-size:12px;padding:5px 8px;flex:1;min-width:100px"
-          data-pi="${row.id}" data-f="taskName" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
-        <button onclick="_sopPlanDeleteRow('${clientId}','${contractId}','${ym}','${row.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;flex-shrink:0">✕</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">指派寫手 *</div>
-          <select class="form-input" style="font-size:12px;width:100%"
-            data-pi="${row.id}" data-f="writerId"
-            onchange="_sopDirectWriterChange('${clientId}','${contractId}','${ym}','${row.id}',this.value)">
-            <option value="">— 選擇寫手 —</option>${writerOpts.replace('value="'+row.writerId+'"','value="'+row.writerId+'" selected')}
-          </select>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">服務項目 *</div>
-          ${row.writerId
-            ? `<select class="form-input" style="font-size:12px;width:100%"
-                data-pi="${row.id}" data-f="specType"
-                onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
-                <option value="">— 選擇項目 —</option>${itemOpts}
-              </select>`
-            : `<div style="padding:8px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--text3)">請先選寫手</div>`
-          }
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">論壇平台</div>
-          <select class="form-input" style="font-size:12px;width:100%"
-            data-pi="${row.id}" data-f="platform" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
-            <option value="${row.platform||''}">${row.platform||'— 選擇 —'}</option>${platformOpts}
-          </select>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">版塊</div>
-          <input value="${row.section||''}" placeholder="版塊" class="form-input" style="font-size:12px;width:100%"
-            data-pi="${row.id}" data-f="section" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;margin-bottom:8px">
-        <div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">回文數</div>
-          <div style="display:inline-flex;align-items:center;gap:4px">
-            <button onclick="_sopReplyAdj('${clientId}','${contractId}','${ym}','${row.id}',-1)"
-              style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center">−</button>
-            <span id="di-reply-${row.id}" style="font-size:14px;font-weight:700;min-width:28px;text-align:center">${row.replyCount||0}</span>
-            <button onclick="_sopReplyAdj('${clientId}','${contractId}','${ym}','${row.id}',1)"
-              style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center">＋</button>
-          </div>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">切角方向</div>
-          ${cutAngleDocLink
-            ? `<a href="${cutAngleDocLink}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#1D4ED8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 10px;text-decoration:none">📄 切角DOC</a>`
-            : `<input value="${row.cutAngle||''}" placeholder="切角方向…" class="form-input" style="font-size:12px;width:100%"
-                data-pi="${row.id}" data-f="cutAngle" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">`
-          }
-        </div>
-      </div>
-      <div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">備註</div>
-        <input value="${row.note||''}" placeholder="備註（選填）" class="form-input" style="font-size:12px;width:100%"
-          data-pi="${row.id}" data-f="note" onchange="_sopPlanEdit('${clientId}','${contractId}','${ym}',this)">
-      </div>
-    </div>`;
-  };
+  // 切角開關顯示
+  const cutBadge = task.requireCutAngle
+    ? `<span style="font-size:10px;background:#fef3c7;color:#92400E;padding:1px 6px;border-radius:10px;margin-left:4px">需切角確認</span>`
+    : '';
+
+  // 行動按鈕
+  const actionBtn = _getTaskActionBtn(task, s, clientId, contractId, ym);
+
+  // 進行紀錄摘要
+  const historySummary = _renderHistorySummary(rel);
 
   return `
-    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">直發線：逐筆新增發文，選寫手後服務項目自動帶入，指派後直接進入撰文流程。</div>
-    ${rows.map((row,idx) => renderRow(row,idx)).join('')}
-    ${!rows.length ? `<div style="text-align:center;padding:24px;border:2px dashed var(--border);border-radius:10px;color:var(--text3);margin-bottom:12px;font-size:13px">點擊「新增發文」開始建立任務</div>` : ''}
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="_sopDirectAddRow('${clientId}','${contractId}','${ym}')">＋ 新增發文</button>
-      ${rows.length ? `<button class="btn btn-primary" style="background:#0f6e56" onclick="_sopSubmitDirect('${clientId}','${contractId}','${ym}')">⚡ 確認派發寫手</button>` : ''}
+    <div id="task-card-${task.id}" style="border:1px solid var(--border);border-radius:10px;
+         margin-bottom:10px;background:var(--surface1);overflow:hidden;
+         border-left:3px solid ${statusColor}">
+      <!-- 卡片標頭 -->
+      <div style="padding:12px 14px;display:flex;align-items:flex-start;gap:10px;cursor:pointer"
+           onclick="_toggleTaskCard('${task.id}')">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+            <span style="font-size:13px;font-weight:600">${task.taskName||task.specType||'—'}</span>
+            ${cutBadge}
+            ${staleDays}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:500;color:${statusColor}">${s}</span>
+            ${rel.writer?`<span style="font-size:11px;color:var(--text3)">✍ ${rel.writer.writerName||'—'}</span>`:''}
+            ${task.dueDate?`<span style="font-size:11px;color:var(--text3)">📅 ${task.dueDate}</span>`:''}
+          </div>
+        </div>
+        <span style="font-size:11px;color:var(--text3);flex-shrink:0">▾</span>
+      </div>
+
+      <!-- 卡片展開內容（預設隱藏）-->
+      <div id="task-body-${task.id}" style="display:none;border-top:1px solid var(--border)">
+        <!-- 任務資訊 -->
+        <div style="padding:10px 14px;font-size:12px;color:var(--text2)">
+          ${task.platform?`<span>📍 ${task.platform}</span>  `:''}
+          ${task.section?`<span>版塊：${task.section}</span>  `:''}
+          ${task.assignedPlanner?`<span>👤 ${_memberName(task.assignedPlanner)}</span>  `:''}
+        </div>
+
+        <!-- 歷程紀錄 -->
+        ${historySummary}
+
+        <!-- 行動區 -->
+        <div style="padding:10px 14px;border-top:1px solid var(--border);background:var(--surface2)">
+          ${actionBtn}
+        </div>
+      </div>
     </div>`;
 }
 
-// 直發線：選寫手後重繪（更新服務項目下拉）
-function _sopDirectWriterChange(clientId, contractId, ym, rowId, writerId){
-  const state = getSopState(clientId, ym, contractId);
-  const row = state.planItems.find(r=>r.id===rowId);
-  if(row){
-    row.writerId = writerId;
-    row.specType = ''; // 清空服務項目，讓使用者重選
+function _toggleTaskCard(taskId){
+  const body = document.getElementById('task-body-'+taskId);
+  if(body) body.style.display = body.style.display==='none' ? 'block' : 'none';
+}
+
+function _memberName(memberId){
+  return (DB.members||[]).find(m=>m.id===memberId)?.name_zh || memberId || '—';
+}
+
+// ── 歷程紀錄摘要 ──
+function _renderHistorySummary(rel){
+  const items = [];
+
+  // 切角記錄
+  if(rel.cut && rel.cut.length){
+    const last = rel.cut.at(-1);
+    const icon = last.action==='approved'?'✓ 切角確認':last.action==='rejected'?'✕ 切角退回':'🔄 切角進行中';
+    items.push(`<div style="font-size:11px;color:var(--text3)">
+      <span style="color:${last.action==='approved'?'#22c55e':last.action==='rejected'?'#ef4444':'#f59e0b'}">${icon}</span>
+      （共 ${rel.cut.length} 次往返）${last.note?'：'+last.note.slice(0,30):''}
+    </div>`);
   }
-  const _sopCl=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(_sopCl);
-  renderSopFlow(clientId, ctId, ym);
-}
 
-
-function _sopSelectLine(clientId, contractId, ym, line, containerId){
-  const state = getSopState(clientId, ym, contractId);
-  state.line = line;
-  // 只有在尚未開始時才設 step=1，已有進度的不重置
-  if(!state.step || state.step < 1) state.step = 1;
-  // 記住用戶明確選線（切換合約時保持，客戶切換時清除）
-  const baseCtId = contractId.includes('::')?contractId.split('::')[0]:contractId;
-  if(!window._sopUserChoseLine) window._sopUserChoseLine = {};
-  window._sopUserChoseLine[baseCtId] = line;
-  if(!window._sopActiveLine) window._sopActiveLine = {};
-  window._sopActiveLine[baseCtId] = line;
-  renderSopFlow(clientId, contractId, ym, containerId||_sopGetContainerId());
-}
-
-function _sopToggleStep(num){
-  const body = document.getElementById('sop-step-body-'+num);
-  const arrow = document.getElementById('sop-arrow-'+num);
-  if(body){ const hidden = body.style.display==='none'; body.style.display=hidden?'':'none'; if(arrow) arrow.style.transform=hidden?'':'rotate(-90deg)'; }
-}
-
-function _sopPlanEdit(clientId, contractId, ym, el){
-  const state = getSopState(clientId, ym, contractId);
-  const id = el.dataset.pi, field = el.dataset.f;
-  const row = state.planItems.find(r=>r.id===id);
-  if(row) row[field] = el.value;
-}
-
-function _sopPlanDeleteRow(clientId, contractId, ym, rowId){
-  const state = getSopState(clientId, ym, contractId);
-  state.planItems = state.planItems.filter(r=>r.id!==rowId);
-  const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
-  const ymv = document.getElementById('sop-ym')?.value||ym;
-  renderSopFlow(cId,ctId,ymv);
-}
-
-function _sopPlanAddRow(clientId, ym, contractId){
-  const state = getSopState(clientId, ym, contractId);
-  state.planItems.push({id:'pi_'+Date.now(),specType:'',date:'',platform:'',section:'',replyRatio:5,cutAngle:'',imgLink:'',note:''});
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
-}
-
-function _sopDirectAddRow(clientId, contractId, ym){
-  const state = getSopState(clientId, ym, contractId);
-  const newIdx = state.planItems.length + 1;
-  state.planItems.push({
-    id:'di_'+Date.now(), specType:'', platform:'', section:'',
-    writerId:'', replyCount:5, cutAngle:'',
-    taskName:'新任務#'+newIdx
-  });
-  if(!contractId){ toast('請先選擇客戶','error'); return; }
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
-}
-
-// A 線：送交客戶確認 → 建立 omRecords + 狀態推進至步驟2
-function _sopSubmitPlan(clientId, contractId, ym){
-  // contractId 可能是 lineKey（CT001::A），getSopState 用完整 key，DB 查詢用 baseCtId
-  const baseCtIdSP = contractId.includes('::')?contractId.split('::')[0]:contractId;
-  const state = getSopState(clientId, ym, contractId);
-  if(!state.planItems.length){ toast('規格表尚無任務，請確認合約規格已設定'); return; }
-  const ct = DB.contracts.find(c=>c.id===baseCtIdSP)||{};
-  const cl = DB.clients.find(c=>c.id===clientId)||{};
-  // 防重複：用 taskName+specType 比對（比 sopPlanItemId 更可靠）
-  const existingA = (DB.omRecords||[]).filter(
-    r=>r.contractId===baseCtIdSP&&(r.month||'').slice(0,7)===ym&&r.sopLine==='A'
-  );
-  const existingKeys = new Set(existingA.map(r=>
-    (r.sopPlanItemId&&r.sopPlanItemId!=='')?r.sopPlanItemId:(r.taskName+'__'+r.specType)
-  ));
-  // 若已有記錄數量 >= planItems 有效行數，直接跳過（避免 key 格式不一致的漏網）
-  const validPlanCount = state.planItems.filter(row=>row.specType).length;
-  if(existingA.length >= validPlanCount){
-    if(!created){ toast('所有任務均已建立，無需重複送出','info'); }
-    state.step = 2;
-    state.planItems = [];
-    _clearSopDraft(clientId, ym, contractId);
-    renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
-    return;
+  // 文章記錄
+  if(rel.draft && rel.draft.length){
+    const last = rel.draft.at(-1);
+    const icon = last.action==='approved'?'✓ 文章通過':last.action==='rejected'?'✕ 文章退回':last.action==='revision'?'🔄 修改中':'📄 已送稿';
+    items.push(`<div style="font-size:11px;color:var(--text3)" style="margin-top:4px">
+      <span style="color:${last.action==='approved'?'#22c55e':last.action==='rejected'||last.action==='revision'?'#f97316':'#8b5cf6'}">${icon}</span>
+      （共 ${rel.draft.length} 次往返）${last.note?'：'+last.note.slice(0,30):''}
+    </div>`);
   }
-  let created = 0;
-  state.planItems.forEach(row=>{
-    if(!row.specType) return;
-    // 同時用 row.id 和 taskName+specType 比對，任一命中就跳過
-    const keyById = row.id||'';
-    const keyByName = (row.taskName||row.specType)+'__'+row.specType;
-    if((keyById && existingKeys.has(keyById)) || existingKeys.has(keyByName)) return;
-    const id = genOmId(cl.name);
-    const rec = {
-      id, contractId:baseCtIdSP, clientId, clientName:cl.name||'',
-      month:ym, specType:row.specType,
-      specId:row.specId||'',
-      taskName:row.taskName||row.specType||'',
-      platform:row.platform||'',
-      section:row.section||'', actionType:_sopIsOpenPost(row.specType)?'開文':'回文',
-      title:row.taskName||'', content:row.cutAngle||'', driveLink:'',
-      replyCount:Number(row.replyCount)||0,
-      note:row.note||'',
-      writerId:'', writerName:'',
-      vendorId:'', vendorName:'',
-      status:'待規劃', clientConfirmStatus:'pending', clientNote:'',
-      sopLine:'A',
-      sopPlanItemId: row.id||'',
-      publishDate:row.date||'', created_at:new Date().toISOString()
-    };
-    (DB.omRecords=DB.omRecords||[]).push(rec);
-    syncToGAS('omRecords',rec).catch(()=>{});
-    created++;
-  });
-  if(!created){ toast('所有任務均已建立，無需重複送出','info'); return; }
-  state.step = 2;
-  state.planItems = []; // 清空記憶體中的 planItems，防止再次進入時重複送出
-  _clearSopDraft(clientId, ym, contractId); // 送出後清除草稿
-  toast(`✓ 已建立 ${created} 筆任務，等待客戶確認`,'success');
-  // 儀錶板通知
-  if(!DB.notifications) DB.notifications=[];
-  DB.notifications.push({ type:'sopPendingClient', clientId, ym, msg:`${cl.name} ${ym} 專案規劃待客戶確認`, created:new Date().toISOString() });
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
+
+  if(!items.length) return '';
+  return `<div style="padding:8px 14px">${items.join('')}</div>`;
 }
 
-// B 線：直接派寫手 → 建立 omRecords + 狀態「撰文中」
-function _sopSubmitDirect(clientId, contractId, ym){
-  // contractId 可能帶 ::B 後綴，strip 成 baseCtId 後查 DB
-  const baseCtIdSD = contractId.includes('::')?contractId.split('::')[0]:contractId;
-  const state = getSopState(clientId, ym, contractId);
-  const ct = DB.contracts.find(c=>c.id===baseCtIdSD)||{};
-  const cl = DB.clients.find(c=>c.id===clientId)||{};
-  const validRows = state.planItems.filter(row=>row.writerId && row.specType);
-  const missingWriter = state.planItems.filter(row=>!row.writerId);
-  const missingType   = state.planItems.filter(row=>row.writerId && !row.specType);
-  if(!state.planItems.length){ toast('請先新增發文'); return; }
-  if(missingWriter.length){ toast(`發文 #${state.planItems.indexOf(missingWriter[0])+1} 尚未選擇寫手`); return; }
-  if(missingType.length){ toast(`發文 #${state.planItems.indexOf(missingType[0])+1} 尚未選擇服務項目`); return; }
-  if(!validRows.length){ toast('請確認每筆發文都已選擇寫手和服務項目'); return; }
+// ── 行動按鈕：依狀態顯示對應操作 ──
+function _getTaskActionBtn(task, status, clientId, contractId, ym){
+  const id = task.id;
+  const refreshCall = `renderMonthlyPlan('${clientId}','${contractId}','${ym}','${document.getElementById('sop-contract-body')?'sop-contract-body':'sop-om-content'}')`;
 
-  // 防重複：過濾掉已有對應 planItem id 記錄的
-  const existingIds = new Set((DB.omRecords||[]).filter(r=>r.sopPlanItemId).map(r=>r.sopPlanItemId));
-  const newRows = validRows.filter(row=>!existingIds.has(row.id));
-  if(!newRows.length){ toast('所有任務均已建立，如需追加請新增發文行'); return; }
+  switch(status){
+    case '待啟動':
+      return `<div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary btn-sm" onclick="_activateTask('${id}','${clientId}','${contractId}','${ym}')">▶ 啟動任務</button>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="cut-toggle-${id}" ${task.requireCutAngle?'checked':''}
+            onchange="_toggleCutAngle('${id}',this.checked,'${clientId}','${contractId}','${ym}')">
+          需要切角確認
+        </label>
+        ${_dueDateInput(id, task.dueDate, clientId, contractId, ym)}
+      </div>`;
 
-  let created=0;
-  newRows.forEach(row=>{
-    const fl = DB.freelancers.find(f=>f.id===row.writerId);
-    const id = genOmId(cl.name);
-    const rec = {
-      id, contractId:baseCtIdSD, clientId, clientName:cl.name||'',
-      month:ym, specType:row.specType,
-      sopPlanItemId: row.id,   // 記錄 planItem id，防重複派發
-      taskName:row.taskName||row.specType||'',
-      platform:row.platform||'',
-      section:row.section||'', actionType:_sopIsOpenPost(row.specType)?'開文':'回文',
-      title:row.taskName||row.specType||'', content:row.cutAngle||'', driveLink:'',
-      replyCount:Number(row.replyCount)||0,
-      note:row.note||'',
-      writerId:row.writerId||'', writerName:fl?.name||'',
-      vendorId:'', vendorName:'',
-      status:'撰文中',
-      clientConfirmStatus:'', clientNote:'',
-      sopLine:'B',
-      created_at:new Date().toISOString()
-    };
-    (DB.omRecords=DB.omRecords||[]).push(rec);
-    syncToGAS('omRecords',rec).catch(()=>{});
-    created++;
-  });
-  // 推進至步驟2（等待寫手）
-  state.step = 2;
-  _clearSopDraft(clientId, ym, contractId); // 送出後清除草稿
-  toast(`✓ 已建立 ${created} 筆任務，通知寫手中`,'success');
-  if(!DB.notifications) DB.notifications=[];
-  DB.notifications.push({ id:'SOP_B_'+Date.now(), type:'writersWorking', clientId, contractId, ym, msg:`${cl.name} ${ym} 寫手撰文中（${created} 筆）`, created:new Date().toISOString(), done:false });
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
-}
+    case '切角進行中':
+      return `<div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">等待客戶確認切角方向。每次往返均留存紀錄。</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="_openCutAngleFlow('${id}','${clientId}','${contractId}','${ym}')">✏️ 填寫切角 / 查看往返</button>
+        </div>
+      </div>`;
 
-// A 線步驟2：企劃端逐筆確認（代客戶操作）
-function _sopClientConfirm(taskId, status){
-  const r = (DB.omRecords||[]).find(x=>x.id===taskId);
-  if(!r){ toast('找不到任務記錄'); return; }
-  r.clientConfirmStatus = status;
-  if(status==='confirmed'){
-    r.status = '切角確認';
-    r.cutAngleDate = new Date().toISOString().slice(0,10); // 切角確認日期
-    r.confirmedAt = new Date().toISOString();
-    r.confirmedBy = 'client';
-    // 加修正歷程（不清除，做為來回紀錄）
-    if(!r.reviewHistory) r.reviewHistory=[];
-    r.reviewHistory.push({action:'confirmed',by:'client',at:new Date().toISOString(),note:r.clientNote||''});
-  } else if(status==='rejected'){
-    r.status = '待規劃';
-    // 加修正歷程
-    if(!r.reviewHistory) r.reviewHistory=[];
-    r.reviewHistory.push({action:'rejected',by:'client',at:new Date().toISOString(),note:r.clientNote||''});
-    // 通知企劃
-    if(!DB.notifications) DB.notifications=[];
-    DB.notifications.push({
-      id:'CREJ_'+Date.now(), type:'clientRejected', taskId,
-      msg:'客戶退回切角：'+(r.taskName||r.specType||'')+'：'+(r.clientNote||'（無意見）'),
-      created:new Date().toISOString(), done:false
-    });
+    case '待指派寫手':
+      return `<div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">切角已確認，指派寫手後進入撰文。</div>
+        ${_writerSelect(id, clientId, contractId, ym)}
+      </div>`;
+
+    case '撰文中':
+      return `<div style="font-size:12px;color:#8b5cf6">
+        ✍ ${task._rel.writer?.writerName||'—'} 撰文中，等待回稿。
+        ${task._rel.writer?.assignedAt?`<span style="color:var(--text3)">（${task._rel.writer.assignedAt.slice(0,10)} 指派）</span>`:''}
+      </div>`;
+
+    case '文章審核中':
+      return `<div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">寫手已送回稿件，審核通過才可指派帳號商。</div>
+        <button class="btn btn-primary btn-sm" onclick="_openDraftFlow('${id}','${clientId}','${contractId}','${ym}')">📝 審核文章 / 查看往返</button>
+      </div>`;
+
+    case '待指派帳號商':
+      return `<div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">文章已通過，指派帳號商後進入上刊。</div>
+        ${_vendorSelect(id, clientId, contractId, ym)}
+      </div>`;
+
+    case '待上刊':
+      return `<div style="font-size:12px;color:#eab308">
+        🕐 等待帳號商回報上刊結果。
+        <button class="btn btn-sm" style="margin-left:8px" onclick="_confirmPublish('${id}','${clientId}','${contractId}','${ym}')">✓ 確認上刊</button>
+      </div>`;
+
+    case '已上刊':
+      return `<div style="font-size:12px;color:#22c55e">✓ 已上刊完成 ${task.publishedAt?'（'+task.publishedAt.slice(0,10)+'）':''}</div>`;
+
+    default:
+      return `<div style="font-size:12px;color:var(--text3)">—</div>`;
   }
-  syncToGAS('omRecords',r).catch(()=>{});
-  // 刷新 SOP 頁
-  _sopRefreshFromRecord(r);
-  // 刷新儀錶板（讓待辦進度同步）
-  if(typeof renderHome==='function') setTimeout(renderHome, 300);
 }
 
-function _sopSaveClientNote(taskId, note){
-  const r = (DB.omRecords||[]).find(x=>x.id===taskId);
-  if(r){ r.clientNote=note; syncToGAS('omRecords',r).catch(()=>{}); }
+function _dueDateInput(taskId, current, clientId, contractId, ym){
+  return `<input type="date" value="${current||''}" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px"
+    onchange="_setTaskDueDate('${taskId}',this.value,'${clientId}','${contractId}','${ym}')"
+    title="截止日">`;
 }
 
-// 企劃修正後重新送出給客戶（退回 → 修改 → 重置為 pending）
-function _sopResubmitToClient(taskId){
-  const r = (DB.omRecords||[]).find(x=>x.id===taskId);
-  if(!r) return;
-  // 先儲存企劃修正後的切角 textarea 內容（如有）
-  const newCutAngle = document.getElementById('planner-cutangle-'+taskId)?.value;
-  if(newCutAngle) r.content = newCutAngle;
-  r.clientConfirmStatus = 'pending'; // 重置為待確認
-  r.clientNote = '';                  // 清除客戶意見，但保留 reviewHistory
-  r.status = '待規劃';
-  // 加修正歷程
-  if(!r.reviewHistory) r.reviewHistory=[];
-  r.reviewHistory.push({action:'resubmit',by:'planner',at:new Date().toISOString(),content:r.content||''});
-  syncToGAS('omRecords',r).catch(()=>{});
-  toast('已重新送交客戶確認','success');
-  // 刷新 SOP 頁（用 _sopRefreshFromRecord 確保 lineKey 正確）
-  _sopRefreshFromRecord(r);
-  // 不強制刷新客戶頁，避免跳頁
+function _writerSelect(taskId, clientId, contractId, ym){
+  const writers = (DB.freelancerPricing||[]);
+  const options = writers.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+  return `<div style="display:flex;gap:8px;align-items:center">
+    <select id="writer-sel-${taskId}" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+      <option value="">— 選擇寫手 —</option>
+      <option value="INTERNAL">內部產出</option>
+      ${options}
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="_assignWriter('${taskId}','${clientId}','${contractId}','${ym}')">指派</button>
+  </div>`;
 }
 
-function _sopStep2Complete(clientId, contractId, ym){
-  const state = getSopState(clientId, ym, contractId);
-  state.step = (state.line==='A') ? 3 : 2;
-  _sopMarkNoticesDone(clientId, ym, 'sopPendingClient');
-  if(typeof renderHome==='function') setTimeout(renderHome, 300);
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
+function _vendorSelect(taskId, clientId, contractId, ym){
+  const vendors = (DB.vendorCompanies||[]);
+  const options = vendors.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  return `<div style="display:flex;gap:8px;align-items:center">
+    <select id="vendor-sel-${taskId}" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+      <option value="">— 選擇帳號商 —</option>
+      ${options}
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="_assignVendor('${taskId}','${clientId}','${contractId}','${ym}')">指派</button>
+  </div>`;
 }
 
-function _sopStepNext(clientId, contractId, ym){
-  const state = getSopState(clientId, ym, contractId);
-  state.step++;
-  _sopMarkNoticesDone(clientId, ym, 'writersWorking');
-  _sopMarkNoticesDone(clientId, ym, 'draftSubmitted');
-  if(typeof renderHome==='function') setTimeout(renderHome, 300);
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
-}
-function _sopMarkNoticesDone(clientId, ym, type){
-  (DB.notifications||[]).forEach(n=>{
-    if(n.clientId===clientId && (n.ym||'').slice(0,7)===(ym||'').slice(0,7) && n.type===type){
-      n.done = true;
-    }
-  });
-}
+// ════════════════════════════════════════════════════════════════
+//  任務操作函式
+// ════════════════════════════════════════════════════════════════
 
-function _sopGetActiveContractId(clientId){
-  // 取目前 sop 頁面顯示的合約 ID
-  if(!clientId) clientId = document.getElementById('sop-client')?.value||'';
-  return window._sopActiveContractId?.[clientId] ||
-    (DB.contracts.filter(c=>c.clientId===clientId&&c.status==='進行中')[0]?.id) || '';
-}
-
-// 從任意 omRecord 取回 lineKey，並刷新對應的 SOP 頁
-function _sopRefreshFromRecord(r){
-  // 只有當企劃在 sop-om 頁面且合約/客戶吻合時才重渲染
-  const sopPage = document.getElementById('page-sop-om');
-  if(!sopPage || !sopPage.classList.contains('active')) return;
-  const ym = document.getElementById('sop-ym')?.value||'';
-  const cId = r.clientId||'';
-  const baseCtId = r.contractId||'';
-  if(!cId||!baseCtId||!ym) return;
-  // 取線別：只用 _sopUserChoseLine（用戶已選的），不用 r.sopLine 強制覆蓋
-  // 避免 A線記錄的通知把 B線記憶蓋掉
-  const activeLine = window._sopUserChoseLine?.[baseCtId] || r.sopLine || 'A';
-  if(!window._sopUserChoseLine) window._sopUserChoseLine = {};
-  if(!window._sopActiveLine) window._sopActiveLine = {};
-  window._sopUserChoseLine[baseCtId] = activeLine;
-  window._sopActiveLine[baseCtId] = activeLine;
-  const lineKey = baseCtId+'::'+activeLine;
-  renderSopFlow(cId, lineKey, ym, _sopGetContainerId());
-}
-function _sopGetContainerId(){
+function _getContainerId(contractId){
   return document.getElementById('sop-contract-body') ? 'sop-contract-body' : 'sop-om-content';
 }
-function _sopAssignWriter(taskId){
-  const writerId = document.getElementById('sw-writer-'+taskId)?.value;
-  if(!writerId){ toast('請選擇寫手'); return; }
-  const r=(DB.omRecords||[]).find(x=>x.id===taskId); if(!r) return;
-  const fl=DB.freelancers.find(f=>f.id===writerId);
-  r.writerId=writerId; r.writerName=fl?.name||''; r.status='撰文中';
-  r.assignDate = new Date().toISOString().slice(0,10); // 派發日期
-  // 讀取個別欄位
-  const platform=document.getElementById('sw-platform-'+taskId)?.value; if(platform) r.platform=platform;
-  const section=document.getElementById('sw-section-'+taskId)?.value; if(section) r.section=section;
-  const note=document.getElementById('sw-note-'+taskId)?.value; if(note) r.note=note;
-  syncToGAS('omRecords',r).catch(()=>{});
-  toast(`✓ 已指派 ${fl?.name||''}`,'success');
-  const ym=document.getElementById('sop-ym')?.value||'';
-  const clientId=r.clientId||'', contractId=r.contractId||'';
-  setTimeout(()=>{ if(clientId&&contractId&&ym) renderSopFlow(clientId,contractId,ym,_sopGetContainerId()); },200);
-}
 
-function _sopBatchAssignWriter(specType, clientId, contractId, ym){
-  const key = specType.replace(/\s/g,'_');
-  const writerId = document.getElementById('sw-batch-writer-'+key)?.value;
-  const platform = document.getElementById('sw-batch-platform-'+key)?.value||'';
-  const section  = document.getElementById('sw-batch-section-'+key)?.value||'';
-  if(!writerId){ toast('請先選擇批次寫手'); return; }
-  const fl = (DB.freelancerPricing||DB.freelancers||[]).find(f=>f.id===writerId);
-  const targets = (DB.omRecords||[]).filter(r=>
-    r.clientId===clientId && (r.month||'').slice(0,7)===ym &&
-    r.specType===specType && !r.writerId && ['待規劃','切角確認','待派寫手'].includes(r.status)
-  );
-  if(!targets.length){ toast('此規格無待指派任務'); return; }
-  targets.forEach(r=>{
-    r.writerId=writerId; r.writerName=fl?.name||''; r.status='撰文中';
-    r.assignDate = new Date().toISOString().slice(0,10);
-    if(platform) r.platform=platform;
-    if(section)  r.section=section;
-    syncToGAS('omRecords',r).catch(()=>{});
-  });
-  toast(`✓ 已批次指派 ${targets.length} 筆給 ${fl?.name||''}`,'success');
-  setTimeout(()=>renderSopFlow(clientId, contractId, ym), 200);
-}
-
-function _sopStep2PartialContinue(clientId, contractId, ym){
-  if(!confirm('確定先以已確認的部分繼續進行步驟3？未確認的任務狀態不變。')) return;
-  const state = getSopState(clientId, ym, contractId);
-  state.step = 3;
-  state.partialConfirm = true;
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
-}
-
-function _sopStep3PartialContinue(clientId, contractId, ym){
-  if(!confirm('確定先以已指派的部分繼續進行步驟4？未指派的任務可繼續回來處理。')) return;
-  const state = getSopState(clientId, ym, contractId);
-  state.step = 4;
-  renderSopFlow(clientId, contractId, ym, _sopGetContainerId());
-}
-
-function _sopSaveNote(taskId, inputId){
-  const r=(DB.omRecords||[]).find(x=>x.id===taskId);
-  if(!r) return;
-  r.note=document.getElementById(inputId)?.value||'';
-  syncToGAS('omRecords',r).catch(()=>{});
-  toast('備註已儲存','success');
-}
-
-
-function _sopMarkAllSopNoticesDone(clientId, ym){
-  ['sopPendingClient','writersWorking','draftSubmitted'].forEach(t=>_sopMarkNoticesDone(clientId, ym, t));
+function _refreshPlan(clientId, contractId, ym){
+  renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId));
   if(typeof renderHome==='function') setTimeout(renderHome, 300);
 }
 
-function _sopAssignVendor(taskId, contractId, ym){
-  const vendorId=document.getElementById('sv-vendor-'+taskId)?.value;
-  if(!vendorId){ toast('請選擇帳號商'); return; }
-  const r=(DB.omRecords||[]).find(x=>x.id===taskId); if(!r) return;
-  const vc=(DB.vendorCompanies||[]).find(v=>v.id===vendorId);
-  r.vendorId=vendorId; r.vendorName=vc?.name||''; r.status='待上刊';
-  syncToGAS('omRecords',r).catch(()=>{});
-  toast(`✓ 已指派 ${vc?.name||''}`,'success');
-  const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
-  const ymv=document.getElementById('sop-ym')?.value||ym;
-  setTimeout(()=>renderSopFlow(cId,ctId||contractId,ymv),200);
+// 啟動任務
+function _activateTask(taskId, clientId, contractId, ym){
+  const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
+  if(!task) return;
+  const needCut = document.getElementById('cut-toggle-'+taskId)?.checked || false;
+  const dueDate = document.getElementById('due-'+taskId)?.value || '';
+  task.activatedAt = new Date().toISOString();
+  task.requireCutAngle = needCut;
+  task.dueDate = dueDate;
+  syncToGAS('tasks', task).catch(()=>{});
+  _refreshPlan(clientId, contractId, ym);
+  toast('任務已啟動', 'success');
 }
 
-function _sopBatchAssignVendor(specType, clientId, ym, contractId){
-  const key = specType.replace(/[^a-zA-Z0-9]/g,'_');
-  const vendorId = document.getElementById('sv-batch-vendor-'+key)?.value;
-  if(!vendorId){ toast('請先選擇批次帳號商'); return; }
-  const vc = (DB.vendorCompanies||[]).find(v=>v.id===vendorId);
-  const targets = (DB.omRecords||[]).filter(r=>
-    r.clientId===clientId && (r.month||'').slice(0,7)===ym &&
-    r.specType===specType && r.status==='待派帳號商'
+// 切換切角開關
+function _toggleCutAngle(taskId, checked, clientId, contractId, ym){
+  const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
+  if(!task) return;
+  task.requireCutAngle = checked;
+  syncToGAS('tasks', task).catch(()=>{});
+}
+
+// 設截止日
+function _setTaskDueDate(taskId, date, clientId, contractId, ym){
+  const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
+  if(!task) return;
+  task.dueDate = date;
+  syncToGAS('tasks', task).catch(()=>{});
+}
+
+// 指派寫手
+function _assignWriter(taskId, clientId, contractId, ym){
+  const sel = document.getElementById('writer-sel-'+taskId);
+  if(!sel || !sel.value){ toast('請選擇寫手', 'warning'); return; }
+  const writer = sel.value==='INTERNAL'
+    ? { id:'INTERNAL', name:'內部產出' }
+    : (DB.freelancerPricing||[]).find(w=>w.id===sel.value);
+  if(!writer) return;
+
+  const assignment = {
+    id: 'WA_'+Date.now().toString(36),
+    taskId, writerId: writer.id, writerName: writer.name,
+    assignedAt: new Date().toISOString(),
+    assignedBy: window.myMember?.id||'',
+  };
+  if(!DB.writerAssignments) DB.writerAssignments = [];
+  // 移除舊的指派（重新指派）
+  DB.writerAssignments = DB.writerAssignments.filter(a=>a.taskId!==taskId);
+  DB.writerAssignments.push(assignment);
+  syncToGAS('writer_assignments', assignment).catch(()=>{});
+  _refreshPlan(clientId, contractId, ym);
+  toast(`已指派 ${writer.name}`, 'success');
+}
+
+// 指派帳號商
+function _assignVendor(taskId, clientId, contractId, ym){
+  const sel = document.getElementById('vendor-sel-'+taskId);
+  if(!sel || !sel.value){ toast('請選擇帳號商', 'warning'); return; }
+  const vendor = (DB.vendorCompanies||[]).find(v=>v.id===sel.value);
+  if(!vendor) return;
+
+  const assignment = {
+    id: 'VA_'+Date.now().toString(36),
+    taskId, vendorId: vendor.id, vendorName: vendor.name,
+    assignedAt: new Date().toISOString(),
+    assignedBy: window.myMember?.id||'',
+    confirmedAt: '',
+  };
+  if(!DB.vendorAssignments) DB.vendorAssignments = [];
+  DB.vendorAssignments = DB.vendorAssignments.filter(a=>a.taskId!==taskId);
+  DB.vendorAssignments.push(assignment);
+  syncToGAS('vendor_assignments', assignment).catch(()=>{});
+  _refreshPlan(clientId, contractId, ym);
+  toast(`已指派 ${vendor.name}`, 'success');
+}
+
+// 確認上刊
+function _confirmPublish(taskId, clientId, contractId, ym){
+  const assignment = (DB.vendorAssignments||[]).find(a=>a.taskId===taskId);
+  if(!assignment){ toast('找不到帳號商指派記錄', 'error'); return; }
+  assignment.confirmedAt = new Date().toISOString();
+  syncToGAS('vendor_assignments', assignment).catch(()=>{});
+  const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
+  if(task){ task.publishedAt = new Date().toISOString().slice(0,10); syncToGAS('tasks', task).catch(()=>{}); }
+  _refreshPlan(clientId, contractId, ym);
+  toast('✓ 已確認上刊', 'success');
+}
+
+// 產生月度計畫
+function _generatePlan(clientId, contractId, ym){
+  if(window._testMode){
+    _testInitPlan(clientId, contractId, ym);
+    renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId));
+    toast('測試模式：月度計畫已建立', 'success');
+    return;
+  }
+  gasApi('generateMonthlyPlan', { clientId, contractId, ym, createdBy: window.myMember?.id||'' })
+    .then(r=>{
+      if(r.ok||r.data?.ok){
+        return loadAllData();
+      } else { toast(r.error||'建立失敗','error'); }
+    })
+    .then(()=>renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId)))
+    .catch(e=>toast('建立失敗：'+e.message,'error'));
+}
+
+// 新增單篇任務
+function _addSingleTask(clientId, contractId, ym){
+  const specs = (DB.specItems||[]).filter(s=>s.contractId===contractId&&(s.category==='口碑'||!s.category));
+  const specOpts = specs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+
+  // 顯示 modal
+  showModal(`
+    <h3 style="margin-bottom:16px">新增單篇任務</h3>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">規格</label>
+        <select id="new-task-spec" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
+          <option value="">— 選擇規格 —</option>
+          ${specOpts}
+          <option value="__custom">自訂（不套規格）</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">任務名稱</label>
+        <input id="new-task-name" type="text" placeholder="例：週監控#5" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">截止日</label>
+        <input id="new-task-due" type="date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="new-task-cut"> 需要切角確認
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="new-task-extra"> 臨時加發（不計入計畫量）
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="_submitNewTask('${clientId}','${contractId}','${ym}')">新增</button>
+    </div>
+  `);
+}
+
+function _submitNewTask(clientId, contractId, ym){
+  const specId   = document.getElementById('new-task-spec')?.value||'';
+  const taskName = document.getElementById('new-task-name')?.value.trim()||'';
+  const dueDate  = document.getElementById('new-task-due')?.value||'';
+  const needCut  = document.getElementById('new-task-cut')?.checked||false;
+  const isExtra  = document.getElementById('new-task-extra')?.checked||false;
+
+  const spec = (DB.specItems||[]).find(s=>s.id===specId);
+  const task = {
+    id: 'T_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    planId: '', contractId, clientId,
+    specType: spec?.name||'自訂',
+    taskName: taskName||(spec?.name||'新任務'),
+    requireCutAngle: needCut,
+    isExtraTask: isExtra,
+    dueDate, activatedAt: '',
+    assignedPlanner: window.myMember?.id||'',
+    coPlanner: '', platform: '', section: '', publishedAt: '',
+    createdAt: new Date().toISOString(),
+  };
+
+  if(!DB.ops_tasks) DB.ops_tasks = [];
+  DB.ops_tasks.push(task);
+  syncToGAS('tasks', task).catch(()=>{});
+  closeModal();
+  renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId));
+  toast('任務已新增', 'success');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  切角迴圈 UI
+// ════════════════════════════════════════════════════════════════
+
+function _openCutAngleFlow(taskId, clientId, contractId, ym){
+  const task = (DB.ops_tasks||[]).find(t=>t.id===taskId)||{};
+  const history = (DB.cutAngleHistory||[]).filter(h=>h.taskId===taskId);
+  const lastApproved = history.find(h=>h.action==='approved');
+  const rounds = {};
+  history.forEach(h=>{ if(!rounds[h.round]) rounds[h.round]=[]; rounds[h.round].push(h); });
+
+  const historyHtml = Object.keys(rounds).sort((a,b)=>a-b).map(round=>{
+    const items = rounds[round];
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">第 ${round} 輪</div>
+      ${items.map(h=>`
+        <div style="padding:4px 0;font-size:12px;display:flex;gap:6px">
+          <span style="color:${h.action==='approved'?'#22c55e':h.action==='rejected'?'#ef4444':'#6366f1'};flex-shrink:0">
+            ${h.action==='approved'?'✓ 確認':h.action==='rejected'?'✕ 退回':h.action==='submitted'?'→ 送審':'📝 修改'}
+          </span>
+          <span style="color:var(--text2)">${h.by==='client'?'客戶':h.by==='planner'?'企劃':'—'}</span>
+          <span style="color:var(--text3)">${h.createdAt?.slice(0,10)||''}</span>
+          ${h.content?`<span style="color:var(--text2)">${h.content.slice(0,40)}</span>`:''}
+          ${h.note?`<span style="color:var(--text3)">：${h.note.slice(0,30)}</span>`:''}
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  const round = (Math.max(0, ...history.map(h=>Number(h.round)||0))) + (lastApproved?0:1);
+
+  showModal(`
+    <h3 style="margin-bottom:4px">切角審核</h3>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px">${task.taskName||task.specType||'—'}</div>
+
+    ${history.length?`
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px">往返記錄（${history.length} 次）</div>
+        ${historyHtml}
+      </div>`:''}
+
+    ${lastApproved?`
+      <div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:#166534">
+        ✓ 切角已確認通過（第 ${lastApproved.round} 輪）
+      </div>`:``}
+
+    ${!lastApproved?`
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">本輪切角方向</label>
+        <textarea id="cut-content-${taskId}" rows="3" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical" placeholder="填寫切角方向..."></textarea>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">備註（選填）</label>
+        <input id="cut-note-${taskId}" type="text" placeholder="額外說明..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="_submitCutAngle('${taskId}','submitted','${clientId}','${contractId}','${ym}',${round})">→ 送客戶審核</button>
+        <button class="btn btn-primary btn-sm" onclick="_submitCutAngle('${taskId}','approved','${clientId}','${contractId}','${ym}',${round})">✓ 直接確認（不需客戶審核）</button>
+      </div>`:`
+      <div style="font-size:12px;color:var(--text3)">切角已通過，寫手可依切角方向撰文。</div>
+    `}
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn btn-sm" onclick="closeModal()">關閉</button>
+    </div>
+  `);
+}
+
+function _submitCutAngle(taskId, action, clientId, contractId, ym, round){
+  const content = document.getElementById('cut-content-'+taskId)?.value.trim()||'';
+  const note    = document.getElementById('cut-note-'+taskId)?.value.trim()||'';
+  if(action==='submitted' && !content){ toast('請填寫切角方向', 'warning'); return; }
+
+  const record = {
+    id:     'CA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    taskId, round: Number(round)||1,
+    action, by: 'planner',
+    content, note,
+    createdAt: new Date().toISOString(),
+  };
+  if(!DB.cutAngleHistory) DB.cutAngleHistory = [];
+  DB.cutAngleHistory.push(record);
+  syncToGAS('cutangle_history', record).catch(()=>{});
+  closeModal();
+  _refreshPlan(clientId, contractId, ym);
+  toast(action==='approved'?'✓ 切角確認完成':'切角已送客戶審核', 'success');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  文章審核迴圈 UI
+// ════════════════════════════════════════════════════════════════
+
+function _openDraftFlow(taskId, clientId, contractId, ym){
+  const task    = (DB.ops_tasks||[]).find(t=>t.id===taskId)||{};
+  const history = (DB.draftHistory||[]).filter(h=>h.taskId===taskId);
+  const writer  = (DB.writerAssignments||[]).find(a=>a.taskId===taskId);
+  const lastApproved = history.slice().reverse().find(h=>h.action==='approved');
+  const rounds = {};
+  history.forEach(h=>{ if(!rounds[h.round]) rounds[h.round]=[]; rounds[h.round].push(h); });
+
+  const historyHtml = Object.keys(rounds).sort((a,b)=>a-b).map(round=>{
+    const items = rounds[round];
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">第 ${round} 輪${items.find(h=>h.draftLink)?` <a href="${items.find(h=>h.draftLink).draftLink}" target="_blank" style="color:#6366f1;font-size:10px">查看稿件 →</a>`:''}</div>
+      ${items.map(h=>`
+        <div style="padding:4px 0;font-size:12px;display:flex;gap:6px;flex-wrap:wrap">
+          <span style="color:${h.action==='approved'?'#22c55e':h.action==='rejected'?'#ef4444':h.action==='revision'?'#f97316':'#6366f1'};flex-shrink:0">
+            ${h.action==='approved'?'✓ 通過':h.action==='rejected'?'✕ 退回':h.action==='revision'?'🔄 修改中':'→ 送審'}
+          </span>
+          <span style="color:var(--text2)">${h.by==='client'?'客戶':h.by==='planner'?'企劃':h.by==='writer'?'寫手':'—'}</span>
+          <span style="color:var(--text3)">${h.createdAt?.slice(0,10)||''}</span>
+          ${h.note?`<span style="color:var(--text3)">：${h.note.slice(0,40)}</span>`:''}
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  const round = (Math.max(0, ...history.map(h=>Number(h.round)||0))) + (lastApproved?0:1);
+
+  showModal(`
+    <h3 style="margin-bottom:4px">文章審核</h3>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:4px">${task.taskName||task.specType||'—'}</div>
+    ${writer?`<div style="font-size:12px;color:var(--text3);margin-bottom:16px">✍ ${writer.writerName||'—'}</div>`:''}
+
+    ${history.length?`
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px">往返記錄（${history.length} 次）</div>
+        ${historyHtml}
+      </div>`:''}
+
+    ${lastApproved?`
+      <div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:#166534">
+        ✓ 文章已審核通過（第 ${lastApproved.round} 輪）
+      </div>`:''}
+
+    ${!lastApproved?`
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">審核意見（退回時必填）</label>
+        <textarea id="draft-note-${taskId}" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical" placeholder="填寫給寫手的修改意見..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="_submitDraftAction('${taskId}','approved','planner','${clientId}','${contractId}','${ym}',${round})">✓ 企劃直接通過</button>
+        <button class="btn btn-sm" style="border-color:#6366f1;color:#6366f1" onclick="_submitDraftAction('${taskId}','submitted','planner','${clientId}','${contractId}','${ym}',${round})">→ 送客戶審核</button>
+        <button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444" onclick="_submitDraftAction('${taskId}','rejected','planner','${clientId}','${contractId}','${ym}',${round})">✕ 退回寫手重寫</button>
+      </div>`:`
+      <div style="font-size:12px;color:var(--text3)">文章已通過，可指派帳號商。</div>
+    `}
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn btn-sm" onclick="closeModal()">關閉</button>
+    </div>
+  `);
+}
+
+function _submitDraftAction(taskId, action, by, clientId, contractId, ym, round){
+  const note = document.getElementById('draft-note-'+taskId)?.value.trim()||'';
+  if((action==='rejected'||action==='revision') && !note){ toast('退回時請填寫修改意見', 'warning'); return; }
+
+  const record = {
+    id:       'DA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    taskId, round: Number(round)||1,
+    action, by, note,
+    draftLink: '',
+    createdAt: new Date().toISOString(),
+  };
+  if(!DB.draftHistory) DB.draftHistory = [];
+  DB.draftHistory.push(record);
+  syncToGAS('draft_history', record).catch(()=>{});
+  closeModal();
+  _refreshPlan(clientId, contractId, ym);
+
+  const msgs = { approved:'✓ 文章通過', submitted:'文章已送客戶審核', rejected:'已退回寫手重寫', revision:'已標記待修改' };
+  toast(msgs[action]||'已更新', 'success');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  儀錶板待辦：讀新架構的任務
+// ════════════════════════════════════════════════════════════════
+
+function getOpsTodoBySelf(){
+  // 取自己負責的任務（新架構）
+  const myId = window.myMember?.id||'';
+  const tasks = (DB.ops_tasks||[]).filter(t=>
+    t.assignedPlanner===myId || t.coPlanner===myId
   );
-  if(!targets.length){ toast('此規格無待指派帳號商的任務'); return; }
-  targets.forEach(r=>{
-    r.vendorId=vendorId; r.vendorName=vc?.name||''; r.status='待上刊';
-    syncToGAS('omRecords',r).catch(()=>{});
-  });
-  // 清除相關通知
-  if(targets.length) _sopMarkAllSopNoticesDone(clientId, ym);
-  toast(`✓ 已批次指派 ${targets.length} 筆給 ${vc?.name||''}`,'success');
-  const cId=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(cId);
-  const ymv=document.getElementById('sop-ym')?.value||ym;
-  setTimeout(()=>renderSopFlow(cId,ctId||contractId,ymv),200);
+  return tasks.map(t=>{
+    const rel    = getTaskRelated(t.id);
+    const status = getTaskStatus(t, rel.cut, rel.draft, rel.writer, rel.vendor);
+    return {...t, _status: status, _rel: rel};
+  }).filter(t=>t._status!=='已上刊'&&t.activatedAt);
 }
 
-function _sopReset(clientId, contractIdFull, ym, containerId){
-  if(!confirm(`確定重置 ${ym} 的作業進度？（不會刪除已建立的口碑記錄）`)) return;
-  // contractIdFull 可能含 ::A 或 ::B，lineKey 就是這個
-  if(DB.sopState?.[clientId]?.[ym]?.[contractIdFull]) delete DB.sopState[clientId][ym][contractIdFull];
-  renderSopFlow(clientId, contractIdFull, ym, containerId||_sopGetContainerId());
-}
+// ════════════════════════════════════════════════════════════════
+//  syncToGAS：新表的路由對應
+// ════════════════════════════════════════════════════════════════
 
-function sopAssignWriter(taskId){_sopAssignWriter(taskId);}
-function sopAssignVendor(taskId){
-  const _sopCl2=(document.getElementById('sop-client')?.value||''); const ctId=_sopGetActiveContractId(_sopCl2);
-  const ym=document.getElementById('sop-ym')?.value||'';
-  _sopAssignVendor(taskId,ctId,ym);
-}
+// 擴充 syncToGAS 以支援新表（在現有函式外補充，不覆蓋原本）
+const _NEW_TABLE_ACTIONS = {
+  'tasks':             'saveTask',
+  'ops_tasks':         'saveTask',
+  'monthly_plans':     'saveMonthlyPlan',
+  'ops_monthly_plans': 'saveMonthlyPlan',
+  'cutangle_history':  'saveCutAngleHistory',
+  'draft_history':     'saveDraftHistory',
+  'writer_assignments':'saveWriterAssignment',
+  'vendor_assignments':'saveVendorAssignment',
+};
+
 // ════════════════════════════════════════
 //  B2 — 廠商任務批次派發（從規格頁觸發）
 // ════════════════════════════════════════
