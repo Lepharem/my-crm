@@ -4076,6 +4076,43 @@ function openModal(title,body,onConfirm,wide=false){
 }
 function closeModal(){document.getElementById('modal-overlay').style.display='none';_modalCb=null;}
 
+// ── showModal shim：讓新架構的 showModal(htmlStr) 直接用 modal-overlay ──
+function showModal(htmlStr){
+  // 直接把整個 HTML 塞進 modal-body，隱藏系統標題列和底部按鈕列
+  const overlay = document.getElementById('modal-overlay');
+  const modalEl = document.getElementById('modal');
+  const titleEl = document.getElementById('modal-title');
+  const bodyEl  = document.getElementById('modal-body');
+  const footer  = modalEl?.querySelector('.modal-foot');   // 實際 class 是 modal-foot
+  if(!overlay || !bodyEl) return;
+
+  // showModal 模式：隱藏系統的 head（標題+X按鈕）和 foot（取消+確認按鈕）
+  // 新架構的 HTML 自帶標題、按鈕，不需要系統的
+  const head = modalEl?.querySelector('.modal-head');
+  if(head) head.style.display = 'none';
+  if(footer) footer.style.display = 'none';
+  if(titleEl) titleEl.style.display = 'none';
+
+  bodyEl.innerHTML = htmlStr;
+  if(modalEl) modalEl.className = 'modal modal-wide';
+  _modalCb = null;
+  overlay.style.display = 'flex';
+}
+
+// ── 復原 modal 顯示狀態（closeModal 後 title/footer 要還原）──
+const _origCloseModal = closeModal;
+closeModal = function(){
+  _origCloseModal();
+  const titleEl = document.getElementById('modal-title');
+  const modalEl = document.getElementById('modal');
+  const footer  = modalEl?.querySelector('.modal-footer');
+  if(titleEl) titleEl.style.display = '';
+  const _foot = document.getElementById('modal')?.querySelector('.modal-foot');
+  if(_foot) _foot.style.display = '';
+  const _head = document.getElementById('modal')?.querySelector('.modal-head');
+  if(_head) _head.style.display = '';
+};
+
 // ═══ DRAWER ═══
 function openDrawer(title,sub,tabsHtml,bodyFn){
   document.getElementById('drawer-title').textContent=title;
@@ -9000,9 +9037,16 @@ function _toggleTaskCard(taskId){
 
 function _memberName(memberId){
   if(!memberId) return '—';
-  const allMembers = (window.D?.members || DB.members || []);
+  // 優先 window.D.members（HR 載入後的），fallback DB.members 或 DB.hrMembers
+  const allMembers = (window.D?.members || DB.members || DB.hrMembers || []);
   const m = allMembers.find(m=>String(m.id)===String(memberId));
-  return m?.name_zh || m?.name || memberId || '—';
+  if(m) return m.name_zh || m.name || memberId;
+  // 若 id 以 TEST_ 開頭（測試模式假 id），顯示角色名
+  if(String(memberId).startsWith('TEST_')){
+    const role = String(memberId).replace('TEST_','');
+    return {owner:'老闆',manager:'主管',employee:'企劃'}[role] || role;
+  }
+  return memberId;
 }
 
 // ── 歷程紀錄摘要 ──
@@ -9104,13 +9148,24 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
 }
 
 function _plannerSelect(taskId, currentPlannerId, clientId, contractId, ym){
-  const planners = (window.D?.members || []).filter(m=>
+  // D.members 來自 loadAllData，測試模式未登入時可能為空
+  const planners = (window.D?.members || DB.members || []).filter(m=>
     m.active===true || m.active==='TRUE' || m.active===1
   );
-  const options = planners.map(m=>`<option value="${m.id}" ${String(m.id)===String(currentPlannerId)?'selected':''}>${m.name_zh||m.name||m.id}</option>`).join('');
-  const defaultVal = currentPlannerId || window.myMember?.id || '';
+  // 自動預設為當前登入者
+  const defaultId = currentPlannerId || window.myMember?.id || '';
+  const options = planners.map(m=>`<option value="${m.id}" ${String(m.id)===String(defaultId)?'selected':''}>${m.name_zh||m.name||m.id}</option>`).join('');
+
+  if(!planners.length){
+    return `<div style="font-size:11px;color:var(--text3)">
+      企劃名單載入中…
+      <button class="btn btn-sm" style="margin-left:6px;font-size:10px"
+        onclick="loadAllData().then(()=>_refreshPlan('${clientId}','${contractId}','${ym}'))">重試</button>
+    </div>`;
+  }
+
   return `<select id="planner-sel-${taskId}"
-    style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;max-width:120px"
+    style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;max-width:140px"
     onchange="_setPlannerOnTask('${taskId}',this.value)">
     <option value="">— 指派企劃 —</option>
     ${options}
@@ -9126,7 +9181,8 @@ function _deactivateTask(taskId, clientId, contractId, ym){
   if(!confirm('確定撤銷啟動？任務將回到「待啟動」狀態。')) return;
   const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
   if(!task) return;
-  task.activatedAt = '';
+  task.activatedAt      = '';
+  task.requireCutAngle  = false;  // 同時清除切角旗標
   syncToGAS('tasks', task).catch(()=>{});
   _refreshPlan(clientId, contractId, ym);
   toast('已撤銷啟動', 'success');
