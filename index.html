@@ -9000,12 +9000,22 @@ function _renderMonthlyPlanInner(clientId, contractId, ym, el){
   const completed = tasksWithStatus.filter(t=>t._status==='已上刊').length;
   const needAction= tasksWithStatus.filter(t=>_taskNeedsAction(t._status)).length;
 
-  // ── 無計畫時，直接顯示空清單 + 加篇按鈕（不自動建規格）──
+  // ── 無計畫時，顯示加篇按鈕 ──
   if(!plans.length && !monthTasks.length){
     el.innerHTML = `
-      <div style="text-align:center;padding:40px 20px;color:var(--text3)">
-        <div style="font-size:32px;margin-bottom:12px">📝</div>
-        <div style="font-size:14px;margin-bottom:20px">${ym} 尚無任務，點「+ 加篇」新增</div>
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:15px;font-weight:600">${(DB.clients||[]).find(c=>c.id===clientId)?.name||''} ／ ${ym}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${ct.contractNo||ct.id} ／ ${ct.name||''}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="_addSingleTask('${clientId}','${contractId}','${ym}')">＋ 加篇</button>
+      </div>
+      <div style="text-align:center;padding:48px 20px;color:var(--text3)">
+        <div style="font-size:36px;margin-bottom:12px">📝</div>
+        <div style="font-size:14px;margin-bottom:24px">${ym} 尚無任務</div>
+        <button class="btn btn-primary" onclick="_addSingleTask('${clientId}','${contractId}','${ym}')">
+          ＋ 新增第一篇任務
+        </button>
       </div>`;
     return;
   }
