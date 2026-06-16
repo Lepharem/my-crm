@@ -1842,10 +1842,10 @@ async function _writerLoadTasks(){
   if(window._testMode && window.TEST_DATA){
     if(TEST_DATA.tasks.length)          DB.ops_tasks          = TEST_DATA.tasks;
     if(TEST_DATA.plans.length)          DB.ops_monthly_plans  = TEST_DATA.plans;
-    DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
-    DB.draftHistory      = TEST_DATA.draftHistory;
-    DB.writerAssignments = TEST_DATA.writerAssignments;
-    DB.vendorAssignments = TEST_DATA.vendorAssignments;
+    if(Array.isArray(TEST_DATA.cutAngleHistory)) if(Array.isArray(TEST_DATA.cutAngleHistory)) DB.cutAngleHistory = TEST_DATA.cutAngleHistory;
+    if(Array.isArray(TEST_DATA.draftHistory)) if(Array.isArray(TEST_DATA.draftHistory)) DB.draftHistory = TEST_DATA.draftHistory;
+    if(Array.isArray(TEST_DATA.writerAssignments)) DB.writerAssignments = TEST_DATA.writerAssignments;
+    if(Array.isArray(TEST_DATA.vendorAssignments)) DB.vendorAssignments = TEST_DATA.vendorAssignments;
   }
 
   const flProfile = _userProfile;
@@ -2123,10 +2123,10 @@ async function renderVendorTasks(){
     if(window._testMode && window.TEST_DATA){
       if(TEST_DATA.tasks.length)          DB.ops_tasks          = TEST_DATA.tasks;
       if(TEST_DATA.plans.length)          DB.ops_monthly_plans  = TEST_DATA.plans;
-      DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
-      DB.draftHistory      = TEST_DATA.draftHistory;
-      DB.writerAssignments = TEST_DATA.writerAssignments;
-      DB.vendorAssignments = TEST_DATA.vendorAssignments;
+      if(Array.isArray(TEST_DATA.cutAngleHistory)) if(Array.isArray(TEST_DATA.cutAngleHistory)) DB.cutAngleHistory = TEST_DATA.cutAngleHistory;
+      if(Array.isArray(TEST_DATA.draftHistory)) if(Array.isArray(TEST_DATA.draftHistory)) DB.draftHistory = TEST_DATA.draftHistory;
+      if(Array.isArray(TEST_DATA.writerAssignments)) DB.writerAssignments = TEST_DATA.writerAssignments;
+      if(Array.isArray(TEST_DATA.vendorAssignments)) DB.vendorAssignments = TEST_DATA.vendorAssignments;
     }
 
     const vcProfile  = _userProfile;
@@ -2312,10 +2312,12 @@ async function _vendorSubmitPost(taskId){
   if(task){ task.platform=platform; task.section=section; }
 
   await syncToGAS('vendor_assignments', va).catch(()=>{});
-  // 同步到 TEST_DATA（確保企劃端切回後也能讀到回報）
-  if(window._testMode && window.TEST_DATA){
+  // 同步到 TEST_DATA（Object.assign 因為 DB 和 TEST_DATA 指向同一陣列，va 已同步）
+  // 額外確認：如果 TEST_DATA.vendorAssignments 和 DB.vendorAssignments 不同陣列
+  if(window._testMode && window.TEST_DATA && TEST_DATA.vendorAssignments !== DB.vendorAssignments){
     const tdva = TEST_DATA.vendorAssignments.find(a=>a.id===va.id);
     if(tdva) Object.assign(tdva, va);
+    else TEST_DATA.vendorAssignments.push({...va});
   }
   toast('✅ 已回報上刊，等待企劃確認', 'success');
   await renderVendorTasks();
@@ -2385,10 +2387,10 @@ function renderClientDashboard(){
   if(window._testMode && window.TEST_DATA){
     if(TEST_DATA.tasks.length)          DB.ops_tasks          = TEST_DATA.tasks;
     if(TEST_DATA.plans.length)          DB.ops_monthly_plans  = TEST_DATA.plans;
-    DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
-    DB.draftHistory      = TEST_DATA.draftHistory;
-    DB.writerAssignments = TEST_DATA.writerAssignments;
-    DB.vendorAssignments = TEST_DATA.vendorAssignments;
+    if(Array.isArray(TEST_DATA.cutAngleHistory)) if(Array.isArray(TEST_DATA.cutAngleHistory)) DB.cutAngleHistory = TEST_DATA.cutAngleHistory;
+    if(Array.isArray(TEST_DATA.draftHistory)) if(Array.isArray(TEST_DATA.draftHistory)) DB.draftHistory = TEST_DATA.draftHistory;
+    if(Array.isArray(TEST_DATA.writerAssignments)) DB.writerAssignments = TEST_DATA.writerAssignments;
+    if(Array.isArray(TEST_DATA.vendorAssignments)) DB.vendorAssignments = TEST_DATA.vendorAssignments;
   }
   const cl = _userProfile;
   if(!cl){ el.innerHTML='<div style="padding:40px;text-align:center;color:#8a8680">找不到客戶資料</div>'; return; }
@@ -8882,10 +8884,10 @@ function _testInitPlan(clientId, contractId, ym){
   // 同步到 DB
   DB.ops_tasks         = TEST_DATA.tasks;
   DB.ops_monthly_plans = TEST_DATA.plans;
-  DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
-  DB.draftHistory      = TEST_DATA.draftHistory;
-  DB.writerAssignments = TEST_DATA.writerAssignments;
-  DB.vendorAssignments = TEST_DATA.vendorAssignments;
+  if(Array.isArray(TEST_DATA.cutAngleHistory)) if(Array.isArray(TEST_DATA.cutAngleHistory)) DB.cutAngleHistory = TEST_DATA.cutAngleHistory;
+  if(Array.isArray(TEST_DATA.draftHistory)) if(Array.isArray(TEST_DATA.draftHistory)) DB.draftHistory = TEST_DATA.draftHistory;
+  if(Array.isArray(TEST_DATA.writerAssignments)) DB.writerAssignments = TEST_DATA.writerAssignments;
+  if(Array.isArray(TEST_DATA.vendorAssignments)) DB.vendorAssignments = TEST_DATA.vendorAssignments;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -8918,19 +8920,14 @@ function renderSopOmPage(){
   }
 
   // 測試模式：只在尚未初始化時建立假資料（避免跳頁重置）
-  if(window._testMode){
-    if(contracts.length){
-      const _hasPlan = (DB.ops_monthly_plans||[]).some(p=>p.contractId===contracts[0].id && p.ym===ym);
-      if(!_hasPlan) _testInitPlan(clientId, contracts[0].id, ym);
-    }
-    // 每次 render 都確保 DB 與 TEST_DATA 同步（防止任何操作後的不一致）
+  // 測試模式：同步 TEST_DATA ↔ DB（不自動建計畫）
+  if(window._testMode && window.TEST_DATA){
     if(TEST_DATA.tasks.length) DB.ops_tasks = TEST_DATA.tasks;
     if(TEST_DATA.plans.length) DB.ops_monthly_plans = TEST_DATA.plans;
-    // 這四個是動態增長的，每次都要同步
-    DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
-    DB.draftHistory      = TEST_DATA.draftHistory;
-    DB.writerAssignments = TEST_DATA.writerAssignments;
-    DB.vendorAssignments = TEST_DATA.vendorAssignments;
+    if(Array.isArray(TEST_DATA.cutAngleHistory)) DB.cutAngleHistory = TEST_DATA.cutAngleHistory;
+    if(Array.isArray(TEST_DATA.draftHistory))    DB.draftHistory    = TEST_DATA.draftHistory;
+    if(Array.isArray(TEST_DATA.writerAssignments)) DB.writerAssignments = TEST_DATA.writerAssignments;
+    if(Array.isArray(TEST_DATA.vendorAssignments)) DB.vendorAssignments = TEST_DATA.vendorAssignments;
   }
 
   // 無進行中合約
@@ -8987,15 +8984,14 @@ function _renderMonthlyPlanInner(clientId, contractId, ym, el){
   const plans = (DB.ops_monthly_plans||[]).filter(p=>p.contractId===contractId && p.ym===ym);
   // 取本月任務（全部）
   const allTasks = (DB.ops_tasks||[]).filter(t=>t.contractId===contractId);
-  const monthTasks = allTasks.filter(t=>{
-    const plan = plans.find(p=>p.id===t.planId);
-    return plan || (t.ym===ym);
-  });
+  // monthTasks：屬於本合約所有任務（不強制依賴 plan，讓加篇後即時顯示）
+  const monthTasks = allTasks;
 
   // 計算各任務即時狀態
   const tasksWithStatus = monthTasks.map(t=>{
     const rel = getTaskRelated(t.id);
     const status = getTaskStatus(t, rel.cut, rel.draft, rel.writer, rel.vendor);
+
     return {...t, _status: status, _rel: rel};
   });
 
@@ -9004,20 +9000,12 @@ function _renderMonthlyPlanInner(clientId, contractId, ym, el){
   const completed = tasksWithStatus.filter(t=>t._status==='已上刊').length;
   const needAction= tasksWithStatus.filter(t=>_taskNeedsAction(t._status)).length;
 
-  // ── 無計畫時顯示初始化按鈕 ──
-  if(!plans.length){
+  // ── 無計畫時，直接顯示空清單 + 加篇按鈕（不自動建規格）──
+  if(!plans.length && !monthTasks.length){
     el.innerHTML = `
-      <div style="padding:32px;text-align:center">
-        <div style="font-size:40px;margin-bottom:16px">📋</div>
-        <div style="font-size:16px;font-weight:600;margin-bottom:8px">尚未建立本月計畫</div>
-        <div style="font-size:13px;color:var(--text3);margin-bottom:24px">${ym} 的口碑執行計畫</div>
-        <button class="btn btn-primary" onclick="_generatePlan('${clientId}','${contractId}','${ym}')">
-          📋 套用月度規格建立計畫
-        </button>
-        <span style="margin:0 12px;color:var(--text3)">或</span>
-        <button class="btn" onclick="_addSingleTask('${clientId}','${contractId}','${ym}')">
-          ＋ 新增單篇任務
-        </button>
+      <div style="text-align:center;padding:40px 20px;color:var(--text3)">
+        <div style="font-size:32px;margin-bottom:12px">📝</div>
+        <div style="font-size:14px;margin-bottom:20px">${ym} 尚無任務，點「+ 加篇」新增</div>
       </div>`;
     return;
   }
@@ -9059,9 +9047,12 @@ function _renderMonthlyPlanInner(clientId, contractId, ym, el){
           tasksWithStatus.filter(t=>t.activatedAt&&t._status!=='已上刊').forEach(t=>{
             byStatus[t._status]=(byStatus[t._status]||0)+1;
           });
+          // 帳號商已回報的待上刊任務，另外計入「待確認上刊」
+          const vReported = tasksWithStatus.filter(t=>t._status==='待上刊'&&t._rel?.vendor?.postLink).length;
           const items = Object.entries(byStatus);
-          if(!items.length) return '';
-          const sc={'切角進行中':'#f59e0b','待指派寫手':'#3b82f6','撰文中':'#8b5cf6','文章審核中':'#f97316','待指派帳號商':'#06b6d4','待上刊':'#eab308'};
+          if(!items.length && !vReported) return '';
+          const sc={'切角進行中':'#f59e0b','待指派寫手':'#3b82f6','撰文中':'#8b5cf6','文章審核中':'#f97316','待指派帳號商':'#06b6d4','待上刊':'#eab308','待確認上刊':'#22c55e'};
+          if(vReported) items.push(['待確認上刊',vReported]);
           return '<div style="display:flex;flex-wrap:wrap;gap:5px">'+
             items.map(([st,n])=>`<span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;
               background:${sc[st]||'#94a3b8'}22;color:${sc[st]||'#94a3b8'}">${st} ${n}</span>`).join('')+
@@ -9097,6 +9088,8 @@ function _statBox(label, val, color){
 
 function _taskNeedsAction(status, task){
   if(task?._deactivateRequested && ['owner','manager'].includes(window.myMember?.role||'')) return true;
+  // 帳號商已回報（postLink 有值），等企劃確認
+  if(status==='待上刊' && task?._rel?.vendor?.postLink) return true;
   return ['切角進行中','文章審核中','待指派寫手','待指派帳號商'].includes(status);
 }
 
@@ -9308,7 +9301,9 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
   const refreshCall = `renderMonthlyPlan('${clientId}','${contractId}','${ym}','${document.getElementById('sop-contract-body')?'sop-contract-body':'sop-om-content'}')`;
 
   switch(status){
-    case '待啟動':
+    case '待啟動': {
+      const _myRole = window.myMember?.role || _currentUser?.hrRole || 'employee';
+      const _isManager = ['owner','manager'].includes(_myRole);
       return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
           <input type="checkbox" id="cut-toggle-${id}" ${task.requireCutAngle?'checked':''}
@@ -9316,9 +9311,10 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
           需切角
         </label>
         ${_dueDateInput(id, task.dueDate, clientId, contractId, ym)}
-        ${_plannerSelect(id, task.assignedPlanner, clientId, contractId, ym)}
+        ${_isManager ? _plannerSelect(id, task.assignedPlanner, clientId, contractId, ym) : ''}
         <button class="btn btn-primary btn-sm" onclick="_activateTask('${id}','${clientId}','${contractId}','${ym}')">▶ 啟動</button>
       </div>`;
+    }
 
     case '切角進行中':
       return `<div>
@@ -9544,10 +9540,11 @@ function _refreshPlan(clientId, contractId, ym){
   if(window._testMode && window.TEST_DATA){
     if(TEST_DATA.tasks.length) DB.ops_tasks = TEST_DATA.tasks;
     if(TEST_DATA.plans.length) DB.ops_monthly_plans = TEST_DATA.plans;
-    DB.cutAngleHistory   = TEST_DATA.cutAngleHistory;
-    DB.draftHistory      = TEST_DATA.draftHistory;
-    DB.writerAssignments = TEST_DATA.writerAssignments;
-    DB.vendorAssignments = TEST_DATA.vendorAssignments;
+    if(Array.isArray(TEST_DATA.cutAngleHistory)) if(Array.isArray(TEST_DATA.cutAngleHistory)) DB.cutAngleHistory = TEST_DATA.cutAngleHistory;
+    if(Array.isArray(TEST_DATA.draftHistory)) if(Array.isArray(TEST_DATA.draftHistory)) DB.draftHistory = TEST_DATA.draftHistory;
+    if(Array.isArray(TEST_DATA.writerAssignments)) DB.writerAssignments = TEST_DATA.writerAssignments;
+    if(Array.isArray(TEST_DATA.vendorAssignments)) DB.vendorAssignments = TEST_DATA.vendorAssignments;
+
   }
   // 重繪當前月度計畫（關鍵！）
   renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId));
@@ -9558,6 +9555,12 @@ function _refreshPlan(clientId, contractId, ym){
 function _activateTask(taskId, clientId, contractId, ym){
   const task = (DB.ops_tasks||[]).find(t=>t.id===taskId);
   if(!task) return;
+  // 組員啟動時自動指派自己為負責企劃（主管可透過下拉另選）
+  const _myRole2 = window.myMember?.role || _currentUser?.hrRole || 'employee';
+  const _isManager2 = ['owner','manager'].includes(_myRole2);
+  if(!_isManager2 && !task.assignedPlanner){
+    task.assignedPlanner = window.myMember?.id || '';
+  }
   const needCut   = document.getElementById('cut-toggle-'+taskId)?.checked || false;
   const dueDate   = document.getElementById('due-'+taskId)?.value || '';
   const plannerId = document.getElementById('planner-sel-'+taskId)?.value || window.myMember?.id || '';
@@ -9637,8 +9640,15 @@ function _assignWriter(taskId, clientId, contractId, ym){
 function _reassignWriter(taskId, clientId, contractId, ym){
   if(!confirm('確定重新指派寫手？現有指派紀錄將被移除。')) return;
   DB.writerAssignments = (DB.writerAssignments||[]).filter(a=>a.taskId!==taskId);
-  // 同時清除所有稿件往返紀錄（重新指派等於重新開始）
-  DB.draftHistory = (DB.draftHistory||[]).filter(h=>h.taskId!==taskId);
+  DB.draftHistory      = (DB.draftHistory||[]).filter(h=>h.taskId!==taskId);
+  // 同步 TEST_DATA
+  if(window._testMode && window.TEST_DATA){
+    TEST_DATA.writerAssignments = TEST_DATA.writerAssignments.filter(a=>a.taskId!==taskId);
+    TEST_DATA.draftHistory      = TEST_DATA.draftHistory.filter(h=>h.taskId!==taskId);
+    // 重新指向（確保 DB 和 TEST_DATA 一致）
+    DB.writerAssignments = TEST_DATA.writerAssignments;
+    DB.draftHistory      = TEST_DATA.draftHistory;
+  }
   _refreshPlan(clientId, contractId, ym);
   toast('已清除寫手指派，請重新指派', 'info');
 }
@@ -9733,14 +9743,10 @@ function _confirmPublish(taskId, clientId, contractId, ym){
 
 // 產生月度計畫
 function _generatePlan(clientId, contractId, ym){
-  if(window._testMode){
-    _testInitPlan(clientId, contractId, ym);
-    // 確保 DB 同步 TEST_DATA
+  if(window._testMode && window.TEST_DATA){
+    // 測試模式：同步而非初始化
     DB.ops_tasks = TEST_DATA.tasks;
     DB.ops_monthly_plans = TEST_DATA.plans;
-    renderMonthlyPlan(clientId, contractId, ym, _getContainerId(contractId));
-    toast('測試模式：月度計畫已建立', 'success');
-    return;
   }
   gasApi('generateMonthlyPlan', { clientId, contractId, ym, createdBy: window.myMember?.id||'' })
     .then(r=>{
@@ -9819,6 +9825,20 @@ function _submitNewTask(clientId, contractId, ym){
 
   if(!DB.ops_tasks) DB.ops_tasks = [];
   DB.ops_tasks.push(task);
+  // 若無計畫記錄，同時建立一個空計畫（確保月度檢視能找到任務）
+  if(!DB.ops_monthly_plans) DB.ops_monthly_plans = [];
+  const _existPlan = DB.ops_monthly_plans.find(p=>p.contractId===contractId&&p.ym===ym);
+  if(!_existPlan){
+    const _newPlan = {id:'PLAN_'+Date.now().toString(36),contractId,clientId,ym,
+      specType:'自訂',plannedQty:0,status:'確認',createdAt:new Date().toISOString()};
+    DB.ops_monthly_plans.push(_newPlan);
+    task.planId = _newPlan.id;
+    if(window._testMode && window.TEST_DATA){
+      TEST_DATA.plans.push(_newPlan);
+      DB.ops_monthly_plans = TEST_DATA.plans;
+    }
+    syncToGAS('monthly_plans', _newPlan).catch(()=>{});
+  }
   syncToGAS('tasks', task).catch(()=>{});
   if(window._testMode && window.TEST_DATA) TEST_DATA.tasks.push(task);
   // 先關閉 modal，再輕量刷新（不跳頁）
