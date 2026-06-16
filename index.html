@@ -9213,6 +9213,9 @@ function _renderTaskCard(task, clientId, contractId, ym){
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
             <span style="font-size:13px;font-weight:600">${task.taskName||task.specType||'—'}</span>
+            ${task.specType && task.taskName && task.taskName!==task.specType
+              ? `<span style="font-size:10px;color:var(--text3);background:var(--surface2);padding:1px 5px;border-radius:4px">${task.specType}</span>`
+              : ''}
             ${cutBadge}
             ${staleDays}
           </div>
@@ -9353,9 +9356,9 @@ function _getTaskActionBtn(task, status, clientId, contractId, ym){
         ${_lastRej?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;font-size:11px;color:#7f1d1d">
           ✕ 已退回給寫手：${_lastRej.note||'（未填意見）'}
         </div>`:''}
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" style="font-size:11px"
-            onclick="_openDraftFlow('${id}','${clientId}','${contractId}','${ym}')">📝 審核 / 查看稿件往返</button>
+            onclick="_openDraftFlow('${id}','${clientId}','${contractId}','${ym}')">📝 審核 / 送審</button>
           <button class="btn btn-sm" style="font-size:11px;color:var(--text3)"
             onclick="_reassignWriter('${id}','${clientId}','${contractId}','${ym}')">重新指派</button>
         </div>
@@ -9770,60 +9773,119 @@ function _generatePlan(clientId, contractId, ym){
 
 // 新增單篇任務
 function _addSingleTask(clientId, contractId, ym){
-  const specs = (DB.specItems||[]).filter(s=>s.contractId===contractId&&(s.category==='口碑'||!s.category));
-  const specOpts = specs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  // 優先用合約的 specItems，fallback 用固定口碑服務清單
+  const contractSpecs = (DB.specItems||[]).filter(s=>
+    s.contractId===contractId && (s.category==='口碑'||!s.category||s.category==='')
+  );
 
-  // 顯示 modal（用 openModal，不用 showModal）
-  openModal('新增單篇任務', `
-    <div style="display:flex;flex-direction:column;gap:10px">
+  // 固定口碑服務類型（當 specItems 沒有時使用）
+  const FIXED_SPEC_TYPES = [
+    '長圖文','短議題文','短圖文','彈性回文','綁定回文','即時回文',
+    '週監控','口碑監控','Google星評','短題文','圖文',
+    '開文','發文','回文','按讚','追蹤','季報','其他',
+  ];
+
+  // 建立規格選項（有合約規格優先，否則用固定清單）
+  let specOptsHtml = '';
+  if(contractSpecs.length){
+    specOptsHtml = contractSpecs.map(s=>`<option value="${s.id}" data-name="${s.name}">${s.name}（合約：${s.qty}${s.unit||'篇'}）</option>`).join('');
+  } else {
+    specOptsHtml = FIXED_SPEC_TYPES.map(n=>`<option value="__type__${n}" data-name="${n}">${n}</option>`).join('');
+  }
+
+  // 計算每種規格已有幾篇（自動編號用）
+  const existingTasks = (DB.ops_tasks||[]).filter(t=>t.contractId===contractId);
+  const countByType = {};
+  existingTasks.forEach(t=>{ countByType[t.specType]=(countByType[t.specType]||0)+1; });
+
+  openModal('新增任務', `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <!-- 規格選擇 -->
       <div>
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">規格</label>
-        <select id="new-task-spec" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
-          <option value="">— 選擇規格 —</option>
-          ${specOpts}
-          <option value="__custom">自訂（不套規格）</option>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px">服務類型 *</label>
+        <select id="new-task-spec" onchange="(()=>{
+          const sel=document.getElementById('new-task-spec');
+          const nm=sel.options[sel.selectedIndex]?.dataset?.name||'';
+          if(nm){
+            const cnt=(${JSON.stringify(countByType)})[nm]||0;
+            const nameEl=document.getElementById('new-task-name');
+            if(nameEl && !nameEl.dataset.userEdited) nameEl.value=nm+'#'+(cnt+1);
+          }
+        })()"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          <option value="">— 選擇服務類型 —</option>
+          ${specOptsHtml}
+          <option value="__custom" data-name="">自訂</option>
         </select>
       </div>
+
+      <!-- 任務名稱（自動填入後可修改）-->
       <div>
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">任務名稱</label>
-        <input id="new-task-name" type="text" placeholder="例：週監控#5" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px">任務名稱 *</label>
+        <input id="new-task-name" type="text" placeholder="選擇類型後自動帶入，可修改"
+          oninput="this.dataset.userEdited='1'"
+          style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box">
       </div>
-      <div>
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">截止日</label>
-        <input id="new-task-due" type="date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
+
+      <!-- 截止日 + 需切角 -->
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px">截止日</label>
+          <input id="new-task-due" type="date"
+            style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding-bottom:8px;white-space:nowrap">
+          <input type="checkbox" id="new-task-cut"> 需切角確認
+        </label>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-        <input type="checkbox" id="new-task-cut"> 需要切角確認
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-        <input type="checkbox" id="new-task-extra"> 臨時加發（不計入計畫量）
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-        <input type="checkbox" id="new-task-repost" onchange="document.getElementById('new-task-repost-detail').style.display=this.checked?'block':'none'"> 補發任務（替代被刪文章）
-      </label>
-      <div id="new-task-repost-detail" style="display:none;margin-top:4px">
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">刪文日期</label>
-        <input id="new-task-deleted-at" type="date" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+
+      <!-- 其他選項 -->
+      <div style="display:flex;flex-direction:column;gap:6px;padding:10px;background:var(--surface2);border-radius:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="new-task-extra"> 臨時加發（不計入計畫量）
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="new-task-repost"
+            onchange="document.getElementById('new-task-repost-detail').style.display=this.checked?'block':'none'">
+          補發任務（替代被刪文章）
+        </label>
+        <div id="new-task-repost-detail" style="display:none;padding-top:4px">
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">刪文日期</label>
+          <input id="new-task-deleted-at" type="date"
+            style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+        </div>
       </div>
     </div>
   `, ()=>{ _submitNewTask('${clientId}','${contractId}','${ym}'); }, true);
 }
 
 function _submitNewTask(clientId, contractId, ym){
-  const specId   = document.getElementById('new-task-spec')?.value||'';
+  const specVal  = document.getElementById('new-task-spec')?.value||'';
   const taskName = document.getElementById('new-task-name')?.value.trim()||'';
   const dueDate  = document.getElementById('new-task-due')?.value||'';
   const needCut  = document.getElementById('new-task-cut')?.checked||false;
   const isExtra  = document.getElementById('new-task-extra')?.checked||false;
 
-  const spec = (DB.specItems||[]).find(s=>s.id===specId);
+  if(!taskName){ toast('請填寫任務名稱', 'warning'); return; }
+
+  // 解析規格：可能是 specItem id、__type__XXX、或 __custom
+  let spec = null, specType = '自訂', specId = '';
+  if(specVal.startsWith('__type__')){
+    specType = specVal.replace('__type__','');
+  } else if(specVal === '__custom' || !specVal){
+    specType = taskName.split('#')[0].trim() || '自訂';
+  } else {
+    spec = (DB.specItems||[]).find(s=>s.id===specVal);
+    specType = spec?.name || taskName.split('#')[0].trim() || '自訂';
+    specId = specVal;
+  }
   const isRepost   = document.getElementById('new-task-repost')?.checked||false;
   const deletedAt  = document.getElementById('new-task-deleted-at')?.value||'';
   const task = {
     id: 'T_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
     planId: '', contractId, clientId,
-    specType: spec?.name||'自訂',
-    taskName: taskName||(spec?.name||'新任務'),
+    specType,
+    taskName: taskName||specType||'新任務',
     requireCutAngle: needCut,
     isExtraTask: isExtra,
     isRepost, deletedAt,
@@ -10012,6 +10074,10 @@ function _openDraftFlow(taskId, clientId, contractId, ym){
 
     ${!lastApproved?`
       ${(()=>{const lastD=(DB.draftHistory||[]).filter(h=>h.taskId===taskId).at(-1);const waitPM=lastD?.action==='submitted'&&lastD?.by==='writer';return waitPM?'':`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:12px;color:#7f1d1d">已退回給寫手，等待重新送稿</div>`;})()}
+      <div style="margin-bottom:8px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">稿件連結（送客戶審核時填入）</label>
+        <input id="draft-link-${taskId}" type="url" placeholder="https://docs.google.com/..." style="width:100%;padding:7px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box">
+      </div>
       <div style="margin-bottom:12px">
         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">審核意見（退回時必填）</label>
         <textarea id="draft-note-${taskId}" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical" placeholder="填寫給寫手的修改意見..."></textarea>
@@ -10031,14 +10097,15 @@ function _openDraftFlow(taskId, clientId, contractId, ym){
 }
 
 function _submitDraftAction(taskId, action, by, clientId, contractId, ym, round){
-  const note = document.getElementById('draft-note-'+taskId)?.value.trim()||'';
+  const note  = document.getElementById('draft-note-'+taskId)?.value.trim()||'';
+  const dLink = document.getElementById('draft-link-'+taskId)?.value.trim()||'';
   if((action==='rejected'||action==='revision') && !note){ toast('退回時請填寫修改意見', 'warning'); return; }
 
   const record = {
     id:       'DA_'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
     taskId, round: Number(round)||1,
     action, by, note,
-    draftLink: '',
+    draftLink: dLink,
     createdAt: new Date().toISOString(),
   };
   if(!DB.draftHistory) DB.draftHistory = [];
