@@ -8913,7 +8913,10 @@ function renderSopOmPage(){
   const clientId  = document.getElementById('sop-client')?.value||'';
   const ym        = document.getElementById('sop-ym')?.value||'';
   const cl        = (DB.clients||[]).find(c=>c.id===clientId)||{};
-  const contracts = (DB.contracts||[]).filter(c=>c.clientId===clientId && c.status==='進行中');
+  // 測試模式下合約 status 不一定準，顯示該客戶全部合約；正式模式優先進行中
+  const _allCt = (DB.contracts||[]).filter(c=>c.clientId===clientId);
+  const _activeCt = _allCt.filter(c=>c.status==='進行中');
+  const contracts = (window._testMode || _activeCt.length===0) ? _allCt : _activeCt;
 
   // 更新 sub 標題
   const sub = document.getElementById('sop-om-sub');
@@ -8949,19 +8952,23 @@ function renderSopOmPage(){
     return;
   }
 
-  // 多合約：顯示 tab
+  // 多合約：顯示 tab（用 index 切換，避開 id 含特殊字元/空值問題）
   if(contracts.length > 1){
-    const activeCtId = window._activeContractTab?.[clientId] || contracts[0].id;
-    const tabs = contracts.map(ct=>`
-      <button class="tab-btn${ct.id===activeCtId?' active':''}"
-        onclick="window._activeContractTab=window._activeContractTab||{};window._activeContractTab['${clientId}']='${ct.id}';renderSopOmPage()"
-        style="padding:8px 16px;border:none;background:${ct.id===activeCtId?'var(--accent)':'transparent'};
-               color:${ct.id===activeCtId?'#fff':'var(--text2)'};border-radius:6px;cursor:pointer;font-size:13px;font-weight:500">
-        ${ct.contractNo||ct.id}
+    let activeIdx = window._activeContractIdx?.[clientId];
+    if(typeof activeIdx!=='number' || activeIdx<0 || activeIdx>=contracts.length) activeIdx = 0;
+    const activeCt = contracts[activeIdx];
+    const tabs = contracts.map((ct,i)=>`
+      <button class="tab-btn${i===activeIdx?' active':''}"
+        onclick="window._activeContractIdx=window._activeContractIdx||{};window._activeContractIdx['${clientId}']=${i};renderSopOmPage()"
+        style="padding:8px 16px;border:none;background:${i===activeIdx?'var(--accent)':'transparent'};
+               color:${i===activeIdx?'#fff':'var(--text2)'};border-radius:6px;cursor:pointer;font-size:13px;font-weight:500">
+        ${ct.contractNo||ct.id||('合約'+(i+1))}
       </button>`).join('');
     wrap.innerHTML = `<div style="display:flex;gap:6px;padding:12px 16px;border-bottom:1px solid var(--border)">${tabs}</div>
       <div id="sop-contract-body"></div>`;
-    renderMonthlyPlan(clientId, activeCtId, ym, 'sop-contract-body');
+    // 直接把合約物件存到 window，renderMonthlyPlan 用 id 找不到時可 fallback
+    window._sopActiveContract = activeCt;
+    renderMonthlyPlan(clientId, activeCt.id, ym, 'sop-contract-body');
   } else {
     wrap.innerHTML = `<div id="sop-contract-body"></div>`;
     renderMonthlyPlan(clientId, contracts[0].id, ym, 'sop-contract-body');
@@ -8988,8 +8995,13 @@ function renderMonthlyPlan(clientId, contractId, ym, containerId){
 }
 
 function _renderMonthlyPlanInner(clientId, contractId, ym, el){
-  const ct = (DB.contracts||[]).find(c=>c.id===contractId);
+  let ct = (DB.contracts||[]).find(c=>c.id===contractId);
+  // fallback：用 window 暫存的合約物件（避開 id 比對失敗）
+  if(!ct && window._sopActiveContract && window._sopActiveContract.id===contractId) ct = window._sopActiveContract;
+  if(!ct && window._sopActiveContract) ct = window._sopActiveContract;
   if(!ct){ el.innerHTML='<div class="empty-state" style="padding:40px"><p>找不到合約</p></div>'; return; }
+  // 統一用 ct 的真實 id（後續 task/plan 比對都以此為準）
+  contractId = ct.id;
 
   // 取本月計畫
   const plans = (DB.ops_monthly_plans||[]).filter(p=>p.contractId===contractId && p.ym===ym);
@@ -9783,6 +9795,17 @@ function _generatePlan(clientId, contractId, ym){
 }
 
 // 新增單篇任務
+function _onSpecTypeChange(){
+  const sel = document.getElementById('new-task-spec');
+  if(!sel) return;
+  const nm = sel.options[sel.selectedIndex]?.dataset?.name || '';
+  const nameEl = document.getElementById('new-task-name');
+  if(nm && nameEl && !nameEl.dataset.userEdited){
+    const cnt = (window._taskCountByType||{})[nm] || 0;
+    nameEl.value = nm + '#' + (cnt+1);
+  }
+}
+
 function _addSingleTask(clientId, contractId, ym){
   // 優先用合約的 specItems，fallback 用固定口碑服務清單
   const contractSpecs = (DB.specItems||[]).filter(s=>
@@ -9808,21 +9831,14 @@ function _addSingleTask(clientId, contractId, ym){
   const existingTasks = (DB.ops_tasks||[]).filter(t=>t.contractId===contractId);
   const countByType = {};
   existingTasks.forEach(t=>{ countByType[t.specType]=(countByType[t.specType]||0)+1; });
+  window._taskCountByType = countByType;  // 供 _onSpecTypeChange 使用
 
   openModal('新增任務', `
     <div style="display:flex;flex-direction:column;gap:12px">
       <!-- 規格選擇 -->
       <div>
         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px">服務類型 *</label>
-        <select id="new-task-spec" onchange="(()=>{
-          const sel=document.getElementById('new-task-spec');
-          const nm=sel.options[sel.selectedIndex]?.dataset?.name||'';
-          if(nm){
-            const cnt=(${JSON.stringify(countByType)})[nm]||0;
-            const nameEl=document.getElementById('new-task-name');
-            if(nameEl && !nameEl.dataset.userEdited) nameEl.value=nm+'#'+(cnt+1);
-          }
-        })()"
+        <select id="new-task-spec" onchange="_onSpecTypeChange()"
         style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px">
           <option value="">— 選擇服務類型 —</option>
           ${specOptsHtml}
@@ -9871,6 +9887,8 @@ function _addSingleTask(clientId, contractId, ym){
 }
 
 function _submitNewTask(clientId, contractId, ym){
+  // 用 window 暫存的真實合約 id（避開 tab 傳入的壞值）
+  if(window._sopActiveContract && window._sopActiveContract.id) contractId = window._sopActiveContract.id;
   const specVal  = document.getElementById('new-task-spec')?.value||'';
   const taskName = document.getElementById('new-task-name')?.value.trim()||'';
   const dueDate  = document.getElementById('new-task-due')?.value||'';
@@ -9924,7 +9942,8 @@ function _submitNewTask(clientId, contractId, ym){
   }
   syncToGAS('tasks', task).catch(()=>{});
   if(window._testMode && window.TEST_DATA) TEST_DATA.tasks.push(task);
-  // 先關閉 modal，再輕量刷新（不跳頁）
+  // 關閉 modal，再輕量刷新（不跳頁）
+  closeModal();
   setTimeout(()=>{
     _refreshPlan(clientId, contractId, ym);
     toast('任務已新增', 'success');
