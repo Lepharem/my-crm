@@ -1971,9 +1971,20 @@ function _renderWriterDashboard(){
   const el = document.getElementById('writer-content');
   if(!el) return;
   const tasks = _writerAllTasks;
-  const needAction  = tasks.filter(t=>['撰文中','文章審核中'].includes(t._status));
-  const waiting     = tasks.filter(t=>['切角進行中'].includes(t._status));
-  const done        = tasks.filter(t=>t._status==='已上刊');
+  // 接力棒：寫手只在「該他動」時才算需行動
+  // 撰文中（尚未送稿）、或被退回（rejected）→ 需行動
+  const _writerTurn = (t)=>{
+    if(t._status==='撰文中') return true;  // 還沒送稿
+    if(t._status==='文章審核中'){
+      const ld = (t._draft||[]).at(-1);
+      return ld && ld.action==='rejected';  // 被退回，需重送
+    }
+    return false;
+  };
+  const needAction  = tasks.filter(_writerTurn);
+  // 等待中：已送稿等審核、或切角進行中（等企劃/客戶）
+  const waiting     = tasks.filter(t=>!_writerTurn(t) && ['撰文中','文章審核中','切角進行中'].includes(t._status));
+  const done        = tasks.filter(t=>['已上刊','待指派帳號商','待上刊'].includes(t._status));
   const statusColor = {'撰文中':'#8b5cf6','文章審核中':'#f97316','切角進行中':'#f59e0b','已上刊':'#22c55e','待上刊':'#eab308'};
 
   el.innerHTML = `
